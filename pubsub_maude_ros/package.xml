@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>pubsub_ros</name>
+  <name>pubsub_maude_ros</name>
   <version>0.0.0</version>
   <description>Ejemplo de nodos ROS2 invocando a Python</description>
   <maintainer email="emartinm@fdi.ucm.es">Enrique Martín</maintainer>

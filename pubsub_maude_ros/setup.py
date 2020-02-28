@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'pubsub_ros'
+package_name = 'pubsub_maude_ros'
 
 setup(
     name=package_name,
@@ -20,8 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-                'talker = pubsub_ros.publisher:main',
-                'listener = pubsub_ros.subscriber:main',
+                'mauder_talker = pubsub_maude_ros.publisher:main',
+                'mauder_listener = pubsub_maude_ros.subscriber:main',
         ],
     },
 )
