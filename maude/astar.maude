@@ -1,19 +1,20 @@
 fmod COSTMAP is
  pr CONVERSION .
+ pr INT .
 
- vars X Y NC NR N N' : Nat .
+ vars X Y NC NR N N' : Int .
  var  F FX FY FNC : Float .
- vars NL NL' : NatList .
+ vars NL NL' : IntList .
  var  CM : CostMap .
  vars S S' : String .
 
- sort NatList CostMap .
- subsort Nat < NatList .
+ sort IntList CostMap .
+ subsort Int < IntList .
 
- op _,_ : NatList NatList -> NatList [ctor assoc] .
- op {_} : NatList -> CostMap [ctor] .
+ op _,_ : IntList IntList -> IntList [ctor assoc] .
+ op {_} : IntList -> CostMap [ctor] .
 
- op |_| : NatList -> Nat .
+ op |_| : IntList -> Nat .
  eq | N | = 1 .
  eq | N, NL | = s(| NL |) .
 
@@ -34,7 +35,7 @@ fmod COSTMAP is
      | NL | == N' .
  eq open?(CM, FX, FY, FNC) = false [owise] .
 
- op check : Nat -> Bool .
+ op check : Int -> Bool .
  eq check(N) = N == 0 .
 
  ops movCost diagMovCost turnCost : -> Float .
@@ -221,7 +222,7 @@ fmod ASTAR is
  op computePath : Node NodeSet -> Path .
  eq computePath({ {X,Y,Z} ANGLE | C + H = T | noPose }, NS) = {X,Y,Z} ANGLE .
  eq computePath({ {X,Y,Z} ANGLE | C + H = T | PREV }, ( {PREV | C' + H' = T' | PREV' }, NS)) =
-       ({X,Y,Z} ANGLE) computePath({PREV | C' + H' = T' | PREV' }, NS) .
+       computePath({PREV | C' + H' = T' | PREV' }, NS) ({X,Y,Z} ANGLE) .
 endfm
 
 set print attribute on .
