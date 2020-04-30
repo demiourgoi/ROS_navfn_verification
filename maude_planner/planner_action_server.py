@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Enrique Martín <emartinm@ucm.es> 2020
+2020 - Enrique Martín <emartinm@ucm.es>
 
 ROS2 planner as an action server using a Maude implementation of A*.
 
@@ -19,6 +19,9 @@ from rclpy.node import Node
 
 from nav2_msgs.action import ComputePathToPose
 from nav2_msgs.msg import Path
+from geometry_msgs.msg import Pose
+
+import maude
 
 """
 TODO: 
@@ -28,24 +31,85 @@ TODO:
 
 
 class MaudePlanner(Node):
+    ASTAR_MAUDE_PATH = '../maude/astar.maude'
 
     def __init__(self):
         super().__init__('maude_planner_action_server') # Node name, could be changed to fit the BT
+        maude.init()
+        maude.load(self.ASTAR_MAUDE_PATH)
+        self.astar_module = maude.getModule('ASTAR')
+        self.costmap = None  # Stores the latest version of the costmap as a 
+                             # string, using Maude representation
+        self.costmap_numrow = 0.0  # Yes, they need to be float numbers ;-)
+        self.costmap_numcol = 0.0                   
         self._action_server = ActionServer(
             self,
             ComputePathToPose,
             'ComputePathToPose',
             self.execute_callback)
+            
+    def get_current_pose(self):
+        # TODO: constant function, complete!
+        p = Pose()
+        p.position.x = 1.0
+        p.position.y = 2.0
+        p.position.z = 3.0
+        p.orientation = self.angle_to_quaternion(angle)
+        return p
+        
+    def costmap_to_maude(self, costmap):
+        """
+        :param costmap nav2_msg.CostMap <-- revisar
+        :return (str, float, float)
+        """
+        # TODO: take a real costmap and translate
+        return ("{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}", 4.0, 4.0)
+            
+    def pose_to_maude(self, pose):
+        # TODO: constant function, complete!
+        return "{0.0, 0.0, 0.0} 90"
+        
+    def angle_to_quaternion(self, angle):
+        """
+        Method to translate angles in grades to quaternions
+        """
+        # TODO: constant function, complete!
+        q = Quaternion()
+        q.x = 0.0
+        q.y = 0.0
+        q.z = 0.0
+        q.w = 0.0
+        return p
+     
+    def maude_to_pose(self, angle, pose_str):
+        """
+        pose_str is a string of the form "({2.0,2.0,0.0} 90)"
+        """
+        # TODO: constant function, complete!
+        p = Pose()
+        p.position.x = 1.0
+        p.position.y = 2.0
+        p.position.z = 3.0
+        p.orientation = self.angle_to_quaternion(angle)
+        return p  
+        
+    def maude_to_path(self, path_str):
+        """
+        Method to parse a string with a path returned by Maude and generate a 
+        Path message
+        """
+        # TODO: constant function, complete!
+        p = Path()
+        return p
 
     def execute_callback(self, goal_handle):
         final_pose = goal_handle.request.pose.pose
         self.get_logger().info('Computing path to {}'.format(final_pose))
         
         # Generate Response
-        positions = Path()
-        positions.poses = [final_pose, final_pose] # Dummy path
+        path = self.maude_to_path("")  # We need to call maude
         result = ComputePathToPose.Result()
-        result.path = positions
+        result.path = path
         
         goal_handle.succeed()
         return result
