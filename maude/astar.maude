@@ -163,7 +163,7 @@ fmod ASTAR is
   if NODE | NS := min(OPEN) /\
      not goalReached(G, NODE) /\
      NEW := generate(G, NODE, CM, NS, CLOSE, NR, NC) [print " 1 " NODE " + " NS " | " NEW "\n" ] .
- ceq a*(G, CM, NR, NC, OPEN, CLOSE) = computePath(NODE, CLOSE)
+ ceq a*(G, CM, NR, NC, OPEN, CLOSE) = computePath(NODE, CLOSE, G)
   if NODE | NS := min(OPEN) /\
      goalReached(G, NODE) [print " 2 " NODE] .
 
@@ -219,18 +219,34 @@ fmod ASTAR is
  eq goalReached({X,Y,Z} ANGLE, { {X,Y,Z} ANGLE' | C + H = T | PREV }) = true .
  eq goalReached(G, NODE) = false [owise] .
 
+***(
+ op computePath(N, NS, G) = computePath(N, NS) .
+
+ op computePath : Node NodeSet Pose -> Path .
+ eq computePath({ {X,Y,Z} ANGLE | C + H = T | noPose }, NS, {X, Y, Z} ANGLE') =
+        computePath({ {X,Y,Z} ANGLE | C + H = T | noPose }, NS)
+        if ANGLE == ANGLE'
+        then empty
+        else ({X, Y, Z} ANGLE')
+        fi .
+
+
+ eq computePath({ {X,Y,Z} ANGLE | C + H = T | PREV }, ( {PREV | C' + H' = T' | noPose }, NS)) =
+       computePath({PREV | C' + H' = T' | PREV' }, NS) ({X,Y,Z} ANGLE) .
+)
+
  op computePath : Node NodeSet -> Path .
  eq computePath({ {X,Y,Z} ANGLE | C + H = T | noPose }, NS) = {X,Y,Z} ANGLE .
  eq computePath({ {X,Y,Z} ANGLE | C + H = T | PREV }, ( {PREV | C' + H' = T' | PREV' }, NS)) =
        computePath({PREV | C' + H' = T' | PREV' }, NS) ({X,Y,Z} ANGLE) .
 endfm
 
-set print attribute on .
+*** set print attribute on .
 
 red a*({2.0, 2.0, 0.0} 90, {0.0, 0.0, 0.0} 90, {0, 0, 0, 0,
-	                                            0, 1, 0, 0,
-	                                            0, 0, 0, 0,
-	                                            0, 0, 0, 0}, 4.0, 4.0) .
+	                                              0, 1, 0, 0,
+	                                              0, 0, 0, 0,
+	                                              0, 0, 0, 0}, 4.0, 4.0) .
 
 eof
 
