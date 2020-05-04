@@ -230,6 +230,8 @@ fmod ASTAR is
        computePath({PREV | C' + H' = T' | PREV' }, NS) ({X,Y,Z} ANGLE) .
 endfm
 
+eof
+
 *** set print attribute on .
 
 red a*({2.0, 2.0, 0.0} 90, {0.0, 0.0, 0.0} 90, {0, 0, 0, 0,
