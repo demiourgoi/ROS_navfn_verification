@@ -18,8 +18,10 @@ from rclpy.action import ActionServer
 from rclpy.node import Node
 
 from nav2_msgs.action import ComputePathToPose
-from nav2_msgs.msg import Path
+from nav2_msgs.msg import Path, Costmap
 from geometry_msgs.msg import Pose, Quaternion
+
+import array
 
 import re
 
@@ -27,8 +29,9 @@ import maude
 
 """
 TODO: 
- * conectar con el Maude loco de Adrián usando la librería de Rubén
  * ser capaz de pasar de orientación en grados a cuaterniones usando algo de ROS
+ * pasar las poses originales a posiciones del mapa, y traducir poses del Path 
+   al marco original
 """
 
 
@@ -43,11 +46,12 @@ class MaudePlanner(Node):
         self.astar_module = maude.getModule('ASTAR')
         
         self.pose_pattern = re.compile(r'\(\{([0-9]+\.[0-9]+),([0-9]+\.[0-9]+),([0-9]+\.[0-9]+)\} ([0-9]+)\)')
+        self.maude_path_pattern = re.compile(r'{\d+\.\d+,\d+\.\d+,\d+\.\d+} \d+')
     
-        self.costmap = None  # Stores the latest version of the costmap as a 
-                             # string, using Maude representation
-        self.costmap_numrow = 0.0  # Yes, they need to be float numbers (ask Adrián)
-        self.costmap_numcol = 0.0           
+        self.costmap, self.costmap_numrow, self.costmap_numcol = self.get_current_map()
+        # Stores the latest version of the costmap as a string, using Maude representation
+        # as well as the number of rows and columns
+        # TODO: Should it be updated if the map changes? Can it change?
         
         self._action_server = ActionServer(
             self,
@@ -55,27 +59,59 @@ class MaudePlanner(Node):
             'ComputePathToPose',
             self.execute_callback)
             
+    def costmap_to_maude(self, costmap):
+        """
+        :param costmap nav2_msg.CostMap
+        :return (str, float, float): string representing the map (0 empty, 1 obstacle),
+                number of rows and number of columns
+        """
+        num_row = costmap.metadata.size_y
+        num_col = costmap.metadata.size_x
+        
+        # TODO: They should be used some day
+        resolution = costmap.metadata.resolution
+        origin  = costmap.metadata.origin
+        
+
+        # https://github.com/ros-planning/navigation2/blob/aaa97902c1e1bb9a509c4ee0d88b880afb528f20/nav2_util/src/costmap.cpp#L27
+        # * free positions (0) are marked as free to Maude (0)
+        # * other positions (no_information, lethal_obstacle, inscribed_inflated_obstacle and medium_cos)
+        #   are marked as obstacles to Maude (1)
+        maude_cells = [('0' if c == 0 else '1') for c in costmap.data]
+        cells_str = ", ".join(maude_cells)
+        
+        return ("{" + cells_str + "}", float(num_row), float(num_col))
+        
+    def get_current_map(self):
+        # TODO: take the map from a real place instead of creating a fake Costmap!        
+        # It seems map_server provides maps using a topic and also a service:
+        # https://index.ros.org/p/nav2_map_server/github-ros-planning-navigation2/#dashing
+        
+        # Fake map that should be obtained from the map server
+        fake = Costmap()
+        fake.metadata.size_y = 4
+        fake.metadata.size_x = 4
+        fake.data = array.array('B')  # Array of unsigned integers of 1 byte
+        fake.data.extend([0, 0,   0, 0, 
+                          0, 254, 0, 0,
+	                      0, 0,   0, 0,
+ 	                      0, 0,   0, 0])
+	                   
+        return self.costmap_to_maude(fake)
+            
     def get_current_pose(self):
         # TODO: constant function, complete!
         # It needs to listen to some topic? Call some action?
         p = Pose()
-        p.position.x = 1.0
+        p.position.x = 2.0
         p.position.y = 2.0
-        p.position.z = 3.0
+        p.position.z = 0.0
         p.orientation = self.angle_to_quaternion(0)
         return p
-        
-    def costmap_to_maude(self, costmap):
-        """
-        :param costmap nav2_msg.CostMap <-- revisar
-        :return (str, float, float)
-        """
-        # TODO: take a real costmap and translate
-        return ("{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}", 4.0, 4.0)
             
-    def pose_to_maude(self, pose):
-        # TODO: constant function, complete!
-        return "{0.0, 0.0, 0.0} 90"
+    def pose_to_maude(self, p):
+        return "{{{}, {}, {}}} {}".format(p.position.x, p.position.y, p.position.z, 
+                                           self.quaternion_to_angle(p.orientation))
         
     def angle_to_quaternion(self, angle):
         """
@@ -88,6 +124,9 @@ class MaudePlanner(Node):
         q.z = 0.0
         q.w = 0.0
         return q
+        
+    def quaternion_to_angle(self, q):
+        return 90
      
     def maude_to_pose(self, pose_str):
         """
@@ -101,12 +140,15 @@ class MaudePlanner(Node):
         p.orientation = self.angle_to_quaternion(float(m.group(4)))
         return p  
         
-    def maude_to_path(self, path_str):
+    def maude_to_path(self, path):
         """
         Method to parse a string with a path returned by Maude and generate a 
         Path message
+        :param path Maude term containing a path. I will contain at least one pose
         """
-        # TODO: constant function, complete!
+        # TODO: create path from pose strings
+        poses = re.findall(self.maude_path_pattern, str(path))
+        print(poses)
         p = Path()
         return p
     
@@ -114,11 +156,17 @@ class MaudePlanner(Node):
         """
         Calls A* to compute a path from pose_ini to pose_fin
         """
-        # TODO: 1) pose to maude
-        #       2) take costmap from attributes
-        #       3) create a* term and reduce
-        #       4) take reduced term as str, parse and create Path
-        return Path()
+        maude_pose_ini = self.pose_to_maude(pose_ini)
+        maude_pose_fin = self.pose_to_maude(pose_fin)
+        self.get_logger().info('Computing Path from {} to {}'.format(maude_pose_ini, maude_pose_fin))
+        
+        term = self.astar_module.parseTerm('a*({}, {}, {}, {}, {})'.format(
+          maude_pose_ini, maude_pose_fin, self.costmap, self.costmap_numrow, 
+          self.costmap_numcol))
+        term.reduce()
+        self.get_logger().info('Maude path found: {}'.format(term))
+        
+        return self.maude_to_path(term)
 
     def execute_callback(self, goal_handle):
         ini_pose = self.get_current_pose()
