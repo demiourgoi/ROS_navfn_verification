@@ -219,21 +219,10 @@ fmod ASTAR is
  eq goalReached({X,Y,Z} ANGLE, { {X,Y,Z} ANGLE' | C + H = T | PREV }) = true .
  eq goalReached(G, NODE) = false [owise] .
 
-***(
- op computePath(N, NS, G) = computePath(N, NS) .
 
  op computePath : Node NodeSet Pose -> Path .
- eq computePath({ {X,Y,Z} ANGLE | C + H = T | noPose }, NS, {X, Y, Z} ANGLE') =
-        computePath({ {X,Y,Z} ANGLE | C + H = T | noPose }, NS)
-        if ANGLE == ANGLE'
-        then empty
-        else ({X, Y, Z} ANGLE')
-        fi .
-
-
- eq computePath({ {X,Y,Z} ANGLE | C + H = T | PREV }, ( {PREV | C' + H' = T' | noPose }, NS)) =
-       computePath({PREV | C' + H' = T' | PREV' }, NS) ({X,Y,Z} ANGLE) .
-)
+ eq computePath({ {X,Y,Z} ANGLE | C + H = T | PREV }, NS, {X, Y, Z} ANGLE') =
+        computePath({ {X,Y,Z} ANGLE' | C + H = T | PREV }, NS) .
 
  op computePath : Node NodeSet -> Path .
  eq computePath({ {X,Y,Z} ANGLE | C + H = T | noPose }, NS) = {X,Y,Z} ANGLE .
