@@ -21,17 +21,20 @@ from nav2_msgs.action import ComputePathToPose
 from nav2_msgs.msg import Path, Costmap
 from geometry_msgs.msg import Pose, Quaternion
 
-import array
+# I couldn't import ROS2 tf2_ros2 module :-(
+import pyquaternion
 
-import re
+import array
 
 import maude
 
 """
 TODO: 
- * ser capaz de pasar de orientación en grados a cuaterniones usando algo de ROS
- * pasar las poses originales a posiciones del mapa, y traducir poses del Path 
-   al marco original
+ * Use tf2_ros to transform degress <-> quaternions (using pyquaternion for now)
+ * Translate initial-final poses to positions in the map
+ * Translate positions in the map to 'absolute' positions when creating the Path
+ * Get current position from some topic/action
+ * Read costmap from some topic/action. Update when needed
 """
 
 
@@ -44,9 +47,6 @@ class MaudePlanner(Node):
         maude.init()
         maude.load(self.ASTAR_MAUDE_PATH)        
         self.astar_module = maude.getModule('ASTAR')
-        
-        self.pose_pattern = re.compile(r'\(\{([0-9]+\.[0-9]+),([0-9]+\.[0-9]+),([0-9]+\.[0-9]+)\} ([0-9]+)\)')
-        self.maude_path_pattern = re.compile(r'{\d+\.\d+,\d+\.\d+,\d+\.\d+} \d+')
     
         self.costmap, self.costmap_numrow, self.costmap_numcol = self.get_current_map()
         # Stores the latest version of the costmap as a string, using Maude representation
@@ -68,7 +68,7 @@ class MaudePlanner(Node):
         num_row = costmap.metadata.size_y
         num_col = costmap.metadata.size_x
         
-        # TODO: They should be used some day
+        # TODO: This data should be used some day
         resolution = costmap.metadata.resolution
         origin  = costmap.metadata.origin
         
@@ -115,54 +115,70 @@ class MaudePlanner(Node):
         
     def angle_to_quaternion(self, angle):
         """
-        Method to translate angles in grades to quaternions
+        Method to translate angles in degrees over Y axis to quaternions
         """
-        # TODO: constant function, complete!
+        pyq = pyquaternion.Quaternion(axis=[0.0, 1.0, 0.0], degrees=angle) # Rotation in degrees over Y axis
+
         q = Quaternion()
-        q.x = 0.0
-        q.y = 0.0
-        q.z = 0.0
-        q.w = 0.0
+        q.x = pyq.x
+        q.y = pyq.y
+        q.z = pyq.z
+        q.w = pyq.w
         return q
         
     def quaternion_to_angle(self, q):
-        return 90
+        pyq = pyquaternion.Quaternion(q.w, q.x, q.y, q.z)
+        # Angles must be over Y axis or there is no rotation
+        assert(list(pyq.axis) == [0.0, 1.0, 0.0] or pyq.degrees == 0.0)
+        return int(pyq.degrees)
      
-    def maude_to_pose(self, pose_str):
+    def maude_to_pose(self, maude_pose):
         """
-        pose_str is a string of the form "({2.0,2.0,0.0} 90)"
+        :param maude_pose Maude term representing a pose, of the form "{2.0,2.0,0.0} 90"
         """
-        m = re.match(self.pose_pattern, pose_str.strip())
         p = Pose()
-        p.position.x = float(m.group(1))
-        p.position.y = float(m.group(2))
-        p.position.z = float(m.group(3))
-        p.orientation = self.angle_to_quaternion(float(m.group(4)))
+
+        pose_parts = list(maude_pose.arguments())
+        point = pose_parts[0]
+        angle = int(str(pose_parts[1]))
+
+        point_parts = list(point.arguments())
+        p.position.x = float(str(point_parts[0]))
+        p.position.y = float(str(point_parts[1]))
+        p.position.z = float(str(point_parts[2]))
+        p.orientation = self.angle_to_quaternion(angle)
+
         return p  
         
-    def maude_to_path(self, path):
+    def maude_to_path(self, path_term):
         """
-        Method to parse a string with a path returned by Maude and generate a 
-        Path message
-        :param path Maude term containing a path. I will contain at least one pose
+        Method to parse a Maude term representing a Path and generate a geometry_msgs.msg.Path
+        :param path_term Maude term containing a path
         """
-        # TODO: create path from pose strings
-        poses = re.findall(self.maude_path_pattern, str(path))
-        print(poses)
         p = Path()
+        for maude_pose in path_term.arguments():
+            p.poses.append(self.maude_to_pose(maude_pose))
         return p
     
     def compute_path_in_maude(self, pose_ini, pose_fin):
         """
-        Calls A* to compute a path from pose_ini to pose_fin
+        Calls Maude implementation of A* to compute a path from pose_ini to pose_fin,
+        returning a geometry_msgs.msg.Path
+        :param pose_ini (geometry_msgs.msg.Pose)
+        :param pose_fin (geometry_msgs.msg.Pose)
+        :returns (geometry_msgs.msg.Path)
         """
         maude_pose_ini = self.pose_to_maude(pose_ini)
         maude_pose_fin = self.pose_to_maude(pose_fin)
         self.get_logger().info('Computing Path from {} to {}'.format(maude_pose_ini, maude_pose_fin))
         
         term = self.astar_module.parseTerm('a*({}, {}, {}, {}, {})'.format(
-          maude_pose_ini, maude_pose_fin, self.costmap, self.costmap_numrow, 
-          self.costmap_numcol))
+            maude_pose_ini,
+            maude_pose_fin,
+            self.costmap,
+            self.costmap_numrow,
+            self.costmap_numcol)
+        )
         term.reduce()
         self.get_logger().info('Maude path found: {}'.format(term))
         
@@ -171,7 +187,7 @@ class MaudePlanner(Node):
     def execute_callback(self, goal_handle):
         ini_pose = self.get_current_pose()
         final_pose = goal_handle.request.pose.pose
-        self.get_logger().info('Computing path from {} to {}'.format(ini_pose, final_pose))
+        self.get_logger().info('Computing path from \n\t{} \n\t\tto\n\t {}'.format(ini_pose, final_pose))
         
         # Generate Response
         path = self.compute_path_in_maude(ini_pose, final_pose)
