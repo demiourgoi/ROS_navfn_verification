@@ -9,9 +9,16 @@ Action definition in https://github.com/ros-planning/navigation2/blob/master/nav
 """
 
 # Test from the terminal:
-# 1) $ source /opt/ros/dashing/setup.bash 
-# 2) $ python3 planner_action_server.py
-# 3) $ ros2 action send_goal ComputePathToPose nav2_msgs/action/ComputePathToPose "{pose: {header: {stamp: {}, frame_id: "vete"}, pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 0.0}}}}"
+# Load ROS environment in all the terminals ($ source /opt/ros/dashing/setup.bash)
+# 1) Launch dummy /map publisher:
+#    $ python map_dummy.py
+# 2) Launch dummy /amcl_pose publisher:
+#    $ python3 amcl_pose_dummy.py
+# 3) Launch planner action server
+#    $ python3 planner_action_server.py
+# 4) Wait 5 seconds so that a map is published and received
+# 5) Ask the action server:
+#    $ ros2 action send_goal ComputePathToPose nav2_msgs/action/ComputePathToPose "{pose: {header: {stamp: {}, frame_id: ""}, pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
 
 import rclpy
 from rclpy.action import ActionServer
@@ -19,7 +26,8 @@ from rclpy.node import Node
 
 from nav2_msgs.action import ComputePathToPose
 from nav2_msgs.msg import Path, Costmap
-from geometry_msgs.msg import Pose, Quaternion
+from nav_msgs.msg import OccupancyGrid
+from geometry_msgs.msg import Pose, Quaternion, PoseWithCovarianceStamped
 
 # I couldn't import ROS2 tf2_ros2 module :-(
 import pyquaternion
@@ -31,10 +39,7 @@ import maude
 """
 TODO: 
  * Use tf2_ros to transform degress <-> quaternions (using pyquaternion for now)
- * Translate initial-final poses to positions in the map
- * Translate positions in the map to 'absolute' positions when creating the Path
- * Get current position from some topic/action
- * Read costmap from some topic/action. Update when needed
+ * Translate between coordinate frames when needed (tf2)
 """
 
 
@@ -47,75 +52,60 @@ class MaudePlanner(Node):
         maude.init()
         maude.load(self.ASTAR_MAUDE_PATH)        
         self.astar_module = maude.getModule('ASTAR')
-    
-        self.costmap, self.costmap_numrow, self.costmap_numcol = self.get_current_map()
-        # Stores the latest version of the costmap as a string, using Maude representation
-        # as well as the number of rows and columns
-        # TODO: Should it be updated if the map changes? Can it change?
-        
+
+        self.occupancy_grid = None  # It will be read and updated from the topic /map
+        self.maude_map = None
+        self.amcl_pose = None       # It will be read and updated from the topic /amcl_pose
+
+        # Configures the action server to respond to ComputePathToPose actions
         self._action_server = ActionServer(
             self,
             ComputePathToPose,
             'ComputePathToPose',
-            self.execute_callback)
-            
-    def costmap_to_maude(self, costmap):
-        """
-        :param costmap nav2_msg.CostMap
-        :return (str, float, float): string representing the map (0 empty, 1 obstacle),
-                number of rows and number of columns
-        """
-        num_row = costmap.metadata.size_y
-        num_col = costmap.metadata.size_x
-        
-        # TODO: This data should be used some day
-        resolution = costmap.metadata.resolution
-        origin  = costmap.metadata.origin
-        
+            self.action_callback)
 
+        # Listen to topic /map
+        self._map_subscription = self.create_subscription(
+            OccupancyGrid,
+            'map',
+            self.map_callback,
+            10)  # Queue size
+
+        # Listen to topic /amcl_pose
+        self._amcl_pose_subscription = self.create_subscription(
+            PoseWithCovarianceStamped,
+            'amcl_pose',
+            self.amcl_pose_callback,
+            10)  # Queue size
+            
+    def map_data_to_maude(self, map_data):
+        """
+        Translates between an array of signed bytes representing a map data to the Maude term
+        :param map_data int8[]
+        :return str representing the map data (0 empty, 1 obstacle),
+        """
         # https://github.com/ros-planning/navigation2/blob/aaa97902c1e1bb9a509c4ee0d88b880afb528f20/nav2_util/src/costmap.cpp#L27
         # * free positions (0) are marked as free to Maude (0)
         # * other positions (no_information, lethal_obstacle, inscribed_inflated_obstacle and medium_cos)
         #   are marked as obstacles to Maude (1)
-        maude_cells = [('0' if c == 0 else '1') for c in costmap.data]
+        maude_cells = [('0' if c == 0 else '1') for c in map_data]
         cells_str = ", ".join(maude_cells)
-        
-        return ("{" + cells_str + "}", float(num_row), float(num_col))
-        
-    def get_current_map(self):
-        # TODO: take the map from a real place instead of creating a fake Costmap!        
-        # It seems map_server provides maps using a topic and also a service:
-        # https://index.ros.org/p/nav2_map_server/github-ros-planning-navigation2/#dashing
-        
-        # Fake map that should be obtained from the map server
-        fake = Costmap()
-        fake.metadata.size_y = 4
-        fake.metadata.size_x = 4
-        fake.data = array.array('B')  # Array of unsigned integers of 1 byte
-        fake.data.extend([0, 0,   0, 0, 
-                          0, 254, 0, 0,
-	                      0, 0,   0, 0,
- 	                      0, 0,   0, 0])
-	                   
-        return self.costmap_to_maude(fake)
-            
-    def get_current_pose(self):
-        # TODO: constant function, complete!
-        # It needs to listen to some topic? Call some action?
-        p = Pose()
-        p.position.x = 2.0
-        p.position.y = 2.0
-        p.position.z = 0.0
-        p.orientation = self.angle_to_quaternion(0)
-        return p
+        return "{" + cells_str + "}"
             
     def pose_to_maude(self, p):
+        """
+        Translates a geometry_msgs/Pose to its Maude representation in a string
+        :param p geometry_msgs/Pose
+        :return str Maude term
+        """
         return "{{{}, {}, {}}} {}".format(p.position.x, p.position.y, p.position.z, 
                                            self.quaternion_to_angle(p.orientation))
         
     def angle_to_quaternion(self, angle):
         """
         Method to translate angles in degrees over Y axis to quaternions
+        :param angle (int) degrees wrt Y axis
+        :return geometry_msgs/Quaternion
         """
         pyq = pyquaternion.Quaternion(axis=[0.0, 1.0, 0.0], degrees=angle) # Rotation in degrees over Y axis
 
@@ -127,6 +117,10 @@ class MaudePlanner(Node):
         return q
         
     def quaternion_to_angle(self, q):
+        """
+        :param q geometry_msgs/Quaternion representing an angle (degrees) wrt Y axis
+        :return (int) number of degrees wrt Y axis
+        """
         pyq = pyquaternion.Quaternion(q.w, q.x, q.y, q.z)
         # Angles must be over Y axis or there is no rotation
         assert(list(pyq.axis) == [0.0, 1.0, 0.0] or pyq.degrees == 0.0)
@@ -135,6 +129,7 @@ class MaudePlanner(Node):
     def maude_to_pose(self, maude_pose):
         """
         :param maude_pose Maude term representing a pose, of the form "{2.0,2.0,0.0} 90"
+        :return geometry_msgs/Pose
         """
         p = Pose()
 
@@ -154,6 +149,7 @@ class MaudePlanner(Node):
         """
         Method to parse a Maude term representing a Path and generate a geometry_msgs.msg.Path
         :param path_term Maude term containing a path
+        :return nav2_msgs/Path
         """
         p = Path()
         for maude_pose in path_term.arguments():
@@ -171,32 +167,45 @@ class MaudePlanner(Node):
         maude_pose_ini = self.pose_to_maude(pose_ini)
         maude_pose_fin = self.pose_to_maude(pose_fin)
         self.get_logger().info('Computing Path from {} to {}'.format(maude_pose_ini, maude_pose_fin))
-        
+
         term = self.astar_module.parseTerm('a*({}, {}, {}, {}, {})'.format(
             maude_pose_ini,
             maude_pose_fin,
-            self.costmap,
-            self.costmap_numrow,
-            self.costmap_numcol)
+            self.maude_map,
+            float(self.occupancy_grid.info.height), # They must be float in the Maude term
+            float(self.occupancy_grid.info.width))
         )
         term.reduce()
         self.get_logger().info('Maude path found: {}'.format(term))
         
         return self.maude_to_path(term)
 
-    def execute_callback(self, goal_handle):
-        ini_pose = self.get_current_pose()
-        final_pose = goal_handle.request.pose.pose
-        self.get_logger().info('Computing path from \n\t{} \n\t\tto\n\t {}'.format(ini_pose, final_pose))
-        
-        # Generate Response
-        path = self.compute_path_in_maude(ini_pose, final_pose)
-        result = ComputePathToPose.Result()
-        result.path = path
-        
-        goal_handle.succeed()
-        return result
+    def map_callback(self, map):
+        self.occupancy_grid = map  # Also stores the original ROS map to keep all the details (for future extensions)
+        self.maude_map = self.map_data_to_maude(map.data)
+        # The map is translated to Maude because it will rarely change and it is an expensive operation
+        # that could delay a ComputePathToPose call if lazily delayed
+        # self.get_logger().info('Storing map from /map: {}'.format(self.maude_map))
 
+    def amcl_pose_callback(self, pose):
+        # self.get_logger().info('Storing current position from /amcl_pose: {}'.format(pose))
+        self.amcl_pose = pose
+        # This pose is lazily translated to Maude only when required
+
+    def action_callback(self, goal_handle):
+        final_pose = goal_handle.request.pose.pose
+        self.get_logger().info('Computing path from \n\t{} \n\t\tto\n\t {}'.format(self.amcl_pose, final_pose))
+
+        if self.amcl_pose and self.occupancy_grid and self.maude_map:
+            # Generate Response
+            path = self.compute_path_in_maude(self.amcl_pose.pose.pose, final_pose)
+            result = ComputePathToPose.Result()
+            result.path = path
+            goal_handle.succeed()
+            return result
+        else:
+            self.get_logger().error('No current pose or map information')
+            goal_handle.abort()
 
 
 def main(args=None):
