@@ -7,11 +7,13 @@ fmod COSTMAP is
  vars NL NL' : IntList .
  var  CM : CostMap .
  vars S S' : String .
+ var  NT : Nat .
 
  sort IntList CostMap .
  subsort Int < IntList .
 
- op _,_ : IntList IntList -> IntList [ctor assoc] .
+ op mtIL : -> IntList [ctor] .
+ op _,_ : IntList IntList -> IntList [ctor assoc id: mtIL] .
  op {_} : IntList -> CostMap [ctor] .
 
  op |_| : IntList -> Nat .
@@ -20,20 +22,17 @@ fmod COSTMAP is
 
  ***        CostMap   X     Y   NCOLS
  op open? : CostMap Float Float  Float  -> Bool [memo] .
- eq open?({N, NL'}, 0.0, 0.0, FNC) = check(N) .
- ceq open?({NL, N, NL'}, FX, FY, FNC) = check(N)
+ ceq open?(CM, FX, FY, FNC) = check(N')
   if X := float2nat(FX) /\
      Y := float2nat(FY) /\
      NC := float2nat(FNC) /\
-     N' := (NC * Y) + X /\
-     | NL | == N' .
- ceq open?({NL, N}, FX, FY, FNC) = check(N)
-  if X := float2nat(FX) /\
-     Y := float2nat(FY) /\
-     NC := float2nat(FNC) /\
-     N' := (NC * Y) + X /\
-     | NL | == N' .
- eq open?(CM, FX, FY, FNC) = false [owise] .
+     N := (NC * Y) + X /\
+     N' := skipN&Get(CM, N) .
+
+ op skipN&Get : CostMap Nat -> Int .
+ eq skipN&Get({N, NL'}, 0) = N .
+ eq skipN&Get({N, NL'}, s(NT)) = skipN&Get({NL'}, NT) .
+ eq skipN&Get(CM, NT) = - 1 [owise] .
 
  op check : Int -> Bool .
  eq check(N) = N == 0 .
@@ -43,7 +42,7 @@ fmod COSTMAP is
  eq diagMovCost = 1.4 .
  eq turnCost = 0.25 .
 
- op float2nat : Float -> Nat .
+ op float2nat : Float -> Nat [memo] .
  ceq float2nat(F) = N'
   if S := string(F) /\
      N := find(S, ".", 0) /\
@@ -150,6 +149,7 @@ fmod ASTAR is
  vars Q Q' : Quaternion .
  var  CM : CostMap .
  var  NODE : Node .
+ var  P : Path .
 
  ***     Init Goal         NumRow NumCol
  op a* : Pose Pose CostMap  Float  Float -> Path .
@@ -222,15 +222,15 @@ fmod ASTAR is
 
  op computePath : Node NodeSet Pose -> Path .
  eq computePath({ {X,Y,Z} ANGLE | C + H = T | PREV }, NS, {X, Y, Z} ANGLE') =
-        computePath({ {X,Y,Z} ANGLE' | C + H = T | PREV }, NS) .
+        computePath({ {X,Y,Z} ANGLE' | C + H = T | PREV }, NS, noPath) .
 
- op computePath : Node NodeSet -> Path .
- eq computePath({ {X,Y,Z} ANGLE | C + H = T | noPose }, NS) = {X,Y,Z} ANGLE .
- eq computePath({ {X,Y,Z} ANGLE | C + H = T | PREV }, ( {PREV | C' + H' = T' | PREV' }, NS)) =
-       computePath({PREV | C' + H' = T' | PREV' }, NS) ({X,Y,Z} ANGLE) .
+ op computePath : Node NodeSet Path -> Path .
+ eq computePath({ {X,Y,Z} ANGLE | C + H = T | noPose }, NS, P) = ({X,Y,Z} ANGLE) P .
+ eq computePath({ {X,Y,Z} ANGLE | C + H = T | PREV }, ( {PREV | C' + H' = T' | PREV' }, NS), P) =
+       computePath({PREV | C' + H' = T' | PREV' }, NS, ({X,Y,Z} ANGLE) P)  .
 endfm
 
-eof
+
 
 *** set print attribute on .
 
