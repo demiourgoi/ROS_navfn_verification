@@ -43,12 +43,7 @@ fmod COSTMAP is
  eq turnCost = 0.25 .
 
  op float2nat : Float -> Nat [memo] .
- ceq float2nat(F) = N'
-  if S := string(F) /\
-     N := find(S, ".", 0) /\
-     S' := substr(S, 0, N) /\
-     N' := rat(S', 10) .
- eq float2nat(F) = 0 [owise] .
+ eq float2nat(F) = rat(floor(F)) .
 endfm
 
 fmod POSE is
