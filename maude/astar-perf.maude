@@ -19,6 +19,8 @@ endfm
 
 eof
 
+*** Changing zeroList definition to zeroList(N), 0 slows it down much
+
 red a*({1.0, 1.0, 0.0} 90, {1.0, 2.0, 0.0} 10, diaphanousMap(384 * 384), 384.0, 384.0) .
 red a*({20.0, 20.0, 0.0} 90, {20.0, 21.0, 0.0} 90, diaphanousMap(384 * 384), 384.0, 384.0) .
 red a*({20.0, 20.0, 0.0} 90, {120.0, 20.0, 0.0} 90, diaphanousMap(384 * 384), 384.0, 384.0) .
