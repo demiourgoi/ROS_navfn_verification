@@ -98,16 +98,21 @@ class MaudePlanner(Node):
         :param p geometry_msgs/Pose
         :return str Maude term
         """
-        return "{{{}, {}, {}}} {}".format(p.position.x, p.position.y, p.position.z, 
-                                           self.quaternion_to_angle(p.orientation))
-        
+        origin = self.occupancy_grid.info.origin.position
+        resolution = self.occupancy_grid.info.resolution
+
+        return "{{{}, {}, {}}} {}".format(round((p.position.x - origin.x) / resolution, 0),
+                                          self.occupancy_grid.info.height - round((p.position.y - origin.y) / resolution, 0),
+                                          round((p.position.z - origin.z) / resolution, 0),
+                                          self.quaternion_to_angle(p.orientation))
+
     def angle_to_quaternion(self, angle):
         """
         Method to translate angles in degrees over Y axis to quaternions
         :param angle (int) degrees wrt Y axis
         :return geometry_msgs/Quaternion
         """
-        pyq = pyquaternion.Quaternion(axis=[0.0, 1.0, 0.0], degrees=angle) # Rotation in degrees over Y axis
+        pyq = pyquaternion.Quaternion(axis=[0.0, 0.0, 1.0], degrees=angle) # Rotation in degrees over Y axis
 
         q = Quaternion()
         q.x = pyq.x
@@ -123,7 +128,8 @@ class MaudePlanner(Node):
         """
         pyq = pyquaternion.Quaternion(q.w, q.x, q.y, q.z)
         # Angles must be over Y axis or there is no rotation
-        assert(list(pyq.axis) == [0.0, 1.0, 0.0] or pyq.degrees == 0.0)
+        # Sometimes it is 0.1, sometimes -0.1
+        # assert(list(pyq.axis) == [0.0, 0.0, 1.0] or pyq.degrees == 0.0)
         return int(pyq.degrees)
      
     def maude_to_pose(self, maude_pose):
@@ -137,13 +143,16 @@ class MaudePlanner(Node):
         point = pose_parts[0]
         angle = int(str(pose_parts[1]))
 
+        resolution = self.occupancy_grid.info.resolution
+        origin = self.occupancy_grid.info.origin.position
+
         point_parts = list(point.arguments())
-        p.position.x = float(str(point_parts[0]))
-        p.position.y = float(str(point_parts[1]))
-        p.position.z = float(str(point_parts[2]))
+        p.position.x = origin.x + resolution * float(str(point_parts[0]))
+        p.position.y = origin.y + resolution * (self.occupancy_grid.info.height - float(str(point_parts[1])))
+        p.position.z = origin.z + resolution * float(str(point_parts[2]))
         p.orientation = self.angle_to_quaternion(angle)
 
-        return p  
+        return p
         
     def maude_to_path(self, path_term):
         """
