@@ -162,7 +162,9 @@ class MaudePlanner(Node):
         """
         p = Path()
         for maude_pose in path_term.arguments():
-            p.poses.append(self.maude_to_pose(maude_pose))
+            # The Maude path ends with noPath
+            if str(maude_pose.symbol()) != 'noPath':
+                p.poses.append(self.maude_to_pose(maude_pose))
         return p
     
     def compute_path_in_maude(self, pose_ini, pose_fin):
@@ -177,16 +179,44 @@ class MaudePlanner(Node):
         maude_pose_fin = self.pose_to_maude(pose_fin)
         self.get_logger().info('Computing Path from {} to {}'.format(maude_pose_ini, maude_pose_fin))
 
-        term = self.astar_module.parseTerm('a*({}, {}, {}, {}, {})'.format(
-            maude_pose_ini,
-            maude_pose_fin,
-            self.maude_map,
-            float(self.occupancy_grid.info.height), # They must be float in the Maude term
-            float(self.occupancy_grid.info.width))
+        # Find sorts and operators needed to construct the a* term
+        # (this can be done once for all)
+        m = self.astar_module
+        pose_kind    = m.findSort('Pose').kind()
+        costmap_kind = m.findSort('CostMap').kind()
+        float_kind   = m.findSort('Float').kind()
+        path_kind    = m.findSort('Path').kind()
+        int_kind     = m.findSort('IntList').kind()
+
+        astar   = m.findSymbol('a*', [pose_kind, pose_kind, costmap_kind, float_kind, float_kind], path_kind)
+        intlist = m.findSymbol('_`,_', [int_kind] * 2, int_kind) 
+        cmap    = m.findSymbol('`{_`}', [int_kind], costmap_kind)
+
+        # Constants that will be used multiple times
+        zero = m.parseTerm('0')
+        one  = m.parseTerm('1')
+        mtIL = m.parseTerm('mtIL')
+
+        # Build the IntList with the costmap data
+        map_list = mtIL
+
+        for c in self.occupancy_grid.data:
+                if c == 0:
+                        map_list = intlist(map_list, zero)
+                else:
+                        map_list = intlist(map_list, one)
+
+        # Build the a* term with makeTerm
+        term = astar(
+                m.parseTerm(maude_pose_ini),
+                m.parseTerm(maude_pose_fin),
+                cmap(map_list),
+                m.parseTerm(str(float(self.occupancy_grid.info.height))),
+                m.parseTerm(str(float(self.occupancy_grid.info.width)))
         )
         term.reduce()
         self.get_logger().info('Maude path found: {}'.format(term))
-        
+
         return self.maude_to_path(term)
 
     def map_callback(self, map):
