@@ -18,11 +18,12 @@ Action definition in https://github.com/ros-planning/navigation2/blob/master/nav
 #    $ python3 planner_action_server.py
 # 4) Wait 5 seconds so that a map is published and received
 # 5) Ask the action server:
-#    $ ros2 action send_goal ComputePathToPose nav2_msgs/action/ComputePathToPose "{pose: {header: {stamp: {}, frame_id: ""}, pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
+#    $ ros2 action send_goal ComputePathToPose nav2_msgs/action/ComputePathToPose "{pose: {header: {stamp: {}, frame_id: "map"}, pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
 
 import rclpy
 from rclpy.action import ActionServer
 from rclpy.node import Node
+import math
 
 from nav2_msgs.action import ComputePathToPose
 from nav2_msgs.msg import Path, Costmap
@@ -53,7 +54,7 @@ class MaudePlanner(Node):
         maude.load(self.ASTAR_MAUDE_PATH)        
         self.astar_module = maude.getModule('ASTAR')
 
-        self.occupancy_grid = None  # It will be read and updated from the topic /map
+        self.occupancy_grid = None  # It will be read and updated from the map topic
         self.maude_map = None
         self.amcl_pose = None       # It will be read and updated from the topic /amcl_pose
 
@@ -64,10 +65,10 @@ class MaudePlanner(Node):
             'ComputePathToPose',
             self.action_callback)
 
-        # Listen to topic /map
+        # Listen to map topic
         self._map_subscription = self.create_subscription(
             OccupancyGrid,
-            'map',
+            'global_costmap/costmap',
             self.map_callback,
             10)  # Queue size
 
@@ -77,7 +78,13 @@ class MaudePlanner(Node):
             'amcl_pose',
             self.amcl_pose_callback,
             10)  # Queue size
-            
+
+        # Plan publisher (so that it is represented in the view)
+        self._plan_publisher = self.create_publisher(
+            Path,
+            '/plan',
+            10)
+
     def map_data_to_maude(self, map_data):
         """
         Translates between an array of signed bytes representing a map data to the Maude term
@@ -88,7 +95,7 @@ class MaudePlanner(Node):
         # * free positions (0) are marked as free to Maude (0)
         # * other positions (no_information, lethal_obstacle, inscribed_inflated_obstacle and medium_cos)
         #   are marked as obstacles to Maude (1)
-        maude_cells = [('0' if c == 0 else '1') for c in map_data]
+        maude_cells = [('0' if c < 50 else '1') for c in map_data]
         cells_str = ", ".join(maude_cells)
         return "{" + cells_str + "}"
             
@@ -112,7 +119,7 @@ class MaudePlanner(Node):
         :param angle (int) degrees wrt Y axis
         :return geometry_msgs/Quaternion
         """
-        pyq = pyquaternion.Quaternion(axis=[0.0, 0.0, 1.0], degrees=angle) # Rotation in degrees over Y axis
+        pyq = pyquaternion.Quaternion(axis=[0.0, 0.0, 1.0], degrees=angle) # Rotation in degrees over Z axis
 
         q = Quaternion()
         q.x = pyq.x
@@ -127,10 +134,11 @@ class MaudePlanner(Node):
         :return (int) number of degrees wrt Y axis
         """
         pyq = pyquaternion.Quaternion(q.w, q.x, q.y, q.z)
-        # Angles must be over Y axis or there is no rotation
-        # Sometimes it is 0.1, sometimes -0.1
-        # assert(list(pyq.axis) == [0.0, 0.0, 1.0] or pyq.degrees == 0.0)
-        return int(pyq.degrees)
+        # Angles must be over Z axis or there is no rotation
+	    #assert(list(map(abs, pyq.axis)) == [0.0, 0.0, 1.0] or pyq.degrees == 0.0)
+	    # Approximate to the coordinate axes or diagonals
+        return (45 * round(int(pyq.degrees) / 45)) % 360
+        #return int(pyq.degrees)
      
     def maude_to_pose(self, maude_pose):
         """
@@ -161,12 +169,15 @@ class MaudePlanner(Node):
         :return nav2_msgs/Path
         """
         p = Path()
+        p.header.stamp = self.get_clock().now().to_msg()
+        p.header.frame_id = self.occupancy_grid.header.frame_id
+
         for maude_pose in path_term.arguments():
             # The Maude path ends with noPath
             if str(maude_pose.symbol()) != 'noPath':
                 p.poses.append(self.maude_to_pose(maude_pose))
         return p
-    
+
     def compute_path_in_maude(self, pose_ini, pose_fin):
         """
         Calls Maude implementation of A* to compute a path from pose_ini to pose_fin,
@@ -201,7 +212,7 @@ class MaudePlanner(Node):
         map_list = mtIL
 
         for c in self.occupancy_grid.data:
-                if c == 0:
+                if c < 50:
                         map_list = intlist(map_list, zero)
                 else:
                         map_list = intlist(map_list, one)
@@ -217,7 +228,12 @@ class MaudePlanner(Node):
         term.reduce()
         self.get_logger().info('Maude path found: {}'.format(term))
 
-        return self.maude_to_path(term)
+        plan = self.maude_to_path(term)
+
+        # Publish the plan to be drawn by RViz
+        self._plan_publisher.publish(plan)
+
+        return plan
 
     def map_callback(self, map):
         self.occupancy_grid = map  # Also stores the original ROS map to keep all the details (for future extensions)
