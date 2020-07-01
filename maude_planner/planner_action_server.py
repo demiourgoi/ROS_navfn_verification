@@ -109,7 +109,7 @@ class MaudePlanner(Node):
         resolution = self.occupancy_grid.info.resolution
 
         return "{{{}, {}, {}}} {}".format(round((p.position.x - origin.x) / resolution, 0),
-                                          self.occupancy_grid.info.height - round((p.position.y - origin.y) / resolution, 0),
+                                          round((p.position.y - origin.y) / resolution, 0),
                                           round((p.position.z - origin.z) / resolution, 0),
                                           self.quaternion_to_angle(p.orientation))
 
@@ -156,7 +156,7 @@ class MaudePlanner(Node):
 
         point_parts = list(point.arguments())
         p.position.x = origin.x + resolution * float(str(point_parts[0]))
-        p.position.y = origin.y + resolution * (self.occupancy_grid.info.height - float(str(point_parts[1])))
+        p.position.y = origin.y + resolution * float(str(point_parts[1]))
         p.position.z = origin.z + resolution * float(str(point_parts[2]))
         p.orientation = self.angle_to_quaternion(angle)
 
@@ -237,7 +237,7 @@ class MaudePlanner(Node):
 
     def map_callback(self, map):
         self.occupancy_grid = map  # Also stores the original ROS map to keep all the details (for future extensions)
-        self.maude_map = self.map_data_to_maude(map.data)
+        #self.maude_map = self.map_data_to_maude(map.data)
         # The map is translated to Maude because it will rarely change and it is an expensive operation
         # that could delay a ComputePathToPose call if lazily delayed
         # self.get_logger().info('Storing map from /map: {}'.format(self.maude_map))
@@ -251,7 +251,7 @@ class MaudePlanner(Node):
         final_pose = goal_handle.request.pose.pose
         self.get_logger().info('Computing path from \n\t{} \n\t\tto\n\t {}'.format(self.amcl_pose, final_pose))
 
-        if self.amcl_pose and self.occupancy_grid and self.maude_map:
+        if self.amcl_pose and self.occupancy_grid:
             # Generate Response
             path = self.compute_path_in_maude(self.amcl_pose.pose.pose, final_pose)
             result = ComputePathToPose.Result()
