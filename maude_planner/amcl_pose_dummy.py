@@ -24,6 +24,9 @@ class PoseDummyPublisher(Node):
         msg.pose.pose.orientation.z = 0.0
         msg.pose.pose.orientation.w = 1.0
 
+        msg.header.frame_id = 'map'
+        msg.header.stamp = self.get_clock().now().to_msg()
+
         self.get_logger().info('Sending pose to /amcl_pose: {}'.format(msg))
         self.publisher_.publish(msg)
 
