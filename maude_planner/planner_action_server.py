@@ -23,7 +23,7 @@ Action definition in https://github.com/ros-planning/navigation2/blob/master/nav
 import rclpy
 from rclpy.action import ActionServer
 from rclpy.node import Node
-import math
+import math, sys
 
 from nav2_msgs.action import ComputePathToPose
 from nav2_msgs.msg import Path, Costmap
@@ -53,6 +53,11 @@ class MaudePlanner(Node):
         maude.init()
         maude.load(self.ASTAR_MAUDE_PATH)        
         self.astar_module = maude.getModule('ASTAR')
+
+        if self.astar_module is not None:
+            self.get_logger().fatal('Cannot find Maude ASTAR module in {}'.format(self.ASTAR_MAUDE_PATH))
+        else:
+            self.get_logger().info('Maude planner node is ready')
 
         self.occupancy_grid = None  # It will be read and updated from the map topic
         self.maude_map = None

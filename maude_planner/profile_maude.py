@@ -84,6 +84,7 @@ class DirectProfiler:
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x), float(y), int(t))),
                 *self.static_args
         )
+        maude.input('do clear memo .')
         start_time = time.perf_counter()
         term.reduce()
         end_time = time.perf_counter()
