@@ -5,7 +5,7 @@ import profile_maude
 import rclpy, random, pyquaternion, array, time, math, csv
 from rclpy.node        import Node
 from rclpy.action      import ActionClient
-from geometry_msgs.msg import PoseWithCovarianceStamped, Quaternion
+from geometry_msgs.msg import Pose, PoseWithCovarianceStamped, Quaternion
 from nav2_msgs.action  import ComputePathToPose
 from nav_msgs.msg      import OccupancyGrid
 
@@ -150,7 +150,8 @@ class ProfilerNode(Node):
         self.index = self.index + 1
         self.timer = self.create_timer(0.2, self.profile)
 
-    def calculate_length(self, poses):
+    @staticmethod
+    def calculate_length(poses):
         '''Calculate the length of a path'''
 
         if len(poses) == 0:
@@ -167,18 +168,19 @@ class ProfilerNode(Node):
 
         return s
 
-    def calculate_rotation(self, poses):
+    @classmethod
+    def calculate_rotation(cls, poses):
         '''Calculate the length of a path'''
 
         if len(poses) == 0:
         	return 0.0, 0
 
-        t = self.quaternion_to_angle(poses[0].orientation)
+        t = cls.quaternion_to_angle(poses[0].orientation)
         s = 0.0
         k = 0
 
         for pose in poses:
-            nt = self.quaternion_to_angle(pose.orientation)
+            nt = cls.quaternion_to_angle(pose.orientation)
             s += abs(nt - t)
             if nt != t:
                 k = k + 1
@@ -186,7 +188,8 @@ class ProfilerNode(Node):
 
         return s, k
 
-    def calculate_distance(self, point1, point2, norm=2):
+    @staticmethod
+    def calculate_distance(point1, point2, norm=2):
     	'''Calculate the distance between two points'''
 
     	return (abs(point2[0] - point1[0]) ** norm + abs(point2[1] - point1[1]) ** norm) ** (1.0 / norm)
@@ -215,10 +218,37 @@ class ProfilerNode(Node):
             self.destroy_node()
             rclpy.shutdown()
 
+    @classmethod
+    def process_path_yaml(cls, filename):
+        '''Process file from YAML file'''
+
+        import yaml
+
+        with open(filename, 'r') as yfile:
+            ypath = yaml.safe_load(yfile)
+
+        path = []
+
+        for ypose in ypath['poses']:
+            p = Pose()
+            p.position.x = ypose['pose']['position']['x']
+            p.position.y = ypose['pose']['position']['y']
+            p.position.z = ypose['pose']['position']['z']
+
+            p.orientation.x = ypose['pose']['orientation']['x']
+            p.orientation.y = ypose['pose']['orientation']['y']
+            p.orientation.z = ypose['pose']['orientation']['z']
+            p.orientation.w = ypose['pose']['orientation']['w']
+
+            path.append(p)
+
+        return cls.calculate_length(path), cls.calculate_rotation(path)
+
 def main(args=None):
     rclpy.init(args=args)
     profiler = ProfilerNode()
     rclpy.spin(profiler)
 
 if __name__ == '__main__':
-    main()
+    #main()
+    print(ProfilerNode.process_path_yaml('plan.yaml'))
