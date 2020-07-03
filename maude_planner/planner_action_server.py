@@ -54,7 +54,7 @@ class MaudePlanner(Node):
         maude.load(self.ASTAR_MAUDE_PATH)        
         self.astar_module = maude.getModule('ASTAR')
 
-        if self.astar_module is not None:
+        if self.astar_module is None:
             self.get_logger().fatal('Cannot find Maude ASTAR module in {}'.format(self.ASTAR_MAUDE_PATH))
         else:
             self.get_logger().info('Maude planner node is ready')

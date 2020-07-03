@@ -53,6 +53,12 @@ class ProfilerNode(Node):
         q.x, q.y, q.z, q.w = pyq.x, pyq.y, pyq.z, pyq.w
         return q
 
+    @staticmethod
+    def quaternion_to_angle(q):
+        '''Convert angles in degrees to quaternions'''
+
+        return pyquaternion.Quaternion(q.w, q.x, q.y, q.z).degrees
+
     def send_initial_pose(self, position):
         '''Send the initial pose to planner'''
 
@@ -129,11 +135,16 @@ class ProfilerNode(Node):
 
         hmtime = end_time - self.start_time
         distance = self.calculate_length(result.poses)
+        rotation, numrot = self.calculate_rotation(result.poses)
 
-        print('Tiempo:', hmtime)
-        print('Distancia:', distance)
+        print('Time:', hmtime)
+        print('Length:', distance)
+        print('Distance:', self.distance2)
+        print('Distance 1:', self.distance1)
+        print('Acc. rotation:', rotation)
+        print('# rotations:', numrot)
 
-        self.csvwriter.writerow([True] + list(TEST_SUITE[self.index][0]) + list(TEST_SUITE[self.index][1]) + [hmtime, distance])
+        self.csvwriter.writerow([True] + list(TEST_SUITE[self.index][0]) + list(TEST_SUITE[self.index][1]) + [hmtime, distance, self.distance2, self.distance1, rotation, numrot])
 
         # Starts again
         self.index = self.index + 1
@@ -156,6 +167,30 @@ class ProfilerNode(Node):
 
         return s
 
+    def calculate_rotation(self, poses):
+        '''Calculate the length of a path'''
+
+        if len(poses) == 0:
+        	return 0.0, 0
+
+        t = self.quaternion_to_angle(poses[0].orientation)
+        s = 0.0
+        k = 0
+
+        for pose in poses:
+            nt = self.quaternion_to_angle(pose.orientation)
+            s += abs(nt - t)
+            if nt != t:
+                k = k + 1
+            t = nt
+
+        return s, k
+
+    def calculate_distance(self, point1, point2, norm=2):
+    	'''Calculate the distance between two points'''
+
+    	return (abs(point2[0] - point1[0]) ** norm + abs(point2[1] - point1[1]) ** norm) ** (1.0 / norm)
+
     def profile(self):
         '''Profile the Maude planner'''
 
@@ -170,6 +205,9 @@ class ProfilerNode(Node):
 
             self.send_initial_pose(initial)
             self.send_map()
+
+            self.distance2 = self.calculate_distance(initial, end)
+            self.distance1 = self.calculate_distance(initial, end, norm=1)
 
             self.compute_path(end)
         else:
