@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import time, csv, maude
+import time, csv, maude, math
 
 import default_costmap
 
@@ -21,7 +21,7 @@ TEST_SUITE = [
     [(190, 222, 180.0), (211, 222, 0.0)],
     [(189, 211, 135.0), (211, 189, 45.0)],
     # Not possible
-#    [(156, 200, 0.0), (178, 200, 0.0)],
+    # [(156, 200, 0.0), (178, 200, 0.0)],
 ]
 
 class DirectProfiler:
@@ -44,6 +44,8 @@ class DirectProfiler:
         self.astar   = m.findSymbol('a*', [pose_kind, pose_kind, costmap_kind, float_kind, float_kind], path_kind)
         intlist      = m.findSymbol('_`,_', [int_kind] * 2, int_kind) 
         cmap         = m.findSymbol('`{_`}', [int_kind], costmap_kind)
+
+        self.pattern = m.parseTerm('{ X:Float, Y:Float, Z:Float } O:Nat')
 
         self.mod = m
 
@@ -91,10 +93,50 @@ class DirectProfiler:
         end_time = time.perf_counter()
 
         hmtime = end_time - start_time
+        length, rotation, numrot = self.calculate_length(term)
 
-        print('Tiempo:', hmtime)
+        print('Time:', hmtime)
+        print('Length:', length)
+        print('Acc. rotation:', rotation)
+        print('# rotations:', numrot)
+        self.csvwriter.writerow([False] + list(origin) + list(dest) + [hmtime, length, rotation, numrot])
 
-        self.csvwriter.writerow([False] + list(origin) + list(dest) + [hmtime, '-'])
+    def destruct_pose(self, pose):
+        '''Obtain the values of a Maude pose'''
+        # Match the pose into the pattern (we assume there is always a single match)
+        subs = next(pose.match(self.pattern))
+
+        return float(str(subs.find('X'))), float(str(subs.find('Y'))), int(str(subs.find('O')))
+
+    def calculate_length(self, mresult):
+        '''Calculate the length, total rotation and number of rotations of a path'''
+
+        if str(mresult.symbol()) == 'noPath':
+            return 0.0
+
+        s  = 0.0     # Length
+        st = 0.0     # Total rotation
+        nr = 0       # Number of rotations
+
+        it    = mresult.arguments()
+        first = next(it)
+
+        x, y, t = self.destruct_pose(first)
+
+        for pose in it:
+            if str(pose.symbol()) == 'noPath':
+                break
+
+            cx, cy, ct = self.destruct_pose(pose)
+
+            if t != ct:
+                nr += 1
+
+            s  += math.sqrt((cx - x) ** 2 + (cy - y) ** 2)
+            st += abs(ct - t)
+            x, y, t = cx, cy, ct
+
+        return s, st, nr
 
 if __name__ == '__main__':
     dprofiler = DirectProfiler()

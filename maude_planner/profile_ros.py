@@ -250,5 +250,5 @@ def main(args=None):
     rclpy.spin(profiler)
 
 if __name__ == '__main__':
-    #main()
-    print(ProfilerNode.process_path_yaml('plan.yaml'))
+    main()
+    #print(ProfilerNode.process_path_yaml('plan.yaml'))
