@@ -12,12 +12,15 @@ class MapDummyPublisher(Node):
 
     def __init__(self):
         super().__init__('map_dummy_publisher')
-        self.publisher_ = self.create_publisher(OccupancyGrid, '/map', 10)
+        self.publisher_ = self.create_publisher(OccupancyGrid, '/global_costmap/costmap', 10)
         timer_period = 5  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
     def timer_callback(self):
         occupancy_grid = OccupancyGrid()
+        occupancy_grid.info.origin.position.x = 0.0
+        occupancy_grid.info.origin.position.y = 0.0
+        occupancy_grid.info.origin.position.z = 0.0
         occupancy_grid.data = array.array('b')  # Array of unsigned integers of 1 byte
         occupancy_grid.data.extend([0, 0,   0, 0,
                                     0, 100, 0, 0,
@@ -26,7 +29,9 @@ class MapDummyPublisher(Node):
         occupancy_grid.info.resolution = 1.0
         occupancy_grid.info.width = 4
         occupancy_grid.info.height = 4
-        self.get_logger().info('Sending map to /map: {}'.format(occupancy_grid))
+        occupancy_grid.header.frame_id = 'map'
+        occupancy_grid.header.stamp = self.get_clock().now().to_msg()
+        self.get_logger().info('Sending map to /global_costmap/costmap: {}'.format(occupancy_grid))
         self.publisher_.publish(occupancy_grid)
 
 
