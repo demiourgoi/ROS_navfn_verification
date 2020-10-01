@@ -15,6 +15,9 @@ export TURTLEBOT3_MODEL=waffle
 export GAZEBO_MODEL_PATH=/opt/ros/dashing/share/turtlebot3_gazebo/models
 export BRINGUP_PATH=/opt/ros/dashing/share/nav2_bringup/launch
 
+# Update maude package
+python3 -m pip install -U maude
+
 # Remove the stack size limit because Maude needs it
 ulimit -s unlimited
 

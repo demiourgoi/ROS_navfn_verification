@@ -69,6 +69,14 @@ class DirectProfiler:
             m.parseTerm(str(float(default_costmap.width)))
         ]
 
+        class MapHook(maude.Hook):
+            def run(self, term, data):
+                x, y, ncols = [int(arg) for arg in term.arguments()]
+                return data.getTerm('trueTerm' if default_costmap.data[x + y * ncols] < 50 else 'falseTerm')
+
+        self.mapHook = MapHook()
+        maude.connectEqHook('open2?', self.mapHook)
+
         # CSV where results are saved
         self.csvfile = open('resultsd.csv', 'w')
         self.csvwriter = csv.writer(self.csvfile)

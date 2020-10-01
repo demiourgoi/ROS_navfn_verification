@@ -43,11 +43,39 @@ TODO:
  * Translate between coordinate frames when needed (tf2)
 """
 
+class MapProvider(maude.Hook):
+    """Handle map queries from a special Maude operator"""
+
+    def __init__(self, planner, module):
+        super().__init__()
+
+        self.planner = planner
+
+        # Store the true and false terms to be returned by the special
+        # operator. Alternatively, term-hook bindings could have been
+        # used, but this will be probably slighly faster and it is safe
+        # as long as the special operator is only reduced in 'module'.
+        self.true_term = module.parseTerm('true')
+        self.false_term = module.parseTerm('false')
+
+        self.true_term.reduce()
+        self.false_term.reduce()
+
+    def run(self, term, data):
+        # The operator arguments are the 2D position and the map side
+        # op open2? : Float Float Float -> Bool
+        x, y, ncols = [int(arg) for arg in term.arguments()]
+        # Map entries are considered opened when the cost is below 50
+        # return data.getTerm('trueTerm' if self.planner.occupancy_grid.data[x + y * ncols] < 50
+        #                               else 'falseTerm')
+        return self.true_term if self.planner.occupancy_grid.data[x + y * ncols] < 50 \
+          else self.false_term
+
 
 class MaudePlanner(Node):
     ASTAR_MAUDE_PATH = '../maude/astar.maude'
 
-    def __init__(self):
+    def __init__(self, map_in_python=True):
         super().__init__('maude_planner_action_server') # Node name, could be changed to fit the BT
 
         maude.init()
@@ -89,6 +117,31 @@ class MaudePlanner(Node):
             Path,
             '/plan',
             10)
+
+        # Connect the Maude special operator to the map
+        self.map_in_python = map_in_python
+
+        if map_in_python:
+            self.map_hook = MapProvider(self, self.astar_module)
+            maude.connectEqHook('open2?', self.map_hook)
+
+        # Find sorts and operators needed to construct the a* term
+        # (once for all)
+        m = self.astar_module
+        pose_kind    = m.findSort('Pose').kind()
+        costmap_kind = m.findSort('CostMap').kind()
+        float_kind   = m.findSort('Float').kind()
+        path_kind    = m.findSort('Path').kind()
+        int_kind     = m.findSort('IntList').kind()
+
+        self.astar_symb   = m.findSymbol('a*', [pose_kind, pose_kind, costmap_kind, float_kind, float_kind], path_kind)
+        self.intlist_symb = m.findSymbol('_`,_', [int_kind] * 2, int_kind)
+        self.cmap_symb    = m.findSymbol('`{_`}', [int_kind], costmap_kind)
+
+        # Constants that will be used multiple times
+        self.zero_term = m.parseTerm('0')
+        self.one_term  = m.parseTerm('1')
+        self.mtIL_term = m.parseTerm('mtIL')
 
     def map_data_to_maude(self, map_data):
         """
@@ -154,15 +207,15 @@ class MaudePlanner(Node):
 
         pose_parts = list(maude_pose.arguments())
         point = pose_parts[0]
-        angle = int(str(pose_parts[1]))
+        angle = int(pose_parts[1])
 
         resolution = self.occupancy_grid.info.resolution
         origin = self.occupancy_grid.info.origin.position
 
         point_parts = list(point.arguments())
-        p.position.x = origin.x + resolution * float(str(point_parts[0]))
-        p.position.y = origin.y + resolution * float(str(point_parts[1]))
-        p.position.z = origin.z + resolution * float(str(point_parts[2]))
+        p.position.x = origin.x + resolution * float(point_parts[0])
+        p.position.y = origin.y + resolution * float(point_parts[1])
+        p.position.z = origin.z + resolution * float(point_parts[2])
         p.orientation = self.angle_to_quaternion(angle)
 
         return p
@@ -195,40 +248,24 @@ class MaudePlanner(Node):
         maude_pose_fin = self.pose_to_maude(pose_fin)
         self.get_logger().info('Computing Path from {} to {}'.format(maude_pose_ini, maude_pose_fin))
 
-        # Find sorts and operators needed to construct the a* term
-        # (this can be done once for all)
-        m = self.astar_module
-        pose_kind    = m.findSort('Pose').kind()
-        costmap_kind = m.findSort('CostMap').kind()
-        float_kind   = m.findSort('Float').kind()
-        path_kind    = m.findSort('Path').kind()
-        int_kind     = m.findSort('IntList').kind()
-
-        astar   = m.findSymbol('a*', [pose_kind, pose_kind, costmap_kind, float_kind, float_kind], path_kind)
-        intlist = m.findSymbol('_`,_', [int_kind] * 2, int_kind) 
-        cmap    = m.findSymbol('`{_`}', [int_kind], costmap_kind)
-
-        # Constants that will be used multiple times
-        zero = m.parseTerm('0')
-        one  = m.parseTerm('1')
-        mtIL = m.parseTerm('mtIL')
-
         # Build the IntList with the costmap data
-        map_list = mtIL
+        # (if the complete map is given to Maude)
+        map_list = self.mtIL_term
 
-        for c in self.occupancy_grid.data:
-                if c < 50:
-                        map_list = intlist(map_list, zero)
-                else:
-                        map_list = intlist(map_list, one)
+        if not self.map_in_python:
+            for c in self.occupancy_grid.data:
+                    if c < 50:
+                            map_list = self.intlist_symb(map_list, self.zero_term)
+                    else:
+                            map_list = self.intlist_symb(map_list, self.one_term)
 
         # Build the a* term with makeTerm
-        term = astar(
-                m.parseTerm(maude_pose_ini),
-                m.parseTerm(maude_pose_fin),
-                cmap(map_list),
-                m.parseTerm(str(float(self.occupancy_grid.info.height))),
-                m.parseTerm(str(float(self.occupancy_grid.info.width)))
+        term = self.astar_symb(
+                self.astar_module.parseTerm(maude_pose_ini),
+                self.astar_module.parseTerm(maude_pose_fin),
+                self.cmap_symb(map_list),
+                self.astar_module.parseTerm(str(float(self.occupancy_grid.info.height))),
+                self.astar_module.parseTerm(str(float(self.occupancy_grid.info.width)))
         )
         term.reduce()
         self.get_logger().info('Maude path found: {}'.format(term))

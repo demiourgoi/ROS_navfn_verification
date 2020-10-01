@@ -29,6 +29,14 @@ fmod COSTMAP is
      N := (NC * Y) + X /\
      N' := skipN&Get(CM, N) .
 
+ *** Alternative open? implemented in Python with random access
+ *** to the map (it should be commented when outside Python)
+ op open2? : Float Float Float -> Bool [memo special (
+    id-hook SpecialHubSymbol
+    term-hook trueTerm (true)
+    term-hook falseTerm (false)
+ )] .
+
  op skipN&Get : CostMap Nat -> Int .
  eq skipN&Get({N, NL'}, 0) = N .
  eq skipN&Get({N, NL'}, s(NT)) = skipN&Get({NL'}, NT) .
@@ -185,7 +193,9 @@ fmod ASTAR is
      Y'' >= 0.0 /\
      X'' < NC /\
      Y'' < NR /\
-     open?(CM, X'', Y'', NC) /\
+     *** Switch comments to select between versions
+***     open?(CM, X'', Y'', NC) /\
+     open2?(X'', Y'', NC) /\
      COST := getCost(ANGLE') /\
      C' := C + CACC + COST /\
      H' := h({X,Y,Z} ANGLE, G) /\
