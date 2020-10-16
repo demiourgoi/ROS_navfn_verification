@@ -1,0 +1,26 @@
+***
+***	Performance evaluation of the A* algorithm
+***
+
+sload astar
+
+fmod ASTAR-PERF is
+	protecting ASTAR .
+
+	op diaphanousMap : Nat -> CostMap .
+	op zeroList : Nat -> IntList .
+
+	var N : Nat .
+
+	eq diaphanousMap(N) = { zeroList(N) } .
+	eq zeroList(0) = mtIL .
+	eq zeroList(s(N)) = 0, zeroList(N) .
+endfm
+
+eof
+
+red a*({1.0, 1.0, 0.0} 90, {1.0, 2.0, 0.0} 10, diaphanousMap(384 * 384), 384.0, 384.0) .
+red a*({20.0, 20.0, 0.0} 90, {20.0, 21.0, 0.0} 90, diaphanousMap(384 * 384), 384.0, 384.0) .
+red a*({20.0, 20.0, 0.0} 90, {120.0, 20.0, 0.0} 90, diaphanousMap(384 * 384), 384.0, 384.0) .
+red a*({0.0, 0.0, 0.0} 90, {383.0, 383.0, 0.0} 90, diaphanousMap(384 * 384), 384.0, 384.0) .
+red a*({161.0, 194.0, 0.0} 1, {169.0, 194.0, 0.0} 1, diaphanousMap(384 * 384), 384.0, 384.0) .
