@@ -45,10 +45,9 @@ fmod COSTMAP is
  op check : Int -> Bool .
  eq check(N) = N == 0 .
 
- ops movCost diagMovCost turnCost : -> Float .
+ ops movCost diagMovCost : -> Float .
  eq movCost = 1.0 .
  eq diagMovCost = 1.4 .
- eq turnCost = 0.25 .
 
  op float2nat : Float -> Nat [memo] .
  eq float2nat(F) = rat(floor(F)) .
@@ -175,16 +174,16 @@ fmod ASTAR is
 
  op generate : Pose Node CostMap NodeSet NodeSet Float Float -> NodeSet .
  ceq generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, OPEN, CLOSE, NR, NC) = NEW'
-  if NEWL := generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, NR, NC, 45, 0, 0.0, 5) /\
-     NEWR := generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, NR, NC, -45, -45, turnCost, 3) /\
+  if NEWL := generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, NR, NC, 45, 0, 5) /\
+     NEWR := generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, NR, NC, -45, -45, 3) /\
      NEW := removeClosed((NEWL, NEWR), CLOSE) /\
      NEW' := updateOpen(NEW, OPEN) .
 
- op generate : Pose Node CostMap Float Float Int Int Float Nat -> NodeSet .
- eq generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, NR, NC, DIF, AACC, CACC, 0) = empty .
- ceq generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, NR, NC, DIF, AACC, CACC, s(N)) =
+ op generate : Pose Node CostMap Float Float Int Int Nat -> NodeSet .
+ eq generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, NR, NC, DIF, AACC, 0) = empty .
+ ceq generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, NR, NC, DIF, AACC, s(N)) =
                                   { {X'',Y'',Z} ANGLE' | C' + H' = T' | {X,Y,Z} ANGLE },
-                                  generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, NR, NC, DIF, AACC + DIF, CACC + turnCost, N)
+                                  generate(G, { {X,Y,Z} ANGLE | C + H = T | PREV }, CM, NR, NC, DIF, AACC + DIF, N)
   if ANGLE' := computeAngle(ANGLE, AACC) /\
      < X', Y' > := getMove(ANGLE') /\
      X'' := X + X' /\
@@ -197,11 +196,11 @@ fmod ASTAR is
 ***     open?(CM, X'', Y'', NC) /\
      open2?(X'', Y'', NC) /\
      COST := getCost(ANGLE') /\
-     C' := C + CACC + COST /\
+     C' := C + COST /\
      H' := h({X'',Y'',Z} ANGLE, G) /\
      T' := C' + H' .
- eq generate(G, NODE, CM, NR, NC, DIF, AACC, CACC, s(N)) =
-          generate(G, NODE, CM, NR, NC, DIF, AACC + DIF, CACC + turnCost, N) [owise] .
+ eq generate(G, NODE, CM, NR, NC, DIF, AACC, s(N)) =
+          generate(G, NODE, CM, NR, NC, DIF, AACC + DIF, N) [owise] .
 
  op computeAngle : Int Int -> Int .
  eq computeAngle(ANGLE, DIF) = (ANGLE + DIF + 360) rem 360 .
