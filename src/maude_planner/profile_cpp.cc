@@ -8,6 +8,7 @@
 #include <cmath>
 #include <fstream>
 #include <chrono>
+#include <string>
 
 using namespace std;
 
@@ -17,27 +18,10 @@ namespace nav2_navfn_planner {
 	extern int create_nav_plan_astar(unsigned char*, int, int, int*, int*, float*, int);
 }
 
-
-constexpr int SIDE = 384;
-
-int TEST_SUITE[][4] = {
-    {161, 194, 162, 194},
-    {161, 194, 161, 193},
-    {161, 194, 162, 193},
-    {161, 194, 168, 194},
-    {162, 189, 236, 189},
-    // Repeated
-    {162, 189, 236, 189},
-    {162, 189, 235, 210},
-    {162, 189, 212, 237},
-    {162, 189, 287, 237},
-    {162, 189, 163, 211},
-    {162, 189, 199, 161},
-    {162, 189, 235, 198},
-    {190, 222, 211, 222},
-    {189, 211, 211, 189},
-    // Not possible
-    // {156, 200, 178, 200}
+struct CostMap {
+	COSTTYPE * data;
+	int width;
+	int height;
 };
 
 double calculate_distance(float * path, size_t points) {
@@ -58,47 +42,101 @@ double calculate_distance(float * path, size_t points) {
 	return s;
 }
 
-void runTest(COSTTYPE * costmap, float * path, size_t index) {
-
-	// Current test case
-	int * tcase = TEST_SUITE[index];
+void runTest(const CostMap &map, float * path, int * tcase) {
 
 	auto start_time = std::chrono::high_resolution_clock::now();
-	int length = nav2_navfn_planner::create_nav_plan_astar(costmap, SIDE, SIDE, tcase + 2, tcase, path, SIDE * 4);
+	int length = nav2_navfn_planner::create_nav_plan_astar(map.data, map.width, map.height, tcase + 2, tcase, path, 4 * max(map.width, map.height));
 	auto end_time = std::chrono::high_resolution_clock::now();
 
 	std::chrono::duration<double> duration = end_time - start_time;
 	double distance = calculate_distance(path, length);
 
-	cout << tcase[0] << ";" << tcase[1] << ";" << tcase[2] << ";" << tcase[3]
-	     << ";" << duration.count() << ";" << distance << endl;
+	// Print a JSON object
+	cout << "{\"initial\": [" << tcase[0] << ", " << tcase[1] << "], "
+	     << "\"goal\": [" << tcase[2] << ", " << tcase[3] << "], "
+	     << "\"duration\": " << duration.count() << ", "
+	     << "\"length\": " << distance << ", "
+	     << "\"path\": [";
+
+	for (size_t i = 0; i < length; i++)
+		cout << "[" << path[2*i] << ", " << path[2*i+1] << ((i+1 < length) ? "], " : "]");
+
+	cout << "]}" << endl;
 }
 
 int main() {
 
-	// Read the default costmap from a file
-	COSTTYPE * costmap = new COSTTYPE[SIDE * SIDE];
+	// Read the configuration data from standard input
+	//
+	// map_width map_height
+	// map_path
+	// (x0 y0 x y) *
 
-	ifstream costmapfile("../costmap.bin", std::ios::binary);
+	CostMap map;
+	string map_path;
 
-	if (!costmapfile.is_open()) {
-		cerr << "Cannot find costmap.bin file." << endl;
+	cin >> map.width >> map.height;
+
+	// The next line is the filename (just in case it contain spaces)
+	while (isspace(cin.peek()))
+		cin.get();
+
+	getline(cin, map_path);
+
+	if (!cin) {
+		cerr << "Errors while parsing the initial configuration." << endl;
 		return 1;
 	}
 
-	if (!costmapfile.read((char *) costmap, SIDE * SIDE * sizeof(COSTTYPE)))
-	{
-		cerr << "Error when reading costmap." << endl;
+	// Read the default costmap from a file
+	map.data = new COSTTYPE[map.width * map.height];
+
+	ifstream costmapfile(map_path, std::ios::binary);
+
+	if (!costmapfile.is_open()) {
+		cerr << "Cannot find " << map_path << " file." << endl;
 		return 2;
+	}
+
+	if (!costmapfile.read((char *) map.data, map.width * map.height * sizeof(COSTTYPE)))
+	{
+		cerr << "Error while reading the costmap." << endl;
+		return 3;
 	}
 
 	costmapfile.close();
 
-	const size_t nrTest = sizeof(TEST_SUITE) / sizeof(TEST_SUITE[0]);
-	float * buffer = new float[SIDE * 4];
+	// Buffer for the calculated paths
+	float * buffer = new float[4 * max(map.width, map.height)];
 
-	for (size_t i = 0; i < nrTest; i++)
-		runTest(costmap, buffer, i);
+	// Keep reading cases from the standard input
+	while (true) {
+		// The initial and goal position coordinates are read
+		// from the standard input
+		int positions[4];
+
+		cin >> positions[0];
+
+		// We finish at the end of file
+		if (cin.eof()) {
+			break;
+		}
+		// Format errors also interrupt the execution
+		else if (cin.fail()) {
+			cerr << "Error while reading the test cases." << endl;
+			return 4;
+		}
+		// An initial -1 discards the line as a comment
+		else if (positions[0] == -1) {
+			cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+			continue;
+		}
+
+		for (size_t i = 1; i < 4; i++)
+			cin >> positions[i];
+
+		runTest(map, buffer, positions);
+	}
 
 	return 0;
 }
