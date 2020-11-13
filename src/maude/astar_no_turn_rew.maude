@@ -276,6 +276,8 @@ endm
 
 *** set print attribute on .
 
+rew init .
+
 search init =>* P:Path s.t. openInWall(P:Path) .
 
 load model-checker.maude
