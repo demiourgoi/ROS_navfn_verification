@@ -155,12 +155,12 @@ mod ASTAR is
  var  P : Path .
 
  ***     Init Goal         NumRow NumCol
- op a* : Pose Pose CostMap  Float  Float -> Path [ctor] .
+ op a* : Pose Pose CostMap  Float  Float -> Path .
  ceq a*(I, G, CM, NR, NC) = a*(G, CM, NR, NC, { I | 0.0 + H = H | noPose }, empty)
   if H := h(I, G) .
 
  ***     Goal         NumRow NumCol  Open    Close
- op a* : Pose CostMap  Float  Float NodeSet NodeSet -> Path .
+ op a* : Pose CostMap  Float  Float NodeSet NodeSet -> Path [ctor] .
 
  rl [noPath] :
     a*(G, CM, NR, NC, empty, CLOSE) =>
@@ -269,9 +269,9 @@ mod INVARIANT is
 
  op init : -> Path .
  eq init = a*({2.0, 2.0, 0.0} 90, {0.0, 0.0, 0.0} 90, {0, 0, 0, 0,
-                                                   0, 1, 1, 0,
-                                                   0, 0, 0, 0,
-                                                   0, 0, 0, 0}, 4.0, 4.0) .
+                                                       0, 1, 1, 0,
+                                                       0, 0, 0, 0,
+                                                       0, 0, 0, 0}, 4.0, 4.0) .
 endm
 
 *** set print attribute on .
@@ -298,4 +298,8 @@ mod A*-MODEL-CHECKING is
  pr PROPS .
 endm
 
+
 red modelCheck(init, [] openNoWall) .
+
+*** To take into account initial state
+red modelCheck(init, openNoWall -> [] openNoWall) .
