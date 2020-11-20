@@ -177,7 +177,6 @@ method AStarAux(goal: Point, costMap: CostMap, open: set<Node>, closed: set<Node
         assert current in open;
         assert ValidOpenSet(newOpen, closed, start, costMap);
         if current.pose.position == goal {
-            // path := current.path; // TODO: path es ghost!
             assert ValidOpenNode(current, closed, start, costMap);
             assert ValidClosedNode(current, closed + {current}, start, costMap);
             assert |current.path| > 0;
