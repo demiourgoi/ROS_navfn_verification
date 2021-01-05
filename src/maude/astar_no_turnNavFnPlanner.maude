@@ -1,0 +1,314 @@
+fmod COSTMAP is
+ pr CONVERSION .
+ pr INT .
+
+ vars X Y NC NR N N' : Int .
+ var  F FX FY FNC : Float .
+ vars NL NL' : IntList .
+ var  CM : CostMap .
+ vars S S' : String .
+ var  NT : Nat .
+
+ sort IntList CostMap .
+ subsort Int < IntList .
+
+ op mtIL : -> IntList [ctor] .
+ op _,_ : IntList IntList -> IntList [ctor assoc id: mtIL] .
+ op {_} : IntList -> CostMap [ctor] .
+
+ op |_| : IntList -> Nat .
+ eq | N | = 1 .
+ eq | N, NL | = s(| NL |) .
+
+ ***        CostMap   X     Y   NCOLS
+ op open? : CostMap Float Float  Float  -> Bool [memo] .
+ ceq open?(CM, FX, FY, FNC) = open?(CM, X, Y, NC)
+  if X := float2nat(FX) /\
+     Y := float2nat(FY) /\
+     NC := float2nat(FNC) .
+
+ op open? : CostMap Nat Nat Nat  -> Bool .
+ ceq open?(CM, X, Y, NC) = check(N')
+  if N := (NC * X) + Y /\
+     N' := skipN&Get(CM, N) .
+
+ op get : CostMap Nat Nat Nat -> Float .
+ ceq get(CM, X, Y, NC) = float(N')
+  if N := (NC * X) + Y /\
+     N' := skipN&Get(CM, N) .
+
+ *** Alternative open? implemented in Python with random access
+ *** to the map (it should be commented when outside Python)
+ op open2? : Float Float Float -> Bool [memo special (
+    id-hook SpecialHubSymbol
+    term-hook trueTerm (true)
+    term-hook falseTerm (false)
+ )] .
+
+ op skipN&Get : CostMap Nat -> Int .
+ eq skipN&Get({N, NL'}, 0) = N .
+ eq skipN&Get({N, NL'}, s(NT)) = skipN&Get({NL'}, NT) .
+ eq skipN&Get(CM, NT) = - 1 [owise] .
+
+ op check : Int -> Bool .
+ eq check(N) = N < 254 .
+
+ ops movCost diagMovCost cellCost obstacleCost mapCost : -> Float .
+ eq movCost = 100.0 .
+ eq diagMovCost = 140.0 .
+ eq cellCost = 50.0 .
+ eq obstacleCost = 254.0 .
+ eq mapCost = 50.0 .
+
+ op float2nat : Float -> Nat [memo] .
+ eq float2nat(F) = rat(floor(F)) .
+endfm
+
+fmod POTENTIAL is
+ pr FLOAT .
+ pr INT .
+
+ ops infinite minusInfinite : -> Float .
+ eq infinite = 255.0 .
+ eq minusInfinite = - 255.0 .
+
+ sort Row Potential .
+ subsort Float < Row < Potential .
+
+ op noNum : -> Row [ctor] .
+ op _._ : Row Row -> Row [ctor assoc id: noNum] .
+
+ op noRow : -> Potential [ctor] .
+ op __ : Potential Potential -> Potential [ctor assoc id: noRow] .
+
+ vars I I' F F' : Float .
+ vars P P' : Potential .
+ vars N N' N1 N2 : Nat .
+ vars R R' : Row .
+
+ op _@[_,_] : Potential Nat Nat ~> Float .
+ eq (R P) @ [0, N] = R [N] .
+ eq (R P) @ [s(N), N'] = P @ [N, N'] .
+
+ op _[_] : Row Nat ~> Float .
+ eq (I . R) [0] = I .
+ eq (I . R) [s(N)] = R [N] .
+
+ op _[_;_\\_] : Potential Nat Nat Float ~> Potential .
+ eq (R P) [0 ; N \\ I] = (R [N \\ I]) P .
+ eq (R P) [s(N) ; N' \\ I] = R (P [N ; N' \\ I]) .
+
+ op _[_\\_] : Row Nat Float ~> Row .
+ eq (I . R) [0 \\ I'] = I' . R .
+ eq (I . R) [s(N) \\ I'] = I . (R [N \\ I']) .
+
+ ***          Rows Cols  Init Init
+ op initialP : Nat  Nat   Nat Nat  -> Potential .
+ ceq initialP(N, N', N1, N2) = P [N1 ; N2 \\ 0.0]
+  if P := initial(N, N') .
+
+ op initial : Nat Nat -> Potential .
+ eq initial(0, N') = noRow .
+ eq initial(s(N), N') = initial(N') initial(N, N') .
+
+ op initial : Nat -> Row [memo] .
+ eq initial(0) = noNum .
+ eq initial(s(N)) = infinite . initial(N) .
+endfm
+
+fmod POSE is
+ pr COSTMAP .
+ pr INT .
+
+ var N : Nat .
+
+ sorts BasicPose Pose Quaternion Point .
+
+ *** Simplified representation for angles
+ subsort Int < Quaternion .
+
+ *** Simplified pose for 2D
+ subsort BasicPose < Pose .
+
+ sort Pair .
+ op <_,_> : Float Float -> Pair [ctor] .
+ op getMove : Int ~> Pair .
+ eq getMove(0)   = <  1.0,  0.0 > .
+ eq getMove(45)  = <  1.0, -1.0 > .
+ eq getMove(90)  = <  0.0, -1.0 > .
+ eq getMove(135) = < -1.0, -1.0 > .
+ eq getMove(180) = < -1.0,  0.0 > .
+ eq getMove(225) = < -1.0,  1.0 > .
+ eq getMove(270) = <  0.0,  1.0 > .
+ eq getMove(315) = <  1.0,  1.0 > .
+
+ op getCost : Int ~> Float [memo] .
+ eq getCost(N) = if (N rem 90) == 0
+                 then movCost
+                 else diagMovCost
+                 fi .
+
+ op {_,_,_} : Nat Nat Nat -> Point [ctor] .
+ op {_,_,_,_} : Float Float Float Float -> Quaternion [ctor] .
+ op __ : Point Quaternion -> Pose [ctor] .
+
+ op {_,_} : Nat Nat -> BasicPose [ctor] .
+
+ op noPose : -> Pose [ctor] .
+endfm
+
+view Pose from TRIV to POSE is
+ sort Elt to Pose .
+endv
+
+fmod PATH is
+ inc LIST{Pose} * (sort List{Pose} to Path,
+                   op nil to noPath) .
+endfm
+
+fmod POSE-SET is
+ pr SET{Pose} * (sort Set{Pose} to PoseSet) .
+
+ eq (P:Pose, P:Pose) = P:Pose .
+
+ vars X Y N N' : Nat .
+ var  PS : PoseSet .
+
+ op createComplete : Nat Nat -> PoseSet .
+ eq createComplete(0, N) = empty .
+ eq createComplete(s(N), N') = createComplete*(N, N'),
+                               createComplete(N, N') .
+
+ op createComplete* : Nat Nat -> PoseSet .
+ eq createComplete*(N, 0) = empty .
+ eq createComplete*(N, s(N')) = {N, N'}, createComplete*(N, N') .
+
+ op _\[_,_] : PoseSet Nat Nat -> PoseSet .
+ eq ({X, Y}, PS)\[X, Y] = PS .
+ eq PS \[X, Y] = PS [owise] .
+endfm
+
+***(
+   The algorithm assumes the number of iterations and the "inflated" map (including limits) are given by the user.
+)
+fmod ASTAR is
+ pr POTENTIAL .
+ pr POSE-SET .
+ pr COSTMAP .
+ pr PATH .
+
+ vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R : PoseSet .
+ vars X Y Z X' Y' Z' XI YI XG YG XC YC XN YN NR NC I NEW : Nat .
+ vars H V V' T FI FI' MINV SNDV DC HF D : Float .
+ vars Q Q' : Quaternion .
+ vars INIT GOAL : Pose .
+ vars P P' : Potential .
+ var  CM : CostMap .
+
+ sort TraversalResult .
+ op <_,_> : PoseSet PoseSet -> TraversalResult [ctor] .
+
+ ***     Init Goal         NumRow NumCol Iterations
+ op a* : Pose Pose CostMap  Nat    Nat      Nat -> Path .
+ ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = computePath({X, Y, Z} Q, {X', Y', Z'} Q', P')
+  if P := initialP(NR, NC, X', Y') /\
+     T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
+     *** EXC := createComplete(NR, NC)\[X, Y] /\
+     CURR := initCurrent({X', Y'}, CM, NR, NC) /\
+     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) [print CURR "\nPotential\n" P'] .
+
+ op initCurrent : Pose CostMap Nat Nat -> PoseSet .
+ ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
+  if P1L := if X > 0     then {sd(X, 1), Y} else empty fi /\
+     P2L := if s(X) < NR then {s(X), Y}     else empty fi /\
+     P3L := if Y > 0     then {X, sd(Y, 1)} else empty fi /\
+     P4L := if s(Y) < NC then {X, s(Y)}     else empty fi .
+
+ ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
+ op a* : Pose Pose CostMap Potential  Nat     Nat   PoseSet PoseSet PoseSet   Float       Nat  -> Potential .
+ eq a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) = P [print "limit"] .
+ ceq a*({X, Y}, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, I) = P
+  if D := P @ [X , Y] /\
+     D =/= infinite [print X " - " Y " con "  D " fin"] .
+ ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) = a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, s(I))
+  if not open?(CM, X, Y, NC) [print "border " X ", " Y] .
+ ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) =
+                        a*(INIT, GOAL, CM, P', NR, NC, CURR, NEXT', EXC', T, s(I))
+  if open?(CM, X, Y, NC) /\
+     FI := minv({X, Y}, P, NR) /\
+     FI' := minh({X, Y}, P, NC) /\
+     MINV := min(FI, FI') /\
+     SNDV := max(FI, FI') /\
+     P' := updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) /\
+     < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NR, NC, T, NEXT, EXC) [print "Now: (" X ", " Y ")\n" "Next:\n" NEXT' "\nEXC:\n" EXC'] .
+ eq a*(INIT, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, s(I)) =
+         if NEXT == empty
+         then a*(INIT, GOAL, CM, P, NR, NC, EXC, NEXT, empty, T + 2.0 * mapCost, I) *** check mapCost
+         else a*(INIT, GOAL, CM, P, NR, NC, NEXT, empty, EXC, T, I)
+         fi [print "nextIteration"] .
+
+ ***                   Current  INIT
+ op traverseNeighbors : Pose    Pose CostMap Potential Nat Nat Float PoseSet PoseSet -> TraversalResult .
+ ceq traverseNeighbors({X, Y}, INIT, CM, P, NR, NC, T, NEXT, EXC) = < (NEXT, P1L, P2L, P3L, P4L), (EXC, P1R, P2R, P3R, P4R) >
+  if < P1L, P1R > := if X > 0     then traverseNeighbor({X, Y}, {sd(X,1), Y}, INIT, CM, P, NC, T) else < empty, empty > fi /\
+     < P2L, P2R > := if s(X) < NR then traverseNeighbor({X, Y}, {s(X), Y}, INIT, CM, P, NC, T)    else < empty, empty > fi /\
+     < P3L, P3R > := if Y > 0     then traverseNeighbor({X, Y}, {X, sd(Y,1)}, INIT, CM, P, NC, T) else < empty, empty > fi /\
+     < P4L, P4R > := if s(Y) < NC then traverseNeighbor({X, Y}, {X, s(Y)}, INIT, CM, P, NC, T)    else < empty, empty > fi .
+
+ op traverseNeighbor : Pose Pose Pose CostMap Potential Nat Float -> TraversalResult .
+ ceq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) = < empty, empty >
+  if (P @ [XN, YN]) <= (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) + (1.0 / sqrt(2.0)) * get(CM, XN, YN, NC) [print "No update vecino"] .
+ eq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) =
+                                   if (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) < T
+                                   then < {XN, YN}, empty >
+                                   else < empty, {XN, YN} >
+                                   fi [owise print "Update vecino"] .
+
+ ***                                                   MINV  SNDV
+ op updatePotential : Potential Pose Pose CostMap Nat Float Float  -> Potential .
+ ceq updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) = P'
+  if V := get(CM, X, Y, NC) /\
+     _-_(SNDV, MINV) > V /\
+     V' := V + MINV /\
+     P' := P [X ; Y \\ V'] .
+ ceq updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) = P
+  if DC := _-_(SNDV, MINV) /\
+     HF := get(CM, X, Y, NC) /\
+     DC < HF /\
+     D := DC / HF /\
+     V := - 0.2301 * D * D + 0.5307 * D + 0.7040 /\
+     V' := MINV + HF * V /\
+     P' := P [X ; Y \\ V'] .
+
+ op minv : Pose Potential Nat -> Float .
+ ceq minv({X, Y}, P, NR) = min(FI, FI')
+  if FI := if X > 0 then P @ [sd(X,1), Y] else infinite fi /\
+     FI' := if s(X) < NR then P @ [s(X), Y] else infinite fi .
+
+ op minh : Pose Potential Nat -> Float .
+ ceq minh({X, Y}, P, NC) = min(FI, FI')
+  if FI := if Y > 0 then P @ [X, sd(Y,1)] else infinite fi /\
+     FI' := if s(Y) < NC then P @ [X, s(Y)] else infinite fi .
+
+ *** TODO
+ op computePath : Pose Pose Potential -> Path .
+ ceq computePath({X, Y, Z} Q, GOAL, P) = noPath
+  if P @ [X, Y] == infinite .
+
+ op h : Pose Pose -> Float .
+ ceq h({X, Y, Z} Q, {X', Y', Z'} Q') = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
+  if H := float(sd(X, X')) /\
+     V := float(sd(Y, Y')) .
+ ceq h({X, Y}, {X', Y'}) = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
+  if H := float(sd(X, X')) /\
+     V := float(sd(Y, Y')) .
+
+endfm
+
+set print attribute on .
+
+red a*({2, 2, 0} 90, {0, 0, 0} 90, {10, 10,  10,  10,
+                                    10, 255, 255, 10,
+                                    10, 10,  10,  10,
+                                    10, 10,  10,  10}, 4, 4, 30) .
+
