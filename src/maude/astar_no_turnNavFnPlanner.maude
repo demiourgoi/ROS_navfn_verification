@@ -193,6 +193,7 @@ endfm
 )
 fmod ASTAR is
  pr POTENTIAL .
+ pr EXT-BOOL .
  pr POSE-SET .
  pr COSTMAP .
  pr PATH .
@@ -215,7 +216,7 @@ fmod ASTAR is
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      *** EXC := createComplete(NR, NC)\[X, Y] /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
-     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) [print CURR "\nPotential\n" P'] .
+     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) .
 
  op initCurrent : Pose CostMap Nat Nat -> PoseSet .
  ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
@@ -226,12 +227,12 @@ fmod ASTAR is
 
  ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
  op a* : Pose Pose CostMap Potential  Nat     Nat   PoseSet PoseSet PoseSet   Float       Nat  -> Potential .
- eq a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) = P [print "limit"] .
+ eq a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) = P .
  ceq a*({X, Y}, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, I) = P
   if D := P @ [X , Y] /\
-     D =/= infinite [print X " - " Y " con "  D " fin"] .
+     D =/= infinite .
  ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) = a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, s(I))
-  if not open?(CM, X, Y, NC) [print "border " X ", " Y] .
+  if not open?(CM, X, Y, NC) .
  ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) =
                         a*(INIT, GOAL, CM, P', NR, NC, CURR, NEXT', EXC', T, s(I))
   if open?(CM, X, Y, NC) /\
@@ -240,20 +241,31 @@ fmod ASTAR is
      MINV := min(FI, FI') /\
      SNDV := max(FI, FI') /\
      P' := updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) /\
-     < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NR, NC, T, NEXT, EXC) [print "Now: (" X ", " Y ")\n" "Next:\n" NEXT' "\nEXC:\n" EXC'] .
+     < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NR, NC, T, NEXT, EXC) .
  eq a*(INIT, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, s(I)) =
          if NEXT == empty
          then a*(INIT, GOAL, CM, P, NR, NC, EXC, NEXT, empty, T + 2.0 * mapCost, I) *** check mapCost
          else a*(INIT, GOAL, CM, P, NR, NC, NEXT, empty, EXC, T, I)
-         fi [print "nextIteration"] .
+         fi .
 
  ***                   Current  INIT
  op traverseNeighbors : Pose    Pose CostMap Potential Nat Nat Float PoseSet PoseSet -> TraversalResult .
  ceq traverseNeighbors({X, Y}, INIT, CM, P, NR, NC, T, NEXT, EXC) = < (NEXT, P1L, P2L, P3L, P4L), (EXC, P1R, P2R, P3R, P4R) >
-  if < P1L, P1R > := if X > 0     then traverseNeighbor({X, Y}, {sd(X,1), Y}, INIT, CM, P, NC, T) else < empty, empty > fi /\
-     < P2L, P2R > := if s(X) < NR then traverseNeighbor({X, Y}, {s(X), Y}, INIT, CM, P, NC, T)    else < empty, empty > fi /\
-     < P3L, P3R > := if Y > 0     then traverseNeighbor({X, Y}, {X, sd(Y,1)}, INIT, CM, P, NC, T) else < empty, empty > fi /\
-     < P4L, P4R > := if s(Y) < NC then traverseNeighbor({X, Y}, {X, s(Y)}, INIT, CM, P, NC, T)    else < empty, empty > fi .
+  if < P1L, P1R > := if (X > 0) and-then open?(CM, sd(X,1), Y, NC)
+                     then traverseNeighbor({X, Y}, {sd(X,1), Y}, INIT, CM, P, NC, T)
+                     else < empty, empty >
+                     fi /\
+     < P2L, P2R > := if (s(X) < NR) and-then open?(CM, s(X), Y, NC)
+                     then traverseNeighbor({X, Y}, {s(X), Y}, INIT, CM, P, NC, T)
+                     else < empty, empty >
+                     fi /\
+     < P3L, P3R > := if Y > 0 and-then open?(CM, X, sd(Y,1), NC)
+                     then traverseNeighbor({X, Y}, {X, sd(Y,1)}, INIT, CM, P, NC, T)
+                     else < empty, empty >
+                     fi /\
+     < P4L, P4R > := if s(Y) < NC and-then open?(CM, X, s(Y), NC)
+                     then traverseNeighbor({X, Y}, {X, s(Y)}, INIT, CM, P, NC, T)
+                     else < empty, empty > fi .
 
  op traverseNeighbor : Pose Pose Pose CostMap Potential Nat Float -> TraversalResult .
  ceq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) = < empty, empty >
@@ -262,7 +274,7 @@ fmod ASTAR is
                                    if (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) < T
                                    then < {XN, YN}, empty >
                                    else < empty, {XN, YN} >
-                                   fi [owise print "Update vecino"] .
+                                   fi [owise] .
 
  ***                                                   MINV  SNDV
  op updatePotential : Potential Pose Pose CostMap Nat Float Float  -> Potential .
@@ -305,7 +317,7 @@ fmod ASTAR is
 
 endfm
 
-set print attribute on .
+*** set print attribute on .
 
 red a*({2, 2, 0} 90, {0, 0, 0} 90, {10, 10,  10,  10,
                                     10, 255, 255, 10,
