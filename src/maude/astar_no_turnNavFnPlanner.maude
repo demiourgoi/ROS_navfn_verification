@@ -130,18 +130,6 @@ fmod POSE is
  *** Simplified pose for 2D
  subsort BasicPose < Pose .
 
- sort Pair .
- op <_,_> : Float Float -> Pair [ctor] .
- op getMove : Int ~> Pair .
- eq getMove(0)   = <  1.0,  0.0 > .
- eq getMove(45)  = <  1.0, -1.0 > .
- eq getMove(90)  = <  0.0, -1.0 > .
- eq getMove(135) = < -1.0, -1.0 > .
- eq getMove(180) = < -1.0,  0.0 > .
- eq getMove(225) = < -1.0,  1.0 > .
- eq getMove(270) = <  0.0,  1.0 > .
- eq getMove(315) = <  1.0,  1.0 > .
-
  op getCost : Int ~> Float [memo] .
  eq getCost(N) = if (N rem 90) == 0
                  then movCost
@@ -190,6 +178,7 @@ endfm
 
 ***(
    The algorithm assumes the number of iterations and the "inflated" map (including limits) are given by the user.
+   The (0,0) position is on the upper-left corner.
 )
 fmod ASTAR is
  pr POTENTIAL .
@@ -199,19 +188,20 @@ fmod ASTAR is
  pr PATH .
 
  vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R : PoseSet .
- vars X Y Z X' Y' Z' XI YI XG YG XC YC XN YN NR NC I NEW : Nat .
+ vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
  vars H V V' T FI FI' MINV SNDV DC HF D : Float .
+ vars INIT GOAL ACCP : Pose .
  vars Q Q' : Quaternion .
- vars INIT GOAL : Pose .
  vars P P' : Potential .
  var  CM : CostMap .
+ var  PT : Path .
 
  sort TraversalResult .
  op <_,_> : PoseSet PoseSet -> TraversalResult [ctor] .
 
  ***     Init Goal         NumRow NumCol Iterations
  op a* : Pose Pose CostMap  Nat    Nat      Nat -> Path .
- ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = computePath({X, Y, Z} Q, {X', Y', Z'} Q', P')
+ ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
   if P := initialP(NR, NC, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      *** EXC := createComplete(NR, NC)\[X, Y] /\
@@ -220,10 +210,22 @@ fmod ASTAR is
 
  op initCurrent : Pose CostMap Nat Nat -> PoseSet .
  ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
-  if P1L := if X > 0     then {sd(X, 1), Y} else empty fi /\
-     P2L := if s(X) < NR then {s(X), Y}     else empty fi /\
-     P3L := if Y > 0     then {X, sd(Y, 1)} else empty fi /\
-     P4L := if s(Y) < NC then {X, s(Y)}     else empty fi .
+  if P1L := if (X > 0) and-then open?(CM, sd(X, 1), Y, NC)
+            then {sd(X, 1), Y}
+            else empty
+            fi /\
+     P2L := if (s(X) < NR) and-then open?(CM, s(X), Y, NC)
+            then {s(X), Y}
+            else empty
+            fi /\
+     P3L := if (Y > 0) and-then open?(CM, X, sd(Y, 1), NC)
+            then {X, sd(Y, 1)}
+            else empty
+            fi /\
+     P4L := if (s(Y) < NC) and-then open?(CM, X, s(Y), NC)
+            then {X, s(Y)}
+            else empty
+            fi .
 
  ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
  op a* : Pose Pose CostMap Potential  Nat     Nat   PoseSet PoseSet PoseSet   Float       Nat  -> Potential .
@@ -303,9 +305,55 @@ fmod ASTAR is
      FI' := if s(Y) < NC then P @ [X, s(Y)] else infinite fi .
 
  *** TODO
- op computePath : Pose Pose Potential -> Path .
- ceq computePath({X, Y, Z} Q, GOAL, P) = noPath
+ op computePath : Pose Pose Potential Nat Nat -> Path .
+ ceq computePath({X, Y, Z} Q, GOAL, P, NR, NC) = noPath
   if P @ [X, Y] == infinite .
+ eq computePath({X, Y, Z} Q, GOAL, P, NR, NC) = $computePath({X, Y}, GOAL, P, NR, NC, noPath) [owise] .
+
+ op $computePath : Pose Pose Potential Nat Nat Path -> Path .
+ eq $computePath({X, Y}, {X, Y, Z} Q, P, NR, NC, PT) = PT ({X, Y, Z} Q) .
+ ceq $computePath({X, Y}, GOAL, P, NR, NC, PT) = $computePath(ACCP, GOAL, P, NR, NC, PT ({X, Y, 0} 0))
+  if ACCP := getMin({X, Y}, P, NR, NC) .
+
+ op getMin : Pose Potential Nat Nat -> Pose .
+ eq getMin(INIT, P, NR, NC) = getMin(INIT, P, NR, NC, noPose, infinite, 0) .
+
+ op getMin : Pose Potential Nat Nat Pose Float Nat -> Pose .
+ ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = if V < MINV
+                                                then getMin({X, Y}, P, NR, NC, {X', Y'}, V, N + 45)
+                                                else getMin({X, Y}, P, NR, NC, ACCP, MINV, N + 45)
+                                                fi
+  if N < 360 /\
+     < X', Y' > := getMove({X, Y}, N, NR, NC) /\
+     V := (P @ [X', Y']) .
+ ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = getMin({X, Y}, P, NR, NC, ACCP, MINV, N + 45)
+  if N < 360 /\
+     not (getMove({X, Y}, N, NR, NC) :: Pair) .
+ eq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = ACCP [owise] .
+
+ sort Pair .
+ op <_,_> : Nat Nat -> Pair [ctor] .
+ op getMove : Pose Nat Nat Nat ~> Pair .
+ ceq getMove({X, Y}, 0, NR, NC)   = <  X, s(Y) >
+  if s(Y) < NC .
+ ceq getMove({X, Y}, 45, NR, NC)  = <  sd(X, 1), s(Y) >
+  if X > 0 /\
+     s(Y) < NC .
+ ceq getMove({X, Y}, 90, NR, NC)  = <  sd(X, 1), Y >
+  if X > 0 .
+ ceq getMove({X, Y}, 135, NR, NC) = < sd(X, 1), sd(Y, 1) >
+  if X > 0 /\
+     Y > 0 .
+ ceq getMove({X, Y}, 180, NR, NC) = < X,  sd(Y, 1) >
+  if Y > 0 .
+ ceq getMove({X, Y}, 225, NR, NC) = < s(X),  sd(Y, 1) >
+  if s(X) < NR /\
+     Y > 0 .
+ ceq getMove({X, Y}, 270, NR, NC) = <  s(X),  Y >
+  if s(X) < NR .
+ ceq getMove({X, Y}, 315, NR, NC) = <  s(X),  s(Y) >
+  if s(X) < NR /\
+     s(Y) < NC .
 
  op h : Pose Pose -> Float .
  ceq h({X, Y, Z} Q, {X', Y', Z'} Q') = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
