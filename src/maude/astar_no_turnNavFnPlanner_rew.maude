@@ -207,8 +207,7 @@ mod ASTAR is
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      *** EXC := createComplete(NR, NC)\[X, Y] /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
-     a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) => P' /\
-     finished(P') .
+     a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) => P' .
 
  op initCurrent : Pose CostMap Nat Nat -> PoseSet .
  ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
@@ -230,7 +229,7 @@ mod ASTAR is
             fi .
 
  ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
- op a* : Pose Pose CostMap Potential  Nat     Nat   PoseSet PoseSet PoseSet   Float       Nat  -> Potential .
+ op a* : Pose Pose CostMap Potential  Nat     Nat   PoseSet PoseSet PoseSet   Float       Nat  ~> Potential .
  rl a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) => P .
  crl a*({X, Y}, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, I) => P
   if D := P @ [X , Y] /\
@@ -363,20 +362,14 @@ mod ASTAR is
  ceq h({X, Y}, {X', Y'}) = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
   if H := float(sd(X, X')) /\
      V := float(sd(Y, Y')) .
-
- op finished : Potential -> Bool .
- eq finished((F . R) P ) = true .
- eq finished(P) = false [owise] .
 endm
 
 *** set print attribute on .
 
-***(
 rew a*({2, 2, 0} 90, {0, 0, 0} 90, {10, 10,  10,  10,
                                     10, 255, 255, 10,
                                     10, 10,  10,  10,
                                     10, 10,  10,  10}, 4, 4, 30) .
-)
 
 load model-checker.maude
 
