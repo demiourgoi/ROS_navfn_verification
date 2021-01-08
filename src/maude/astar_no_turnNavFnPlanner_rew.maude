@@ -180,7 +180,7 @@ endfm
    The algorithm assumes the number of iterations and the "inflated" map (including limits) are given by the user.
    The (0,0) position is on the upper-left corner.
 )
-fmod ASTAR is
+mod ASTAR is
  pr POTENTIAL .
  pr EXT-BOOL .
  pr POSE-SET .
@@ -189,24 +189,26 @@ fmod ASTAR is
 
  vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R : PoseSet .
  vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
- vars H V V' T FI FI' MINV SNDV DC HF D : Float .
+ vars H V V' T FI FI' MINV SNDV DC HF D F : Float .
  vars INIT GOAL ACCP : Pose .
  vars Q Q' : Quaternion .
  vars P P' : Potential .
  var  CM : CostMap .
  var  PT : Path .
+ var  R : Row .
 
  sort TraversalResult .
  op <_,_> : PoseSet PoseSet -> TraversalResult [ctor] .
 
  ***     Init Goal         NumRow NumCol Iterations
  op a* : Pose Pose CostMap  Nat    Nat      Nat -> Path .
- ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
+ crl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) => computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
   if P := initialP(NR, NC, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      *** EXC := createComplete(NR, NC)\[X, Y] /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
-     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) .
+     a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) => P' /\
+     finished(P') .
 
  op initCurrent : Pose CostMap Nat Nat -> PoseSet .
  ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
@@ -229,13 +231,13 @@ fmod ASTAR is
 
  ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
  op a* : Pose Pose CostMap Potential  Nat     Nat   PoseSet PoseSet PoseSet   Float       Nat  -> Potential .
- eq a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) = P .
- ceq a*({X, Y}, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, I) = P
+ rl a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) => P .
+ crl a*({X, Y}, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, I) => P
   if D := P @ [X , Y] /\
      D =/= infinite .
- ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) = a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, s(I))
+ crl a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) => a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, s(I))
   if not open?(CM, X, Y, NC) .
- ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) =
+ crl a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) =>
                         a*(INIT, GOAL, CM, P', NR, NC, CURR, NEXT', EXC', T, s(I))
   if open?(CM, X, Y, NC) /\
      FI := minv({X, Y}, P, NR) /\
@@ -244,7 +246,7 @@ fmod ASTAR is
      SNDV := max(FI, FI') /\
      P' := updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) /\
      < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NR, NC, T, NEXT, EXC) .
- eq a*(INIT, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, s(I)) =
+ rl a*(INIT, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, s(I)) =>
          if NEXT == empty
          then a*(INIT, GOAL, CM, P, NR, NC, EXC, NEXT, empty, T + 2.0 * mapCost, I) *** check mapCost
          else a*(INIT, GOAL, CM, P, NR, NC, NEXT, empty, EXC, T, I)
@@ -271,7 +273,7 @@ fmod ASTAR is
 
  op traverseNeighbor : Pose Pose Pose CostMap Potential Nat Float -> TraversalResult .
  ceq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) = < empty, empty >
-  if (P @ [XN, YN]) <= (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) + (1.0 / sqrt(2.0)) * get(CM, XN, YN, NC) [print "No update vecino"] .
+  if (P @ [XN, YN]) <= (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) + (1.0 / sqrt(2.0)) * get(CM, XN, YN, NC) .
  eq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) =
                                    if (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) < T
                                    then < {XN, YN}, empty >
@@ -304,7 +306,6 @@ fmod ASTAR is
   if FI := if Y > 0 then P @ [X, sd(Y,1)] else infinite fi /\
      FI' := if s(Y) < NC then P @ [X, s(Y)] else infinite fi .
 
- *** TODO
  op computePath : Pose Pose Potential Nat Nat -> Path .
  ceq computePath({X, Y, Z} Q, GOAL, P, NR, NC) = noPath
   if P @ [X, Y] == infinite .
@@ -313,7 +314,7 @@ fmod ASTAR is
  op $computePath : Pose Pose Potential Nat Nat Path -> Path .
  eq $computePath({X, Y}, {X, Y, Z} Q, P, NR, NC, PT) = PT ({X, Y, Z} Q) .
  ceq $computePath({X, Y}, GOAL, P, NR, NC, PT) = $computePath(ACCP, GOAL, P, NR, NC, PT ({X, Y, 0} 0))
-  if ACCP := getMin({X, Y}, P, NR, NC) [owise] .
+  if ACCP := getMin({X, Y}, P, NR, NC) [owise print X " " Y " " P " " NR " " NC] .
 
  op getMin : Pose Potential Nat Nat -> Pose .
  eq getMin(INIT, P, NR, NC) = getMin(INIT, P, NR, NC, noPose, infinite, 0) .
@@ -363,12 +364,59 @@ fmod ASTAR is
   if H := float(sd(X, X')) /\
      V := float(sd(Y, Y')) .
 
-endfm
+ op finished : Potential -> Bool .
+ eq finished((F . R) P ) = true .
+ eq finished(P) = false [owise] .
+endm
 
 *** set print attribute on .
 
-red a*({2, 2, 0} 90, {0, 0, 0} 90, {10, 10,  10,  10,
+***(
+rew a*({2, 2, 0} 90, {0, 0, 0} 90, {10, 10,  10,  10,
                                     10, 255, 255, 10,
                                     10, 10,  10,  10,
                                     10, 10,  10,  10}, 4, 4, 30) .
+)
 
+load model-checker.maude
+
+mod PROPS is
+ pr SATISFACTION .
+ pr ASTAR .
+
+ subsort Potential < State .
+
+ vars CURR NEXT EXC : PoseSet .
+ vars NR NC N X Y : Nat .
+ vars INIT GOAL : Pose .
+ var  CM : CostMap .
+ var  P : Potential .
+ var  T : Float .
+
+ ops wallInCurrent wallInNext wallInExcess : -> Prop [ctor] .
+ ceq a*(INIT, GOAL, CM, P, NR, NC, {X, Y} CURR, NEXT, EXC, T, N) |= wallInCurrent = true
+  if not open?(CM, X, Y, NC) .
+ ceq a*(INIT, GOAL, CM, P, NR, NC, CURR, {X, Y} NEXT, EXC, T, N) |= wallInNext = true
+  if not open?(CM, X, Y, NC) .
+ ceq a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, {X, Y} EXC, T, N) |= wallInExcess = true
+  if not open?(CM, X, Y, NC) .
+endm
+
+mod TEST is
+ pr LTL-SIMPLIFIER .
+ pr MODEL-CHECKER .
+ pr PROPS .
+
+ op init : -> Potential .
+ eq init = a*({2, 2}, {0,0}, {10, 10,  10,  10,
+                       10, 255, 255, 10,
+                       10, 10,  10,  10,
+                       10, 10,  10,  10},
+              ( (0.0 . 2.55e+2 . 2.55e+2 . 2.55e+2)
+                (2.55e+2 . 2.55e+2 . 2.55e+2 . 2.55e+2)
+                (2.55e+2 . 2.55e+2 . 2.55e+2 . 2.55e+2)
+                (2.55e+2 . 2.55e+2 . 2.55e+2 . 2.55e+2)),
+              4, 4, ({0,1}, {1,0}), empty, empty, 5.3684271247461902e+2, 30) .
+endm
+
+red modelCheck(init, [] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess)) .
