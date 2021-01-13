@@ -247,7 +247,7 @@ mod ASTAR is
      < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NR, NC, T, NEXT, EXC) .
  rl a*(INIT, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, s(I)) =>
          if NEXT == empty
-         then a*(INIT, GOAL, CM, P, NR, NC, EXC, NEXT, empty, T + 2.0 * mapCost, I) *** check mapCost
+         then a*(INIT, GOAL, CM, P, NR, NC, EXC, empty, NEXT, T + 2.0 * mapCost, I) *** check mapCost
          else a*(INIT, GOAL, CM, P, NR, NC, NEXT, empty, EXC, T, I)
          fi .
 
