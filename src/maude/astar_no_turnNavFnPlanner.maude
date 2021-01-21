@@ -53,12 +53,14 @@ fmod COSTMAP is
  op check : Int -> Bool .
  eq check(N) = N < 254 .
 
- ops movCost diagMovCost cellCost obstacleCost mapCost : -> Float .
+ ops movCost diagMovCost cellCost obstacleCost mapCost costNeutral stepSize : -> Float .
  eq movCost = 100.0 .
  eq diagMovCost = 140.0 .
  eq cellCost = 50.0 .
  eq obstacleCost = 254.0 .
  eq mapCost = 50.0 .
+ eq costNeutral = 50.0 .
+ eq stepSize = 0.5 .
 
  op float2nat : Float -> Nat [memo] .
  eq float2nat(F) = rat(floor(F)) .
@@ -117,10 +119,15 @@ fmod POTENTIAL is
 endfm
 
 fmod POSE is
+ pr EXT-BOOL .
  pr COSTMAP .
  pr INT .
 
- var N : Nat .
+ vars N NR NC X Y Z X' Y' Z' : Nat .
+ vars Q Q' : Quaternion .
+ vars H V FX FY : Float .
+ var  CM : CostMap .
+ var  NOW : Pose .
 
  sorts BasicPose Pose Quaternion Point .
 
@@ -137,12 +144,86 @@ fmod POSE is
                  fi .
 
  op {_,_,_} : Nat Nat Nat -> Point [ctor] .
+ op {_,_,_} : Float Float Float -> Point [ctor] .
  op {_,_,_,_} : Float Float Float Float -> Quaternion [ctor] .
  op __ : Point Quaternion -> Pose [ctor] .
 
  op {_,_} : Nat Nat -> BasicPose [ctor] .
+ op {_,_} : Float Float -> BasicPose [ctor] .
 
  op noPose : -> Pose [ctor] .
+
+ op h : Pose Pose -> Float .
+ ceq h({X, Y, Z} Q, {X', Y', Z'} Q') = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
+  if H := float(sd(X, X')) /\
+     V := float(sd(Y, Y')) .
+ ceq h({X, Y}, {X', Y'}) = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
+  if H := float(sd(X, X')) /\
+     V := float(sd(Y, Y')) .
+
+ op closest : BasicPose ~> BasicPose .
+ eq closest({FX, FY}) = {float2nat(closest(FX)), float2nat(closest(FY))} .
+
+ op closest : Float -> Float .
+ eq closest(FX) = if _-_(ceiling(FX), FX) <= _-_(FX, floor(FX))
+                  then ceiling(FX)
+                  else floor(FX)
+                  fi .
+
+ *** It returns true if all exist and are open
+ op allNeighborsOpen : CostMap Pose Nat Nat -> Bool .
+ eq allNeighborsOpen(CM, NOW, NR, NC) = $allNeighborsOpen(CM, NOW, NR, NC, 0) .
+
+ op $allNeighborsOpen : CostMap Pose Nat Nat Nat -> Bool .
+ eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 0) =
+               if (s(Y) < NC)
+               then open?(CM, X, s(Y), NC)
+               else false
+               fi and-then
+               $allNeighborsOpen(CM, {X, Y}, NR, NC, 45) .
+ eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 45) =
+               if (X > 0) and (s(Y) < NC)
+               then open?(CM, sd(X, 1), s(Y), NC)
+               else false
+               fi and-then
+               $allNeighborsOpen(CM, {X, Y}, NR, NC, 90) .
+ eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 90) =
+               if X > 0
+               then open?(CM, sd(X, 1), Y, NC)
+               else false
+               fi and-then
+               $allNeighborsOpen(CM, {X, Y}, NR, NC, 135) .
+ eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 135) =
+               if X > 0 and Y > 0
+               then open?(CM, sd(X, 1), sd(Y, 1), NC)
+               else false
+               fi and-then
+               $allNeighborsOpen(CM, {X, Y}, NR, NC, 180) .
+ eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 180) =
+               if Y > 0
+               then open?(CM, X,  sd(Y, 1), NC)
+               else false
+               fi and-then
+               $allNeighborsOpen(CM, {X, Y}, NR, NC, 225) .
+ eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 225) =
+               if (s(X) < NR) and (Y > 0)
+               then open?(CM, s(X),  sd(Y, 1), NC)
+               else false
+               fi and-then
+               $allNeighborsOpen(CM, {X, Y}, NR, NC, 270) .
+ eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 270) =
+               if (s(X) < NR)
+               then open?(CM, s(X),  Y, NC)
+               else false
+               fi and-then
+               $allNeighborsOpen(CM, {X, Y}, NR, NC, 315) .
+ eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 315) =
+               if (s(X) < NR) and (s(Y) < NC)
+               then open?(CM, s(X),  s(Y), NC)
+               else false
+               fi and-then
+               $allNeighborsOpen(CM, {X, Y}, NR, NC, 360) .
+ eq $allNeighborsOpen(CM, NOW, NR, NC, N) = true [owise] .
 endfm
 
 view Pose from TRIV to POSE is
@@ -176,20 +257,137 @@ fmod POSE-SET is
  eq PS \[X, Y] = PS [owise] .
 endfm
 
+fmod GRADIENT is
+ pr FLOAT .
+ pr NAT .
+
+ sort GCell GRow Gradient .
+ subsort GCell < GRow < Gradient .
+
+ op <_,_> : Float Float -> GCell [ctor] .
+
+ op mtGR : -> GRow [ctor] .
+ op __ : GRow GRow -> GRow [ctor assoc id: mtGR] .
+
+ op mtGradient : -> Gradient [ctor] .
+ op _,_ : Gradient Gradient -> Gradient [ctor assoc id: mtGradient] .
+
+ vars X Y N N' : Nat .
+ vars GC GC' : GCell .
+ var  G : Gradient .
+ var  GR : GRow .
+ var  F : Float .
+
+ op _[[_,_]] : Gradient Nat Nat -> GCell .
+ eq (GR, G) [[0, Y]] = GR [Y] .
+ eq (GR, G) [[s(X), Y]] = G [[X, Y]] .
+ eq G [[X,Y]] = < 0.0, 0.0 > [owise] .
+
+ op _[_] : GRow Nat -> GCell .
+ eq (GC GR) [0] = GC .
+ eq (GC GR) [s(Y)] = GR [Y] .
+ eq GR [Y] = < 0.0, 0.0 > [owise] .
+
+ op initialGradient : Nat Nat -> Gradient .
+ eq initialGradient(0, N') = mtGradient .
+ eq initialGradient(s(N), N') = initialGRow(N'), initialGradient(N, N') .
+
+ op initialGRow : Nat -> GRow [memo] .
+ eq initialGRow(0) = mtGR .
+ eq initialGRow(s(N)) = < 0.0, 0.0 > initialGRow(N) .
+
+ op _|_,_|->_ : Gradient Nat Nat GCell -> Gradient .
+ eq (GR, G) | 0, Y |-> GC = (GR [Y] -> GC), G .
+ eq (GR, G) | s(X), Y |-> GC = GR, (G | X, Y |-> GC) .
+ eq G | X,Y |-> GC = G [owise] .
+
+ op _[_]->_ : GRow Nat GCell -> GRow .
+ eq (GC GR) [0] -> GC' = GC' GR .
+ eq (GC GR) [s(Y)] -> GC' = GC (GR [Y] -> GC') .
+ eq GR [Y] -> GC' = GR [owise] .
+endfm
+
+fmod BASIC-TRAVERSE is
+ pr POTENTIAL .
+ pr POSE-SET .
+ pr PATH .
+
+ vars H V V' T FI FI' MINV SNDV DC HF D DX DY SS FX FY FX' FY' FX'' FY'' : Float .
+ vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R : PoseSet .
+ vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
+ vars INIT GOAL ACCP NOW : Pose .
+ vars Q Q' : Quaternion .
+ vars P P' : Potential .
+ var  CM : CostMap .
+ var  PT : Path .
+
+ *** Basic computation without gradient
+ op computePath : Pose Pose Potential Nat Nat -> Path .
+ ceq computePath({X, Y, Z} Q, GOAL, P, NR, NC) = noPath
+  if P @ [X, Y] == infinite .
+ eq computePath({X, Y, Z} Q, GOAL, P, NR, NC) = $computePath({X, Y}, GOAL, P, NR, NC, noPath) [owise] .
+
+ op $computePath : Pose Pose Potential Nat Nat Path -> Path .
+ eq $computePath({X, Y}, {X, Y, Z} Q, P, NR, NC, PT) = PT ({X, Y, Z} Q) .
+ ceq $computePath({X, Y}, GOAL, P, NR, NC, PT) = $computePath(ACCP, GOAL, P, NR, NC, PT ({X, Y, 0} 0))
+  if ACCP := getMin({X, Y}, P, NR, NC) [owise] .
+
+ op getMin : Pose Potential Nat Nat -> Pose .
+ eq getMin(INIT, P, NR, NC) = getMin(INIT, P, NR, NC, noPose, infinite, 0) .
+
+ op getMin : Pose Potential Nat Nat Pose Float Nat -> Pose .
+ ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = if V < MINV
+                                                then getMin({X, Y}, P, NR, NC, {X', Y'}, V, N + 45)
+                                                else getMin({X, Y}, P, NR, NC, ACCP, MINV, N + 45)
+                                                fi
+  if N < 360 /\
+     < X', Y' > := getMove({X, Y}, N, NR, NC) /\
+     V := (P @ [X', Y']) .
+ ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = getMin({X, Y}, P, NR, NC, ACCP, MINV, N + 45)
+  if N < 360 /\
+     not (getMove({X, Y}, N, NR, NC) :: Pair) .
+ eq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = ACCP [owise] .
+
+ sort Pair .
+ op <_,_> : Nat Nat -> Pair [ctor] .
+ op getMove : Pose Nat Nat Nat ~> Pair .
+ ceq getMove({X, Y}, 0, NR, NC)   = <  X, s(Y) >
+  if s(Y) < NC .
+ ceq getMove({X, Y}, 45, NR, NC)  = <  sd(X, 1), s(Y) >
+  if X > 0 /\
+     s(Y) < NC .
+ ceq getMove({X, Y}, 90, NR, NC)  = <  sd(X, 1), Y >
+  if X > 0 .
+ ceq getMove({X, Y}, 135, NR, NC) = < sd(X, 1), sd(Y, 1) >
+  if X > 0 /\
+     Y > 0 .
+ ceq getMove({X, Y}, 180, NR, NC) = < X,  sd(Y, 1) >
+  if Y > 0 .
+ ceq getMove({X, Y}, 225, NR, NC) = < s(X),  sd(Y, 1) >
+  if s(X) < NR /\
+     Y > 0 .
+ ceq getMove({X, Y}, 270, NR, NC) = <  s(X),  Y >
+  if s(X) < NR .
+ ceq getMove({X, Y}, 315, NR, NC) = <  s(X),  s(Y) >
+  if s(X) < NR /\
+     s(Y) < NC .
+endfm
+
 ***(
    The algorithm assumes the number of iterations and the "inflated" map (including limits) are given by the user.
    The (0,0) position is on the upper-left corner.
 )
 fmod ASTAR is
- pr POTENTIAL .
+ pr BASIC-TRAVERSE .
+ pr GRADIENT .
  pr EXT-BOOL .
- pr POSE-SET .
  pr COSTMAP .
  pr PATH .
 
+ vars V V' T FI FI' MINV SNDV DC HF D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FX' FY' FX'' FY'' NORM EX SX SEX EY SY SEY CX CY XX YY : Float .
  vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R : PoseSet .
  vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
- vars H V V' T FI FI' MINV SNDV DC HF D : Float .
+ vars G G' G1 G2 G3 : Gradient .
  vars INIT GOAL ACCP : Pose .
  vars Q Q' : Quaternion .
  vars P P' : Potential .
@@ -201,12 +399,13 @@ fmod ASTAR is
 
  ***     Init Goal         NumRow NumCol Iterations
  op a* : Pose Pose CostMap  Nat    Nat      Nat -> Path .
- ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
+ ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = *** computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
+                                                       computePath(CM, P', {X, Y}, {X', Y'}, stepSize, G, NR, NC, I)
   if P := initialP(NR, NC, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
-     *** EXC := createComplete(NR, NC)\[X, Y] /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
-     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) .
+     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) /\
+     G := initialGradient(NR, NC) .
 
  op initCurrent : Pose CostMap Nat Nat -> PoseSet .
  ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
@@ -304,65 +503,136 @@ fmod ASTAR is
   if FI := if Y > 0 then P @ [X, sd(Y,1)] else infinite fi /\
      FI' := if s(Y) < NC then P @ [X, s(Y)] else infinite fi .
 
- *** TODO
- op computePath : Pose Pose Potential Nat Nat -> Path .
- ceq computePath({X, Y, Z} Q, GOAL, P, NR, NC) = noPath
-  if P @ [X, Y] == infinite .
- eq computePath({X, Y, Z} Q, GOAL, P, NR, NC) = $computePath({X, Y}, GOAL, P, NR, NC, noPath) [owise] .
+ ***                                INIT GOAL STEP SIZE
+ op computePath : CostMap Potential Pose Pose   Float   Gradient Nat Nat Nat -> Path .
+ eq computePath(CM, P, {X, Y}, {X', Y'}, SS, G, NR, NC, N) = computePath(CM, P, {float(X'), float(Y')}, SS, G, NR, NC, N, {float(X), float(Y)}, 0.0, 0.0, noPath) .
 
- op $computePath : Pose Pose Potential Nat Nat Path -> Path .
- eq $computePath({X, Y}, {X, Y, Z} Q, P, NR, NC, PT) = PT ({X, Y, Z} Q) .
- ceq $computePath({X, Y}, GOAL, P, NR, NC, PT) = $computePath(ACCP, GOAL, P, NR, NC, PT ({X, Y, 0} 0))
-  if ACCP := getMin({X, Y}, P, NR, NC) [owise] .
+ ***                                GOAL STEP SIZE                             DX    DY    ACC
+ op computePath : CostMap Potential Pose   Float   Gradient Nat Nat Nat Pose Float Float Path -> Path .
+ eq computePath(CM, P, GOAL, SS, G, NR, NC, 0, CURR, DX, DY, PT) = noPath .
+ ceq computePath(CM, P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX, FY, 0.0} 0)
+  if {X, Y} := closest({FX' + DX, FY' + DY}) /\
+     (P @ [X, Y]) <= costNeutral .
+ ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
+                               computePath(CM, P, GOAL, SS, G, NR, NC, N, {float(X'), float(Y')}, 0.0, 0.0, PT ({FX', FY', 0.0} 0))
+  if FX' := FX + DX /\
+     FY' := FY + DY /\
+     {X, Y} := closest({FX', FY'}) /\
+     (P @ [X, Y]) > costNeutral /\
+     not allNeighborsOpen(CM, {X,Y}, NR, NC) /\
+     {X', Y'} := getMin({X, Y}, P, NR, NC) .
+ ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
+  if FX' := FX + DX /\
+     FY' := FY + DY /\
+     {X, Y} := closest({FX', FY'}) /\
+     (P @ [X, Y]) > costNeutral /\
+     allNeighborsOpen(CM, {X,Y}, NR, NC) /\
+     < CX, CY, G1 > := update&get(G, P, X, Y, NR, NC) /\
+     < SX, SY, G2 > := update&get(G1, P, s(X), Y, NR, NC) /\
+     < SEX, SEY, G3 > := update&get(G2, P, s(X), s(Y), NR, NC) /\
+     < EX, EY, G' > := update&get(G3, P, X, s(Y), NR, NC) /\
+     DDX := _-_(1.0, DX) /\
+     DDY := _-_(1.0, DY) /\
+     XX := (DDY * (DDX * CX) + (DX * EX)) + DY * ((DDX * SX) + (DX * SEX)) /\
+     YY := (DDY * (DDX * CY) + (DX * EY)) + DY * ((DDX * SY) + (DX * SEY)) /\
+     XX == 0.0 /\
+     YY =/= 0.0 .
+ ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
+                               computePath(CM, P, GOAL, SS, G', NR, NC, N, {FX'', FY''}, DX'', DY'', PT ({FX', FY', 0.0} 0))
+  if FX' := FX + DX /\
+     FY' := FY + DY /\
+     {X, Y} := closest({FX', FY'}) /\
+     (P @ [X, Y]) > costNeutral /\
+     allNeighborsOpen(CM, {X,Y}, NR, NC) /\
+     < CX, CY, G1 > := update&get(G, P, X, Y, NR, NC) /\
+     < SX, SY, G2 > := update&get(G1, P, s(X), Y, NR, NC) /\
+     < SEX, SEY, G3 > := update&get(G2, P, s(X), s(Y), NR, NC) /\
+     < EX, EY, G' > := update&get(G3, P, X, s(Y), NR, NC) /\
+     DDX := _-_(1.0, DX) /\
+     DDY := _-_(1.0, DY) /\
+     XX := (DDY * (DDX * CX) + (DX * EX)) + DY * ((DDX * SX) + (DX * SEX)) /\
+     YY := (DDY * (DDX * CY) + (DX * EY)) + DY * ((DDX * SY) + (DX * SEY)) /\
+     ((XX =/= 0.0) or (YY =/= 0.0)) /\
+     DX' := DX + XX * (SS / sqrt((XX * XX) + (YY * YY))) /\
+     DY' := DY + YY * (SS / sqrt((XX * XX) + (YY * YY))) /\
+     FX'' := if abs(DX') > 1.0
+             then FX' + DX'
+             else FX'
+             fi /\
+     DX'' := if abs(DX') > 1.0
+             then _-_(DX', sign(DX'))
+             else DX'
+             fi /\
+     FY'' := if abs(DY') > 1.0
+             then FY' + DY'
+             else FY'
+             fi /\
+     DY'' := if abs(DY') > 1.0
+             then _-_(DY', sign(DY'))
+             else DY'
+             fi .
 
- op getMin : Pose Potential Nat Nat -> Pose .
- eq getMin(INIT, P, NR, NC) = getMin(INIT, P, NR, NC, noPose, infinite, 0) .
+ sort GradientUpdateRes .
+ op <_,_,_> : Float Float Gradient -> GradientUpdateRes [ctor] .
 
- op getMin : Pose Potential Nat Nat Pose Float Nat -> Pose .
- ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = if V < MINV
-                                                then getMin({X, Y}, P, NR, NC, {X', Y'}, V, N + 45)
-                                                else getMin({X, Y}, P, NR, NC, ACCP, MINV, N + 45)
-                                                fi
-  if N < 360 /\
-     < X', Y' > := getMove({X, Y}, N, NR, NC) /\
-     V := (P @ [X', Y']) .
- ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = getMin({X, Y}, P, NR, NC, ACCP, MINV, N + 45)
-  if N < 360 /\
-     not (getMove({X, Y}, N, NR, NC) :: Pair) .
- eq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = ACCP [owise] .
+ op update&get : Gradient Potential Nat Nat Nat Nat -> GradientUpdateRes .
+ ceq update&get(G, P, X, Y, NC, NR) = < FX, FY, G >
+  if < FX, FY > := (G [[X, Y]]) /\
+     < FX, FY > =/= < 0.0, 0.0 > .
+ ceq update&get(G, P, X, Y, NC, NR) = < 0.0, 0.0, G >
+  if (G [[X, Y]]) == < 0.0, 0.0 > /\
+     ((X == 0) or (s(X) == NR) or (Y == 0) or (s(Y) == NC)) .
+ ceq update&get(G, P, X, Y, NC, NR) = < DX', DY', G' >
+  if G [[X, Y]] == < 0.0, 0.0 > /\
+     ((X =/= 0) and (s(X) =/= NR) and (Y =/= 0) and (s(Y) =/= NC)) /\
+     (P @ [X, Y]) == infinite /\
+     DX := if (P @ [X, sd(Y, 1)]) < infinite
+           then - obstacleCost
+           else if (P @ [X, s(Y)]) < infinite
+                then obstacleCost
+                else 0.0
+                fi
+           fi /\
+     DY := if (P @ [sd(X, 1), Y]) < infinite
+           then - obstacleCost
+           else if (P @ [s(X), Y]) < infinite
+                then obstacleCost
+                else 0.0
+                fi
+           fi /\
+     NORM := sqrt((DX * DX) + (DY * DY)) /\
+     DX' := if NORM > 0.0 then DX / NORM else DX fi /\
+     DY' := if NORM > 0.0 then DY / NORM else DY fi /\
+     G' := (G | X, Y |-> < DX', DY' >) .
+ ceq update&get(G, P, X, Y, NC, NR) = < DX', DY', G' >
+  if G [[X, Y]] == < 0.0, 0.0 > /\
+     ((X =/= 0) and (s(X) =/= NR) and (Y =/= 0) and (s(Y) =/= NC)) /\
+     (P @ [X, Y]) < infinite /\
+     DX := if (P @ [X, s(Y)]) < infinite
+           then _-_((P @ [X, Y]), (P @ [X, s(Y)]))
+           else if (P @ [X, sd(Y, 1)]) < infinite
+                then _-_((P @ [X, s(Y, 1)]), (P @ [X, Y]))
+                else 0.0
+                fi
+           fi /\
+     DY := if (P @ [s(X), Y]) < infinite
+           then _-_((P @ [X, Y]), (P @ [s(X), Y]))
+           else if (P @ [sd(X, 1), Y]) < infinite
+                then _-_((P @ [sd(X, 1), Y]), (P @ [X, Y]))
+                else 0.0
+                fi
+           fi /\
+     NORM := sqrt((DX * DX) + (DY * DY)) /\
+     DX' := if NORM > 0.0 then DX / NORM else DX fi /\
+     DY' := if NORM > 0.0 then DY / NORM else DY fi /\
+     G' := (G | X, Y |-> < DX', DY' >) .
 
- sort Pair .
- op <_,_> : Nat Nat -> Pair [ctor] .
- op getMove : Pose Nat Nat Nat ~> Pair .
- ceq getMove({X, Y}, 0, NR, NC)   = <  X, s(Y) >
-  if s(Y) < NC .
- ceq getMove({X, Y}, 45, NR, NC)  = <  sd(X, 1), s(Y) >
-  if X > 0 /\
-     s(Y) < NC .
- ceq getMove({X, Y}, 90, NR, NC)  = <  sd(X, 1), Y >
-  if X > 0 .
- ceq getMove({X, Y}, 135, NR, NC) = < sd(X, 1), sd(Y, 1) >
-  if X > 0 /\
-     Y > 0 .
- ceq getMove({X, Y}, 180, NR, NC) = < X,  sd(Y, 1) >
-  if Y > 0 .
- ceq getMove({X, Y}, 225, NR, NC) = < s(X),  sd(Y, 1) >
-  if s(X) < NR /\
-     Y > 0 .
- ceq getMove({X, Y}, 270, NR, NC) = <  s(X),  Y >
-  if s(X) < NR .
- ceq getMove({X, Y}, 315, NR, NC) = <  s(X),  s(Y) >
-  if s(X) < NR /\
-     s(Y) < NC .
-
- op h : Pose Pose -> Float .
- ceq h({X, Y, Z} Q, {X', Y', Z'} Q') = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
-  if H := float(sd(X, X')) /\
-     V := float(sd(Y, Y')) .
- ceq h({X, Y}, {X', Y'}) = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
-  if H := float(sd(X, X')) /\
-     V := float(sd(Y, Y')) .
-
+ op sign : Float -> Float .
+ eq sign(0.0) = 0.0 .
+ ceq sign(V) = - 1.0
+  if V < 0.0 .
+ ceq sign(V) = 1.0
+  if V > 0.0 .
 endfm
 
 *** set print attribute on .
