@@ -71,8 +71,8 @@ fmod POTENTIAL is
  pr INT .
 
  ops infinite minusInfinite : -> Float .
- eq infinite = 255.0 .
- eq minusInfinite = - 255.0 .
+ eq infinite = 1e10 .
+ eq minusInfinite = - 1e10 .
 
  sort Row Potential .
  subsort Float < Row < Potential .
@@ -507,18 +507,18 @@ fmod ASTAR is
  op computePath : CostMap Potential Pose Pose   Float   Gradient Nat Nat Nat -> Path .
  eq computePath(CM, P, {X, Y}, {X', Y'}, SS, G, NR, NC, N) = computePath(CM, P, {float(X'), float(Y')}, SS, G, NR, NC, N, {float(X), float(Y)}, 0.0, 0.0, noPath) .
 
- ***                                GOAL STEP SIZE                             DX    DY    ACC
+ ***                                GOAL STEP SIZE                            DX    DY    ACC
  op computePath : CostMap Potential Pose   Float   Gradient Nat Nat Nat Pose Float Float Path -> Path .
  eq computePath(CM, P, GOAL, SS, G, NR, NC, 0, CURR, DX, DY, PT) = noPath .
  ceq computePath(CM, P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX, FY, 0.0} 0)
   if {X, Y} := closest({FX' + DX, FY' + DY}) /\
-     (P @ [X, Y]) <= costNeutral .
+     (P @ [X, Y]) < costNeutral .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
                                computePath(CM, P, GOAL, SS, G, NR, NC, N, {float(X'), float(Y')}, 0.0, 0.0, PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
      FY' := FY + DY /\
      {X, Y} := closest({FX', FY'}) /\
-     (P @ [X, Y]) > costNeutral /\
+     (P @ [X, Y]) >= costNeutral /\
      not allNeighborsOpen(CM, {X,Y}, NR, NC) /\
      {X', Y'} := getMin({X, Y}, P, NR, NC) .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
@@ -637,8 +637,8 @@ endfm
 
 *** set print attribute on .
 
-red a*({2, 2, 0} 90, {0, 0, 0} 90, {10, 10,  10,  10,
-                                    10, 255, 255, 10,
-                                    10, 10,  10,  10,
-                                    10, 10,  10,  10}, 4, 4, 30) .
+red a*({2, 2, 0} 90, {0, 0, 0} 90, {50, 50,  50,  50,
+                                    50, 254, 254, 50,
+                                    50, 50,  50,  50,
+                                    50, 50,  50,  50}, 4, 4, 30) .
 
