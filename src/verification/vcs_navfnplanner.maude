@@ -1,0 +1,209 @@
+in "smtex.maude" .
+
+
+fmod POSE-VERIF is
+  protecting BOOLEAN .
+  protecting QUANTIFIER .
+  protecting REAL-INTEGER .
+
+  sorts Pose Point .
+
+  op _===_ : Point Point -> Boolean [ctor gather (e E) prec 51] .
+  op _=/==_ : Point Point -> Boolean [ctor gather (e E) prec 51] .
+  op _?_:_ : Boolean Point Point -> Point [ctor gather (e e e) prec 71] .
+
+  op point-row : Point -> Integer .
+  op point-col : Point -> Integer .
+
+  op point-axiom : Point -> Boolean .
+  eq point-axiom(P:Point) = true .
+
+
+  
+  op pose : Point -> Pose [ctor] .
+
+  op _===_ : Pose Pose -> Boolean [ctor gather (e E) prec 51] .
+  op _=/==_ : Pose Pose -> Boolean [ctor gather (e E) prec 51] .
+  op _?_:_ : Boolean Pose Pose -> Pose [ctor gather (e e e) prec 71] .
+
+  op pose-position : Pose -> Point .
+  
+  op pose-axiom : Pose -> Boolean .
+
+  eq pose-axiom(P:Pose) = true .
+
+  op adjacent-horizontal : Pose Pose -> Boolean .  
+  op adjacent-vertical : Pose Pose -> Boolean .  
+  op adjacent : Pose Pose -> Boolean .
+
+  
+  eq adjacent-horizontal(P1:Pose, P2:Pose) =
+    (point-row(pose-position(P1:Pose)) === point-row(pose-position(P2:Pose)) and point-col(pose-position(P1:Pose)) === point-col(pose-position(P2:Pose)) + 1) or
+    (point-row(pose-position(P1:Pose)) === point-row(pose-position(P2:Pose)) and point-col(pose-position(P1:Pose)) === point-col(pose-position(P2:Pose)) - 1) .
+  
+  eq adjacent-vertical(P1:Pose, P2:Pose) =
+    (point-col(pose-position(P1:Pose)) === point-col(pose-position(P2:Pose)) and point-row(pose-position(P1:Pose)) === point-row(pose-position(P2:Pose)) + 1) or
+    (point-col(pose-position(P1:Pose)) === point-col(pose-position(P2:Pose)) and point-row(pose-position(P1:Pose)) === point-row(pose-position(P2:Pose)) - 1) .
+  
+  vars P1 P2 : Pose .
+  
+  eq adjacent(P1, P2) = 
+    adjacent-horizontal(P1, P2) or adjacent-vertical(P1, P2) .
+
+  op P! : -> Point .
+  ops I! J! : -> Integer [ctor] .
+  
+endfm
+
+view Pose from TRIV to POSE-VERIF is
+        sort Elt to Pose .
+endv
+
+fmod COSTMAP-VERIF is
+  protecting BOOLEAN .
+  protecting QUANTIFIER .
+  protecting REAL-INTEGER .
+  protecting POSE-VERIF .
+  protecting SMT-ARRAY{Integer, Integer} .
+  
+  
+  sort CostMap .
+  
+  op obstacle-cost : -> Real .
+  eq obstacle-cost = toReal(254) .
+  
+  op value : CostMap Point -> Real .
+  op num-rows : CostMap -> Integer .
+  op num-cols : CostMap -> Integer .
+  
+  op costmap-valid : CostMap -> Boolean .
+
+  var CM : CostMap .
+
+
+  
+  eq costmap-valid(CM) = 
+    num-rows(CM) >= 0 and 
+    num-cols(CM) >= 0 and
+    (forall I! .
+    (forall J! . 
+      ((0 <= I! and I! < num-rows(CM) and 0 <= J! and J! < num-cols(CM)) 
+        implies 
+          (forall P! . 
+            ((point-row(P!) === I! and point-row(P!) === J!) implies value(CM, P!) > toReal(0)))))) .
+  
+  
+  var I J : Integer .
+  
+  op open : CostMap Integer Integer -> Boolean .
+  eq open(CM:CostMap, I, J:Integer) =
+    forall P! . (point-row(P!) === I and point-col(P!) === J:Integer) implies
+      value(CM:CostMap, P!) < obstacle-cost .
+endfm
+
+
+
+
+fmod POTENTIALMAP-VERIF is
+  protecting BOOLEAN .
+  protecting QUANTIFIER .
+  protecting REAL-INTEGER .
+  protecting POSE-VERIF .
+  protecting COSTMAP-VERIF .
+
+  sort RealInf .
+  
+  op isInfinity : RealInf -> Boolean .
+  op unwrapReal : RealInf -> Real .
+  
+  sort PotentialMap .
+  
+  op elem : PotentialMap Integer Integer -> RealInf .
+  
+  op potentialmap-valid : PotentialMap CostMap -> Boolean .
+  op has-adjacent-real : Pose PotentialMap Integer Integer -> Boolean .
+  
+  
+  var PM : PotentialMap .
+  var CM : CostMap .
+  var P : Pose .
+  var NR NC : Integer .
+  
+  eq potentialmap-valid(PM, CM) =
+    forall I! .
+    forall J! .
+      (0 <= I! and I! < num-rows(CM) and 0 <= J! and J! < num-cols(CM) and (not isInfinity(elem(PM, I!, J!)))) implies open(CM, I!, J!) .
+
+  eq has-adjacent-real(P, PM, NR, NC) = 
+    0 <= point-row(pose-position(P)) and point-row(pose-position(P)) < NR 
+    and 0 <= point-col(pose-position(P)) and point-col(pose-position(P)) < NC
+    and 
+      (
+        (point-row(pose-position(P)) > 0 and not isInfinity(elem(PM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))))
+        or 
+        (point-row(pose-position(P)) + 1 < NR and not isInfinity(elem(PM, point-row(pose-position(P)) + 1, point-col(pose-position(P)))))
+        or
+        (point-col(pose-position(P)) > 0 and not isInfinity(elem(PM, point-row(pose-position(P)), point-col(pose-position(P)) - 1)))
+        or 
+        (point-col(pose-position(P)) + 1 < NC and not isInfinity(elem(PM, point-row(pose-position(P)), point-col(pose-position(P)) + 1)))      
+      ) .
+  
+      
+  
+endfm
+
+
+fmod POSE_QUEUE is
+  protecting BOOLEAN .
+  protecting SMT-ARRAY{Integer, Pose} .
+  protecting POTENTIALMAP-VERIF .
+  protecting COSTMAP-VERIF .
+
+  sort PoseQueue .
+  subsort Array{Integer, Pose} < PoseQueue .
+  
+  op length : PoseQueue -> Integer .
+  
+  op enqueue : Pose PoseQueue PoseQueue -> Boolean .
+  op dequeue : PoseQueue PoseQueue -> Boolean .
+  op empty : PoseQueue -> Boolean .
+  op front : PoseQueue Pose -> Boolean .
+  
+  op valid-queue : PoseQueue PotentialMap CostMap -> Boolean .
+  
+  op _===_ : PoseQueue PoseQueue -> Boolean [ctor gather (e E) prec 51] .
+  op _=/==_ : PoseQueue PoseQueue -> Boolean [ctor gather (e E) prec 51] .
+  op _?_:_ : Boolean PoseQueue PoseQueue -> PoseQueue [ctor gather (e e e) prec 71] .
+  
+  
+  vars Q Q1 Q2 : PoseQueue .
+  var P : Pose .
+  var PM : PotentialMap .
+  var CM : CostMap .
+  
+  eq enqueue(P, Q1, Q2) =
+    length(Q2) === length(Q1) + 1 
+    and Q2 === Q1[length(Q2) -> P] .
+    
+  eq dequeue(Q1, Q2) = 
+    length(Q2) > 0 
+    and length(Q2) === length(Q1) - 1
+    and (forall I! . (0 <= I! and I! < length(Q2)) implies (Q2[I!] === Q1[I! + 1])) .
+  
+  eq empty(Q) = length(Q) === 0 .
+  
+  eq front(Q, P) = length(Q) > 0 and Q[0] === P .
+  
+  
+  eq valid-queue(Q, PM, CM) =
+    forall I! . (0 <= I! and I! < length(Q)) 
+      implies
+        (
+          0 <= point-row(pose-position(Q[I!])) and point-row(pose-position(Q[I!])) < num-rows(CM)
+        and 
+          0 <= point-col(pose-position(Q[I!])) and point-col(pose-position(Q[I!])) < num-cols(CM)
+         and
+          has-adjacent-real(Q[I!], PM, num-rows(CM), num-cols(CM))          
+        ) .
+endfm
+
