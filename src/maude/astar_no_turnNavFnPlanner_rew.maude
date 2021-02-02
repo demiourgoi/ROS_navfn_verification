@@ -1,213 +1,36 @@
-fmod COSTMAP is
- pr CONVERSION .
- pr INT .
-
- vars X Y NC NR N N' : Int .
- var  F FX FY FNC : Float .
- vars NL NL' : IntList .
- var  CM : CostMap .
- vars S S' : String .
- var  NT : Nat .
-
- sort IntList CostMap .
- subsort Int < IntList .
-
- op mtIL : -> IntList [ctor] .
- op _,_ : IntList IntList -> IntList [ctor assoc id: mtIL] .
- op {_} : IntList -> CostMap [ctor] .
-
- op |_| : IntList -> Nat .
- eq | N | = 1 .
- eq | N, NL | = s(| NL |) .
-
- ***        CostMap   X     Y   NCOLS
- op open? : CostMap Float Float  Float  -> Bool [memo] .
- ceq open?(CM, FX, FY, FNC) = open?(CM, X, Y, NC)
-  if X := float2nat(FX) /\
-     Y := float2nat(FY) /\
-     NC := float2nat(FNC) .
-
- op open? : CostMap Nat Nat Nat  -> Bool .
- ceq open?(CM, X, Y, NC) = check(N')
-  if N := (NC * X) + Y /\
-     N' := skipN&Get(CM, N) .
-
- op get : CostMap Nat Nat Nat -> Float .
- ceq get(CM, X, Y, NC) = float(N')
-  if N := (NC * X) + Y /\
-     N' := skipN&Get(CM, N) .
-
- *** Alternative open? implemented in Python with random access
- *** to the map (it should be commented when outside Python)
- op open2? : Float Float Float -> Bool [memo special (
-    id-hook SpecialHubSymbol
-    term-hook trueTerm (true)
-    term-hook falseTerm (false)
- )] .
-
- op skipN&Get : CostMap Nat -> Int .
- eq skipN&Get({N, NL'}, 0) = N .
- eq skipN&Get({N, NL'}, s(NT)) = skipN&Get({NL'}, NT) .
- eq skipN&Get(CM, NT) = - 1 [owise] .
-
- op check : Int -> Bool .
- eq check(N) = N < 254 .
-
- ops movCost diagMovCost cellCost obstacleCost mapCost : -> Float .
- eq movCost = 100.0 .
- eq diagMovCost = 140.0 .
- eq cellCost = 50.0 .
- eq obstacleCost = 254.0 .
- eq mapCost = 50.0 .
-
- op float2nat : Float -> Nat [memo] .
- eq float2nat(F) = rat(floor(F)) .
-endfm
-
-fmod POTENTIAL is
- pr FLOAT .
- pr INT .
-
- ops infinite minusInfinite : -> Float .
- eq infinite = 255.0 .
- eq minusInfinite = - 255.0 .
-
- sort Row Potential .
- subsort Float < Row < Potential .
-
- op noNum : -> Row [ctor] .
- op _._ : Row Row -> Row [ctor assoc id: noNum] .
-
- op noRow : -> Potential [ctor] .
- op __ : Potential Potential -> Potential [ctor assoc id: noRow] .
-
- vars I I' F F' : Float .
- vars P P' : Potential .
- vars N N' N1 N2 : Nat .
- vars R R' : Row .
-
- op _@[_,_] : Potential Nat Nat ~> Float .
- eq (R P) @ [0, N] = R [N] .
- eq (R P) @ [s(N), N'] = P @ [N, N'] .
-
- op _[_] : Row Nat ~> Float .
- eq (I . R) [0] = I .
- eq (I . R) [s(N)] = R [N] .
-
- op _[_;_\\_] : Potential Nat Nat Float ~> Potential .
- eq (R P) [0 ; N \\ I] = (R [N \\ I]) P .
- eq (R P) [s(N) ; N' \\ I] = R (P [N ; N' \\ I]) .
-
- op _[_\\_] : Row Nat Float ~> Row .
- eq (I . R) [0 \\ I'] = I' . R .
- eq (I . R) [s(N) \\ I'] = I . (R [N \\ I']) .
-
- ***          Rows Cols  Init Init
- op initialP : Nat  Nat   Nat Nat  -> Potential .
- ceq initialP(N, N', N1, N2) = P [N1 ; N2 \\ 0.0]
-  if P := initial(N, N') .
-
- op initial : Nat Nat -> Potential .
- eq initial(0, N') = noRow .
- eq initial(s(N), N') = initial(N') initial(N, N') .
-
- op initial : Nat -> Row [memo] .
- eq initial(0) = noNum .
- eq initial(s(N)) = infinite . initial(N) .
-endfm
-
-fmod POSE is
- pr COSTMAP .
- pr INT .
-
- var N : Nat .
-
- sorts BasicPose Pose Quaternion Point .
-
- *** Simplified representation for angles
- subsort Int < Quaternion .
-
- *** Simplified pose for 2D
- subsort BasicPose < Pose .
-
- op getCost : Int ~> Float [memo] .
- eq getCost(N) = if (N rem 90) == 0
-                 then movCost
-                 else diagMovCost
-                 fi .
-
- op {_,_,_} : Nat Nat Nat -> Point [ctor] .
- op {_,_,_,_} : Float Float Float Float -> Quaternion [ctor] .
- op __ : Point Quaternion -> Pose [ctor] .
-
- op {_,_} : Nat Nat -> BasicPose [ctor] .
-
- op noPose : -> Pose [ctor] .
-endfm
-
-view Pose from TRIV to POSE is
- sort Elt to Pose .
-endv
-
-fmod PATH is
- inc LIST{Pose} * (sort List{Pose} to Path,
-                   op nil to noPath) .
-endfm
-
-fmod POSE-SET is
- pr SET{Pose} * (sort Set{Pose} to PoseSet) .
-
- eq (P:Pose, P:Pose) = P:Pose .
-
- vars X Y N N' : Nat .
- var  PS : PoseSet .
-
- op createComplete : Nat Nat -> PoseSet .
- eq createComplete(0, N) = empty .
- eq createComplete(s(N), N') = createComplete*(N, N'),
-                               createComplete(N, N') .
-
- op createComplete* : Nat Nat -> PoseSet .
- eq createComplete*(N, 0) = empty .
- eq createComplete*(N, s(N')) = {N, N'}, createComplete*(N, N') .
-
- op _\[_,_] : PoseSet Nat Nat -> PoseSet .
- eq ({X, Y}, PS)\[X, Y] = PS .
- eq PS \[X, Y] = PS [owise] .
-endfm
+load common.maude
 
 ***(
    The algorithm assumes the number of iterations and the "inflated" map (including limits) are given by the user.
    The (0,0) position is on the upper-left corner.
 )
 mod ASTAR is
- pr POTENTIAL .
+ pr GRADIENT-TRAVERSAL .
+ pr GRADIENT .
  pr EXT-BOOL .
- pr POSE-SET .
  pr COSTMAP .
- pr PATH .
 
+ vars V V' T FI FI' MINV SNDV DC HF D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FX' FY' : Float .
  vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R : PoseSet .
  vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
- vars H V V' T FI FI' MINV SNDV DC HF D F : Float .
  vars INIT GOAL ACCP : Pose .
  vars Q Q' : Quaternion .
  vars P P' : Potential .
+ var  G : Gradient .
  var  CM : CostMap .
  var  PT : Path .
- var  R : Row .
 
  sort TraversalResult .
  op <_,_> : PoseSet PoseSet -> TraversalResult [ctor] .
 
  ***     Init Goal         NumRow NumCol Iterations
  op a* : Pose Pose CostMap  Nat    Nat      Nat -> Path .
- crl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) => computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
+ crl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) => computePath(CM, P', {X, Y}, {X', Y'}, stepSize, G, NR, NC, I)
   if P := initialP(NR, NC, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
-     *** EXC := createComplete(NR, NC)\[X, Y] /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
-     a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) => P' .
+     a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) => P' /\
+     G := initialGradient(NR, NC) .
 
  op initCurrent : Pose CostMap Nat Nat -> PoseSet .
  ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
@@ -272,7 +95,7 @@ mod ASTAR is
 
  op traverseNeighbor : Pose Pose Pose CostMap Potential Nat Float -> TraversalResult .
  ceq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) = < empty, empty >
-  if (P @ [XN, YN]) <= (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) + (1.0 / sqrt(2.0)) * get(CM, XN, YN, NC) .
+  if (P @ [XN, YN]) <= (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) + (1.0 / sqrt(2.0)) * get(CM, XN, YN, NC) [print "No update vecino"] .
  eq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) =
                                    if (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) < T
                                    then < {XN, YN}, empty >
@@ -289,7 +112,7 @@ mod ASTAR is
  ceq updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) = P
   if DC := _-_(SNDV, MINV) /\
      HF := get(CM, X, Y, NC) /\
-     DC <= HF /\
+     DC < HF /\
      D := DC / HF /\
      V := - 0.2301 * D * D + 0.5307 * D + 0.7040 /\
      V' := MINV + HF * V /\
@@ -305,71 +128,14 @@ mod ASTAR is
   if FI := if Y > 0 then P @ [X, sd(Y,1)] else infinite fi /\
      FI' := if s(Y) < NC then P @ [X, s(Y)] else infinite fi .
 
- op computePath : Pose Pose Potential Nat Nat -> Path .
- ceq computePath({X, Y, Z} Q, GOAL, P, NR, NC) = noPath
-  if P @ [X, Y] == infinite .
- eq computePath({X, Y, Z} Q, GOAL, P, NR, NC) = $computePath({X, Y}, GOAL, P, NR, NC, noPath) [owise] .
-
- op $computePath : Pose Pose Potential Nat Nat Path -> Path .
- eq $computePath({X, Y}, {X, Y, Z} Q, P, NR, NC, PT) = PT ({X, Y, Z} Q) .
- ceq $computePath({X, Y}, GOAL, P, NR, NC, PT) = $computePath(ACCP, GOAL, P, NR, NC, PT ({X, Y, 0} 0))
-  if ACCP := getMin({X, Y}, P, NR, NC) [owise print X " " Y " " P " " NR " " NC] .
-
- op getMin : Pose Potential Nat Nat -> Pose .
- eq getMin(INIT, P, NR, NC) = getMin(INIT, P, NR, NC, noPose, infinite, 0) .
-
- op getMin : Pose Potential Nat Nat Pose Float Nat -> Pose .
- ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = if V < MINV
-                                                then getMin({X, Y}, P, NR, NC, {X', Y'}, V, N + 45)
-                                                else getMin({X, Y}, P, NR, NC, ACCP, MINV, N + 45)
-                                                fi
-  if N < 360 /\
-     < X', Y' > := getMove({X, Y}, N, NR, NC) /\
-     V := (P @ [X', Y']) .
- ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = getMin({X, Y}, P, NR, NC, ACCP, MINV, N + 45)
-  if N < 360 /\
-     not (getMove({X, Y}, N, NR, NC) :: Pair) .
- eq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = ACCP [owise] .
-
- sort Pair .
- op <_,_> : Nat Nat -> Pair [ctor] .
- op getMove : Pose Nat Nat Nat ~> Pair .
- ceq getMove({X, Y}, 0, NR, NC)   = <  X, s(Y) >
-  if s(Y) < NC .
- ceq getMove({X, Y}, 45, NR, NC)  = <  sd(X, 1), s(Y) >
-  if X > 0 /\
-     s(Y) < NC .
- ceq getMove({X, Y}, 90, NR, NC)  = <  sd(X, 1), Y >
-  if X > 0 .
- ceq getMove({X, Y}, 135, NR, NC) = < sd(X, 1), sd(Y, 1) >
-  if X > 0 /\
-     Y > 0 .
- ceq getMove({X, Y}, 180, NR, NC) = < X,  sd(Y, 1) >
-  if Y > 0 .
- ceq getMove({X, Y}, 225, NR, NC) = < s(X),  sd(Y, 1) >
-  if s(X) < NR /\
-     Y > 0 .
- ceq getMove({X, Y}, 270, NR, NC) = <  s(X),  Y >
-  if s(X) < NR .
- ceq getMove({X, Y}, 315, NR, NC) = <  s(X),  s(Y) >
-  if s(X) < NR /\
-     s(Y) < NC .
-
- op h : Pose Pose -> Float .
- ceq h({X, Y, Z} Q, {X', Y', Z'} Q') = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
-  if H := float(sd(X, X')) /\
-     V := float(sd(Y, Y')) .
- ceq h({X, Y}, {X', Y'}) = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
-  if H := float(sd(X, X')) /\
-     V := float(sd(Y, Y')) .
 endm
 
 *** set print attribute on .
 
-rew a*({2, 2, 0} 90, {0, 0, 0} 90, {10, 10,  10,  10,
-                                    10, 255, 255, 10,
-                                    10, 10,  10,  10,
-                                    10, 10,  10,  10}, 4, 4, 30) .
+rew a*({2, 2, 0} 90, {0, 0, 0} 90, {50, 50,  50,  50,
+                                    50, 254, 254, 50,
+                                    50, 50,  50,  50,
+                                    50, 50,  50,  50}, 4, 4, 30) .
 
 load model-checker.maude
 
@@ -413,3 +179,4 @@ mod TEST is
 endm
 
 red modelCheck(init, [] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess)) .
+
