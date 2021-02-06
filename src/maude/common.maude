@@ -325,7 +325,7 @@ fmod BASIC-TRAVERSE is
  pr POSE-SET .
  pr PATH .
 
- vars H V V' T MINV DC D DX DY SS FX FY FX' FY' FX'' FY'' : Float .
+ vars H V V' T MINV D DX DY SS FX FY FX' FY' FX'' FY'' : Float .
  vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
  vars INIT GOAL ACCP NOW : Pose .
  vars Q Q' : Quaternion .
@@ -393,7 +393,7 @@ fmod GRADIENT-TRAVERSAL is
  pr PATH .
  pr SIGN .
 
- vars V T DC D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FX' FY' FX'' FY'' NORM EX SX SEX EY SY SEY CX CY XX YY : Float .
+ vars V T D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FX' FY' FX'' FY'' NORM EX SX SEX EY SY SEY CX CY XX YY : Float .
  vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
  vars G G' G1 G2 G3 : Gradient .
  vars INIT GOAL : Pose .
