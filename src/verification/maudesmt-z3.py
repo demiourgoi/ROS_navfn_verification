@@ -1,10 +1,9 @@
 #
-# Extension of the Maude SMT support for other theories
+# Extension of the Maude SMT support for other theories (Z3 version)
 #
 
 import maude
-import pysmt
-import pysmt.shortcuts as smt
+import z3 as smt
 
 # Adaptation for versions before 0.6
 if maude.Symbol.__hash__ is None:
@@ -35,25 +34,27 @@ class SMTConverter:
 		self.load_real()
 		self.load_real_integer()
 
-		self.sorts_table[self.boolean_sort] = smt.BOOL
-		self.sorts_table[self.integer_sort] = smt.INT
-		self.sorts_table[self.real_sort] = smt.REAL
+		self.sorts_table[self.boolean_sort] = smt.BoolSort()
+		self.sorts_table[self.integer_sort] = smt.IntSort()
+		self.sorts_table[self.real_sort] = smt.RealSort()
 
 	def load_boolean(self):
 		self.boolean_sort = self.module.findSort('Boolean')
 		boolk = self.boolean_sort.kind()
 
+		b = smt.BoolRef
+
 		boolean_ops = [
-			('true', 0, smt.TRUE),
-			('false', 0, smt.FALSE),
+			('true', 0, lambda: smt.BoolVal(True)),
+			('false', 0, lambda: smt.BoolVal(False)),
 			('not_', 1, smt.Not),
 			('_and_', 2, smt.And),
 			('_xor_', 2, smt.Xor),
 			('_or_', 2, smt.Or),
 			('_implies_', 2, smt.Implies),
-			('_===_', 2, smt.EqualsOrIff),
-			('_=/==_', 2, smt.NotEquals),
-			('_?_:_', 3, smt.Ite)
+			('_===_', 2, b.__eq__),
+			('_=/==_', 2, b.__ne__),
+			('_?_:_', 3, smt.If)
 		]
 
 		for name, arity, target in boolean_ops:
@@ -67,21 +68,22 @@ class SMTConverter:
 
 		kinds = [self.boolean_sort.kind(), self.integer_sort.kind()]
 
+		a = smt.ArithRef
+
 		integer_ops = [
-			('-_', [1], 1, lambda x: smt.Minus(smt.Nat(0), x)),
-			('_+_', [1, 1], 1, smt.Plus),
-			('_*_', [1, 1], 1, smt.Times),
-			('_-_', [1, 1], 1, smt.Minus),
-			# Not supported by pysmt
-			('_div_', [1, 1], 1, None),
-			('_mod_', [1, 1], 1, None),
-			('_<_', [1, 1], 0, smt.LT),
-			('_<=_', [1, 1], 0, smt.LE),
-			('_>_', [1, 1], 0, smt.GT),
-			('_>=_', [1, 1], 0, smt.GE),
-			('_===_', [1, 1], 0, smt.Equals),
-			('_=/==_', [1, 1], 0, smt.NotEquals),
-			('_?_:_', [0, 1, 1], 1, smt.Ite)
+			('-_', [1], 1, a.__neg__),
+			('_+_', [1, 1], 1, a.__add__),
+			('_*_', [1, 1], 1, a.__mul__),
+			('_-_', [1, 1], 1, a.__sub__),
+			('_div_', [1, 1], 1, a.__div__),
+			('_mod_', [1, 1], 1, a.__mod__),
+			('_<_', [1, 1], 0, a.__lt__),
+			('_<=_', [1, 1], 0, a.__le__),
+			('_>_', [1, 1], 0, a.__gt__),
+			('_>=_', [1, 1], 0, a.__ge__),
+			('_===_', [1, 1], 0, a.__eq__),
+			('_=/==_', [1, 1], 0, a.__ne__),
+			('_?_:_', [0, 1, 1], 1, smt.If)
 		]
 
 		for name, domain, rtype, target in integer_ops:
@@ -97,19 +99,21 @@ class SMTConverter:
 
 		kinds = [self.boolean_sort.kind(), self.real_sort.kind()]
 
+		a = smt.ArithRef
+
 		real_ops = [
-			('-_', [1], 1, lambda x: smt.Minus(smt.Real(0.0), x)),
-			('_+_', [1, 1], 1, smt.Plus),
-			('_*_', [1, 1], 1, smt.Times),
-			('_-_', [1, 1], 1, smt.Minus),
-			('_/_', [1, 1], 1, smt.Div),
-			('_<_', [1, 1], 0, smt.LT),
-			('_<=_', [1, 1], 0, smt.LE),
-			('_>_', [1, 1], 0, smt.GT),
-			('_>=_', [1, 1], 0, smt.GE),
-			('_===_', [1, 1], 0, smt.Equals),
-			('_=/==_', [1, 1], 0, smt.NotEquals),
-			('_?_:_', [0, 1, 1], 1, smt.Ite)
+			('-_', [1], 1, a.__neg__),
+			('_+_', [1, 1], 1, a.__add__),
+			('_*_', [1, 1], 1, a.__mul__),
+			('_-_', [1, 1], 1, a.__sub__),
+			('_/_', [1, 1], 1, a.__div__),
+			('_<_', [1, 1], 0, a.__lt__),
+			('_<=_', [1, 1], 0, a.__le__),
+			('_>_', [1, 1], 0, a.__gt__),
+			('_>=_', [1, 1], 0, a.__ge__),
+			('_===_', [1, 1], 0, a.__eq__),
+			('_=/==_', [1, 1], 0, a.__ne__),
+			('_?_:_', [0, 1, 1], 1, smt.If)
 		]
 
 		for name, domain, rtype, target in real_ops:
@@ -125,9 +129,8 @@ class SMTConverter:
 
 		real_integer_ops = [
 			('toReal', [1], 2, smt.ToReal),
-			# Not supported by pysmt
-			('toInteger', [2], 1, lambda x: x),
-			('isInteger', [2], 0, None)
+			('toInteger', [2], 1, smt.ToInt),
+			('isInteger', [2], 0, smt.IsInt)
 		]
 
 		for name, domain, rtype, target in real_integer_ops:
@@ -175,24 +178,25 @@ class SMTConverter:
 
 		# Custom sort
 		else:
-			smt_sort = smt.Type(str(sort))
+			smt_sort = smt.DeclareSort(str(sort))
 
 		self.sorts_table[sort] = smt_sort
 		return smt_sort
 
 	def _make_fnsymb(self, symbol):
-		rtype = self._smt_sort(symbol.getRangeSort())
 		domain = [self._smt_sort(sort) for sort in symbol.getOpDeclarations()[0].getDomainAndRange()]
 
-		return smt.Symbol(str(symbol), smt.FunctionType(rtype, domain[:-1]))
+		return smt.Function(str(symbol), *domain)
 
 	def _make_function(self, symbol):
-		symb = lambda *args: smt.Function(self._make_fnsymb(symbol), args)
+		symb = self._make_fnsymb(symbol)
 		self.ops_table[symbol] = symb
 		return symb
 
 	def _make_polymorph(self, symbol):
 		symbol_name = str(symbol)
+
+		a = smt.ArrayRef
 
 		polymorph_ops = {
 			'forall_._': lambda x, y: smt.ForAll([x], y),
@@ -200,9 +204,9 @@ class SMTConverter:
 			# Not really polymorph, but parameterized
 			'_[_]': smt.Select,
 			'_[_->_]': smt.Store,
-			'_===_': smt.EqualsOrIff,
-			'_=/==_': smt.NotEquals,
-			'_?_:_': smt.Ite
+			'_===_': a.__eq__,
+			'_=/==_': a.__ne__,
+			'_?_:_': smt.If
 		}
 
 		symb = polymorph_ops.get(symbol_name)
@@ -220,13 +224,13 @@ class SMTConverter:
 
 		# Variable
 		if str(symbol) == str(term.getSort()):
-			return smt.Symbol(str(term), self._smt_sort(term.getSort()))
+			return smt.Const(str(term), self._smt_sort(term.getSort()))
 		# Integer constant
 		elif symbol == self.intlit_symb:
-			return smt.Int(int(term))
+			return smt.IntVal(int(term))
 		# Real constant
 		elif symbol == self.reallit_symb:
-			return smt.Real(float(term))
+			return smt.RealVal(float(term))
 		# Other symbols
 		else:
 			symb = self.ops_table.get(symbol)
@@ -252,10 +256,11 @@ if __name__ == '__main__':
 
 	sc = SMTConverter(smtmod)
 
-	# Archimedian property
+	# Archimedian property (is not decided by Z3)
 	t1 = sc.translate(smtmod.parseTerm('forall C:Real . (C:Real > 0/1 implies exists N:Integer . (N:Integer > 1 and 1/1 / toReal(N:Integer) < C:Real))'))
 	# Reals are not bounded
-	t2 = sc.translate(smtmod.parseTerm('forall N:Integer . exists X:Real . X:Real > toReal(N:Integer)'))
+	t2 = sc.translate(smtmod.parseTerm('forall N:Integer . exists C . C > toReal(N:Integer)'))
+
 	# Uinterpreted functions
 	t3 = sc.translate(smtmod.parseTerm('log(R:Real) === 1/1'))
 	t4 = sc.translate(smtmod.parseTerm('log(R:Real) === 1/1 and log(R:Real) === 2/1'))
@@ -265,8 +270,7 @@ if __name__ == '__main__':
 	t7 = sc.translate(smtmod.parseTerm('(A:Array{Integer, Integer}[N:Integer -> 1])[N:Integer] === 1 and length(A:Array{Integer,Integer}) > N:Integer'))
 
 	# Check properties
-	for t in [t1, t2, t3, t4, t5, t6, t7]:
-		try:
-			print(t, '--', 'sat' if smt.is_sat(t) else 'unsat')
-		except pysmt.exceptions.SolverReturnedUnknownResultError:
-			print(t, '--', 'undef')
+	for t in [t2, t3, t4, t5, t6, t7]:
+		solver = smt.Solver()
+		solver.add(t)
+		print(t, '--', solver.check())

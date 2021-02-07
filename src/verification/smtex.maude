@@ -47,6 +47,9 @@ fmod TEST is
 
 	sort Being .
 
+	*** Constants can be used as variables
+	op C : -> Real [ctor] .
+
 	op log : Real -> Real [ctor] .
 
 	op human : Being -> Boolean [ctor] .
