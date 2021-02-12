@@ -177,11 +177,15 @@ fmod POSE is
  op closest : BasicPose ~> BasicPose .
  eq closest({FX, FY}) = {float2nat(closest(FX)), float2nat(closest(FY))} .
 
+***(
  op closest : Float -> Float .
  eq closest(FX) = if _-_(ceiling(FX), FX) <= _-_(FX, floor(FX))
                   then ceiling(FX)
                   else floor(FX)
                   fi .
+)
+ op closest : Float -> Float .
+ eq closest(FX) = floor(FX) .
 
  *** It returns true if all exist and are open
  op allNeighborsOpen : CostMap Pose Nat Nat -> Bool .
