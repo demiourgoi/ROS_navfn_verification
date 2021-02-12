@@ -1,78 +1,89 @@
 # -*- coding: utf-8 -*-
 
-import time, csv, maude, math
+import time
+import csv
+import maude
+import math
+import sys
 
-import default_costmap
-
-TEST_SUITE = [
-    [(161, 194, 0.0), (162, 194, 0.0)],
-    [(161, 194, 0.0), (161, 193, 0.0)],
-    [(161, 194, 0.0), (162, 193, 0.0)],
-    [(161, 194, 0.0), (168, 194, 0.0)],
-    [(162, 189, 45.0), (236, 189, 180.0)],
-    [(162, 189, 45.0), (236, 189, 180.0)],
-    # (−1.9, -0.55) -> (1.75, 0.5)
-    [(162, 189, 0.0), (235, 210, 0.0)],
-    [(162, 189, 0.0), (212, 237, 20.0)],
-    [(162, 189, 0.0), (287, 237, 30.0)],
-    [(162, 189, 0.0), (163, 211, 40.0)],
-    [(162, 189, 0.0), (199, 161, 50.0)],
-    [(162, 189, 0.0), (235, 198, 60.0)],
-    [(190, 222, 180.0), (211, 222, 0.0)],
-    [(189, 211, 135.0), (211, 189, 45.0)],
-    # Not possible
-    # [(156, 200, 0.0), (178, 200, 0.0)],
-]
 
 class DirectProfiler:
     '''Profile the Maude A* algorithm directly'''
 
-    ASTAR_MAUDE_PATH = '../maude/astar.maude'
+    ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner.maude'
 
-    def __init__(self):
+    def __init__(self, test_path):
+        with open(test_path, 'r') as ftest:
+            lines = ftest.readlines()
+            self.w, self.h = lines[0].strip().split()
+            self.w = int(self.w)
+            self.h = int(self.h)
+            self.map_bin_file = lines[1].strip()
+            self.map_data = [0] * (self.w * self.h)
+            with open(self.map_bin_file, 'rb') as fmap:
+                for i in range(self.w * self.h):
+                    cell = fmap.read(1)
+                    self.map_data[i] = int.from_bytes(cell, 'big')  # It's one byte, it doesn't matter big or little endian
+                
+            self.test_cases = list()
+            for test in lines[3:]:
+                x0, y0, x1, y1 = [float(c) for c in test.strip().split()]
+                self.test_cases.append(((x0, y0, 0.0), (x1, y1, 0.0)))  # Orientation 0 degrees
+            print(self.test_cases)
+    
         maude.init()
         maude.load(self.ASTAR_MAUDE_PATH)
 
         # Find sorts and operators needed to construct the a* term
-        m            = maude.getModule('ASTAR')
-        pose_kind    = m.findSort('Pose').kind()
-        costmap_kind = m.findSort('CostMap').kind()
-        float_kind   = m.findSort('Float').kind()
-        path_kind    = m.findSort('Path').kind()
-        int_kind     = m.findSort('IntList').kind()
+        self.m       = maude.getModule('ASTAR')
+        pose_kind    = self.m.findSort('Pose').kind()
+        costmap_kind = self.m.findSort('CostMap').kind()
+        float_kind   = self.m.findSort('Float').kind()
+        path_kind    = self.m.findSort('Path').kind()
+        int_kind     = self.m.findSort('IntList').kind()
+        nat_kind     = self.m.findSort('Nat').kind()
+        
+        
+        self.astar = self.m.findSymbol('a*', [pose_kind, pose_kind, costmap_kind,
+                                         nat_kind, nat_kind, nat_kind], 
+                                         path_kind)
 
-        self.astar   = m.findSymbol('a*', [pose_kind, pose_kind, costmap_kind, float_kind, float_kind], path_kind)
-        intlist      = m.findSymbol('_`,_', [int_kind] * 2, int_kind) 
-        cmap         = m.findSymbol('`{_`}', [int_kind], costmap_kind)
+        intlist      = self.m.findSymbol('_`,_', [int_kind] * 2, int_kind) 
+        cmap         = self.m.findSymbol('`{_`}', [int_kind], costmap_kind)
 
-        self.pattern = m.parseTerm('{ X:Float, Y:Float, Z:Float } O:Nat')
+        self.pattern = self.m.parseTerm('{ X:Float, Y:Float, Z:Float } O:Nat')
 
-        self.mod = m
+        self.mod = self.m
 
         # Constants that will be used multiple times
-        zero = m.parseTerm('0')
-        one  = m.parseTerm('1')
-        mtIL = m.parseTerm('mtIL')
+        zero = self.m.parseTerm('0')
+        one  = self.m.parseTerm('1')
+        mtIL = self.m.parseTerm('mtIL')
+        
+        # Dictionary with Maude integer terms from 0 to 255 to avoid parsing 
+        # when constructing the map_list in Maude
+        int_terms = dict()
+        for i in range(0,256):
+        	int_terms[i] = self.m.parseTerm(str(i))
 
         # Build the IntList with the costmap data
         map_list = mtIL
 
-        for c in default_costmap.data:
-                if c < 50:
-                        map_list = intlist(map_list, zero)
-                else:
-                        map_list = intlist(map_list, one)
+        for c in self.map_data:
+        	map_list = intlist(map_list, int_terms[c])
 
         self.static_args = [
             cmap(map_list),
-            m.parseTerm(str(float(default_costmap.height))),
-            m.parseTerm(str(float(default_costmap.width)))
+            self.m.parseTerm(str(int(self.h))),
+            self.m.parseTerm(str(int(self.w))),
+            self.m.parseTerm("100"),  # TODO Enrique: improve, not a constant
         ]
 
+        # TODO Enrique: adapt this hook if needed
         class MapHook(maude.Hook):
             def run(self, term, data):
                 x, y, ncols = [int(arg) for arg in term.arguments()]
-                return data.getTerm('trueTerm' if default_costmap.data[x + y * ncols] < 50 else 'falseTerm')
+                return data.getTerm('trueTerm' if self.map_data[x + y * ncols] < 50 else 'falseTerm')
 
         self.mapHook = MapHook()
         maude.connectEqHook('open2?', self.mapHook)
@@ -81,8 +92,8 @@ class DirectProfiler:
         self.csvfile = open('resultsd.csv', 'w')
         self.csvwriter = csv.writer(self.csvfile)
 
-    def run_test_suite(self):
-        for origin, dest in TEST_SUITE:
+    def run_test_suite(self):          
+        for origin, dest in self.test_cases:
             self.run_astar(origin, dest)
 
     def run_astar(self, origin, dest):
@@ -95,10 +106,17 @@ class DirectProfiler:
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x), float(y), int(t))),
                 *self.static_args
         )
-        maude.input('do clear memo .')
+        maude.input('do clear memo .')  # TODO Enrique: shows a warning 'Warning: <standard input>, line 1: syntax error'
         start_time = time.perf_counter()
+        call = term.copy()
         term.reduce()
         end_time = time.perf_counter()
+
+        print(term.getSort())  ## 
+        print(self.m.findSort('NeList{Pose}')) ##
+        if term.getSort() != self.m.findSort('Pose') and term.getSort() != self.m.findSort('NeList{Pose}'): ## TODO: fail to obtain the sort NeList{Pose}
+            print(f'ERRROR when reducing {call} -> {term}')
+            return     
 
         hmtime = end_time - start_time
         length, rotation, numrot = self.calculate_length(term)
@@ -120,7 +138,13 @@ class DirectProfiler:
         '''Calculate the length, total rotation and number of rotations of a path'''
 
         if str(mresult.symbol()) == 'noPath':
+            # TODO Enrique: adapt to new Maude version.
+            # TODO: should return 3 values?
             return 0.0
+            
+        if mresult.getSort() == self.m.findSort('Pose'):
+            # Origin and destinationa are the same
+            return 0, 0, 0
 
         s  = 0.0     # Length
         st = 0.0     # Total rotation
@@ -130,6 +154,7 @@ class DirectProfiler:
         first = next(it)
 
         x, y, t = self.destruct_pose(first)
+        deg = next(it)
 
         for pose in it:
             if str(pose.symbol()) == 'noPath':
@@ -147,5 +172,5 @@ class DirectProfiler:
         return s, st, nr
 
 if __name__ == '__main__':
-    dprofiler = DirectProfiler()
+    dprofiler = DirectProfiler(sys.argv[1])
     dprofiler.run_test_suite()
