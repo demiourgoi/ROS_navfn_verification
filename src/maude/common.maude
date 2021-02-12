@@ -435,7 +435,7 @@ fmod GRADIENT-TRAVERSAL is
      XX := (DDY * (DDX * CX) + (DX * EX)) + DY * ((DDX * SX) + (DX * SEX)) /\
      YY := (DDY * (DDX * CY) + (DX * EY)) + DY * ((DDX * SY) + (DX * SEY)) /\
      XX == 0.0 /\
-     YY =/= 0.0 .
+     YY == 0.0 .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
                                computePath(CM, P, GOAL, SS, G', NR, NC, N, {FX'', FY''}, DX'', DY'', PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
@@ -510,7 +510,7 @@ fmod GRADIENT-TRAVERSAL is
      DX := if (P @ [X, s(Y)]) < infinite
            then _-_((P @ [X, Y]), (P @ [X, s(Y)]))
            else if (P @ [X, sd(Y, 1)]) < infinite
-                then _-_((P @ [X, s(Y, 1)]), (P @ [X, Y]))
+                then _-_((P @ [X, sd(Y, 1)]), (P @ [X, Y]))
                 else 0.0
                 fi
            fi /\
@@ -525,5 +525,7 @@ fmod GRADIENT-TRAVERSAL is
      DX' := if NORM > 0.0 then DX / NORM else DX fi /\
      DY' := if NORM > 0.0 then DY / NORM else DY fi /\
      G' := (G | X, Y |-> < DX', DY' >) .
-
 endfm
+
+
+

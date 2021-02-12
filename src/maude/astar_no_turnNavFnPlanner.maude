@@ -131,9 +131,7 @@ fmod ASTAR is
 
 endfm
 
-eof
-
-set print attribute on .
+*** set print attribute on .
 
 red a*({2, 2, 0} 90, {0, 0, 0} 90, {50, 50,  50,  50,
                                     50, 50,  50,  50,
