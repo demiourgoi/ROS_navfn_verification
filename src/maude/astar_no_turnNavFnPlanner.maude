@@ -10,7 +10,7 @@ fmod ASTAR is
  pr EXT-BOOL .
  pr COSTMAP .
 
- vars V V' T FI FI' MINV SNDV DC HF D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FX' FY' : Float .
+ vars V V' T FI FI' MINV SNDV DC HF D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FZ FX' FY' FZ' : Float .
  vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R : PoseSet .
  vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
  vars INIT GOAL ACCP : Pose .
@@ -25,6 +25,9 @@ fmod ASTAR is
 
  ***     Init Goal         NumRow NumCol Iterations
  op a* : Pose Pose CostMap  Nat    Nat      Nat -> Path .
+ eq a*({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NR, NC, I) =
+         a*({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
+            {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I) .
  ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = *** computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
                                                        computePath(CM, P', {X, Y}, {X', Y'}, stepSize, G, NR, NC, I)
   if P := initialP(NR, NC, X', Y') /\
@@ -132,6 +135,11 @@ fmod ASTAR is
 endfm
 
 *** set print attribute on .
+
+red a*({2.0, 2.0, 0.0} 90, {0.0, 0.0, 0.0} 90, {50, 50,  50,  50,
+                                                50, 50,  50,  50,
+                                                50, 50,  50,  50,
+                                                50, 50,  50,  50}, 4, 4, 30) .
 
 red a*({2, 2, 0} 90, {0, 0, 0} 90, {50, 50,  50,  50,
                                     50, 50,  50,  50,
