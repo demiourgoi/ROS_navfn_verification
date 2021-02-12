@@ -409,15 +409,15 @@ fmod GRADIENT-TRAVERSAL is
  ***                                GOAL STEP SIZE                            DX    DY    ACC
  op computePath : CostMap Potential Pose   Float   Gradient Nat Nat Nat Pose Float Float Path -> Path .
  eq computePath(CM, P, GOAL, SS, G, NR, NC, 0, CURR, DX, DY, PT) = noPath .
- ceq computePath(CM, P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX, FY, 0.0} 0)
+ ceq computePath(CM, P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX' + DX, FY' + DY, 0.0} 0) ({FX, FY, 0.0} 0)
   if {X, Y} := closest({FX' + DX, FY' + DY}) /\
-     (P @ [X, Y]) < costNeutral .
+     (P @ [X, Y]) <= costNeutral .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
                                computePath(CM, P, GOAL, SS, G, NR, NC, N, {float(X'), float(Y')}, 0.0, 0.0, PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
      FY' := FY + DY /\
      {X, Y} := closest({FX', FY'}) /\
-     (P @ [X, Y]) >= costNeutral /\
+     (P @ [X, Y]) > costNeutral /\
      not allNeighborsOpen(CM, {X,Y}, NR, NC) /\
      {X', Y'} := getMin({X, Y}, P, NR, NC) .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
@@ -527,5 +527,19 @@ fmod GRADIENT-TRAVERSAL is
      G' := (G | X, Y |-> < DX', DY' >) .
 endfm
 
+eof
+
+set print attribute on .
+
+red
+computePath({50,50,50,50,50,50,50,50,50},
+            (1.2724633791999999e+2 . 8.5199999999999989e+1 . 5.0e+1)
+            (1.0e+2 . 5.0e+1 . 0.0)
+            (1.0e+10 . 8.5199999999999989e+1 . 5.0e+1),
+            {1.0,2.0}, 5.0e-1,
+            ((< 0.0,0.0 > < 0.0,0.0 > < 0.0,0.0 >),
+             (< 0.0,0.0 > < 0.0,0.0 > < 0.0,0.0 >),
+             (< 0.0,0.0 > < 0.0,0.0 > < 0.0,0.0 >)), 3, 3, 99, {1.0,1.0}, 0.0, 0.0,
+            {0.0,0.0,0.0} 0) .
 
 
