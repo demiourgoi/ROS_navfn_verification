@@ -71,7 +71,7 @@ fmod ASTAR is
      < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NR, NC, T, NEXT, EXC) .
  eq a*(INIT, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, s(I)) =
          if NEXT == empty
-         then a*(INIT, GOAL, CM, P, NR, NC, EXC, empty, NEXT, T + 2.0 * mapCost, I) *** check mapCost
+         then a*(INIT, GOAL, CM, P, NR, NC, EXC, empty, NEXT, T + 2.0 * mapCost, I)
          else a*(INIT, GOAL, CM, P, NR, NC, NEXT, empty, EXC, T, I)
          fi .
 
@@ -110,7 +110,7 @@ fmod ASTAR is
      _-_(SNDV, MINV) > V /\
      V' := V + MINV /\
      P' := P [X ; Y \\ V'] .
- ceq updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) = P
+ ceq updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) = P'
   if DC := _-_(SNDV, MINV) /\
      HF := get(CM, X, Y, NC) /\
      DC < HF /\
@@ -131,7 +131,16 @@ fmod ASTAR is
 
 endfm
 
-*** set print attribute on .
+eof
+
+set print attribute on .
+
+red a*({2, 2, 0} 90, {0, 0, 0} 90, {50, 50,  50,  50,
+                                    50, 50,  50,  50,
+                                    50, 50,  50,  50,
+                                    50, 50,  50,  50}, 4, 4, 30) .
+
+eof
 
 red a*({2, 2, 0} 90, {0, 0, 0} 90, {50, 50,  50,  50,
                                     50, 254, 254, 50,
