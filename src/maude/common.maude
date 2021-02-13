@@ -411,21 +411,21 @@ fmod GRADIENT-TRAVERSAL is
  eq computePath(CM, P, GOAL, SS, G, NR, NC, 0, CURR, DX, DY, PT) = noPath .
  ceq computePath(CM, P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX' + DX, FY' + DY, 0.0} 0) ({FX, FY, 0.0} 0)
   if {X, Y} := closest({FX' + DX, FY' + DY}) /\
-     (P @ [X, Y]) < costNeutral .
+     (P @ [X, Y]) < costNeutral [print "Eq2 " FX' ", " FY'] .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
                                computePath(CM, P, GOAL, SS, G, NR, NC, N, {float(X'), float(Y')}, 0.0, 0.0, PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
      FY' := FY + DY /\
      {X, Y} := closest({FX', FY'}) /\
      (P @ [X, Y]) >= costNeutral /\
-     not allNeighborsOpen(CM, {X,Y}, NR, NC) /\
-     {X', Y'} := getMin({X, Y}, P, NR, NC) .
+     not allNeighborsOpen(CM, {float2nat(FX),float2nat(FY)}, NR, NC) /\
+     {X', Y'} := getMin({X, Y}, P, NR, NC) [print "Eq3 " FX ", " FY] .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
   if FX' := FX + DX /\
      FY' := FY + DY /\
      {X, Y} := closest({FX', FY'}) /\
      (P @ [X, Y]) >= costNeutral /\
-     allNeighborsOpen(CM, {X,Y}, NR, NC) /\
+     allNeighborsOpen(CM, {float2nat(FX),float2nat(FY)}, NR, NC) /\
      < CX, CY, G1 > := update&get(G, P, X, Y, NR, NC) /\
      < SX, SY, G2 > := update&get(G1, P, s(X), Y, NR, NC) /\
      < SEX, SEY, G3 > := update&get(G2, P, s(X), s(Y), NR, NC) /\
@@ -435,14 +435,14 @@ fmod GRADIENT-TRAVERSAL is
      XX := (DDY * (DDX * CX) + (DX * EX)) + DY * ((DDX * SX) + (DX * SEX)) /\
      YY := (DDY * (DDX * CY) + (DX * EY)) + DY * ((DDX * SY) + (DX * SEY)) /\
      XX == 0.0 /\
-     YY == 0.0 .
+     YY == 0.0 [print "Eq4 " FX ", " FY] .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
                                computePath(CM, P, GOAL, SS, G', NR, NC, N, {FX'', FY''}, DX'', DY'', PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
      FY' := FY + DY /\
      {X, Y} := closest({FX', FY'}) /\
      (P @ [X, Y]) >= costNeutral /\
-     allNeighborsOpen(CM, {X,Y}, NR, NC) /\
+     allNeighborsOpen(CM, {float2nat(FX),float2nat(FY)}, NR, NC) /\
      < CX, CY, G1 > := update&get(G, P, X, Y, NR, NC) /\
      < SX, SY, G2 > := update&get(G1, P, s(X), Y, NR, NC) /\
      < SEX, SEY, G3 > := update&get(G2, P, s(X), s(Y), NR, NC) /\
@@ -455,21 +455,21 @@ fmod GRADIENT-TRAVERSAL is
      DX' := DX + XX * (SS / sqrt((XX * XX) + (YY * YY))) /\
      DY' := DY + YY * (SS / sqrt((XX * XX) + (YY * YY))) /\
      FX'' := if abs(DX') > 1.0
-             then FX' + sign(DX')
-             else FX'
+             then FX + sign(DX')
+             else FX
              fi /\
      DX'' := if abs(DX') > 1.0
              then _-_(DX', sign(DX'))
              else DX'
              fi /\
      FY'' := if abs(DY') > 1.0
-             then FY' + sign(DY')
-             else FY'
+             then FY + sign(DY')
+             else FY
              fi /\
      DY'' := if abs(DY') > 1.0
              then _-_(DY', sign(DY'))
              else DY'
-             fi .
+             fi [print "Eq5 " FX ", " FY] .
 
  sort GradientUpdateRes .
  op <_,_,_> : Float Float Gradient -> GradientUpdateRes [ctor] .
