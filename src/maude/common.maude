@@ -177,15 +177,11 @@ fmod POSE is
  op closest : BasicPose ~> BasicPose .
  eq closest({FX, FY}) = {float2nat(closest(FX)), float2nat(closest(FY))} .
 
-***(
  op closest : Float -> Float .
  eq closest(FX) = if _-_(ceiling(FX), FX) <= _-_(FX, floor(FX))
                   then ceiling(FX)
                   else floor(FX)
                   fi .
-)
- op closest : Float -> Float .
- eq closest(FX) = floor(FX) .
 
  *** It returns true if all exist and are open
  op allNeighborsOpen : CostMap Pose Nat Nat -> Bool .
@@ -415,20 +411,20 @@ fmod GRADIENT-TRAVERSAL is
  eq computePath(CM, P, GOAL, SS, G, NR, NC, 0, CURR, DX, DY, PT) = noPath .
  ceq computePath(CM, P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX' + DX, FY' + DY, 0.0} 0) ({FX, FY, 0.0} 0)
   if {X, Y} := closest({FX' + DX, FY' + DY}) /\
-     (P @ [X, Y]) <= costNeutral .
+     (P @ [X, Y]) < costNeutral .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
                                computePath(CM, P, GOAL, SS, G, NR, NC, N, {float(X'), float(Y')}, 0.0, 0.0, PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
      FY' := FY + DY /\
      {X, Y} := closest({FX', FY'}) /\
-     (P @ [X, Y]) > costNeutral /\
+     (P @ [X, Y]) >= costNeutral /\
      not allNeighborsOpen(CM, {X,Y}, NR, NC) /\
      {X', Y'} := getMin({X, Y}, P, NR, NC) .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
   if FX' := FX + DX /\
      FY' := FY + DY /\
      {X, Y} := closest({FX', FY'}) /\
-     (P @ [X, Y]) > costNeutral /\
+     (P @ [X, Y]) >= costNeutral /\
      allNeighborsOpen(CM, {X,Y}, NR, NC) /\
      < CX, CY, G1 > := update&get(G, P, X, Y, NR, NC) /\
      < SX, SY, G2 > := update&get(G1, P, s(X), Y, NR, NC) /\
@@ -445,7 +441,7 @@ fmod GRADIENT-TRAVERSAL is
   if FX' := FX + DX /\
      FY' := FY + DY /\
      {X, Y} := closest({FX', FY'}) /\
-     (P @ [X, Y]) > costNeutral /\
+     (P @ [X, Y]) >= costNeutral /\
      allNeighborsOpen(CM, {X,Y}, NR, NC) /\
      < CX, CY, G1 > := update&get(G, P, X, Y, NR, NC) /\
      < SX, SY, G2 > := update&get(G1, P, s(X), Y, NR, NC) /\
@@ -459,7 +455,7 @@ fmod GRADIENT-TRAVERSAL is
      DX' := DX + XX * (SS / sqrt((XX * XX) + (YY * YY))) /\
      DY' := DY + YY * (SS / sqrt((XX * XX) + (YY * YY))) /\
      FX'' := if abs(DX') > 1.0
-             then FX' + DX'
+             then FX' + sign(DX')
              else FX'
              fi /\
      DX'' := if abs(DX') > 1.0
@@ -467,7 +463,7 @@ fmod GRADIENT-TRAVERSAL is
              else DX'
              fi /\
      FY'' := if abs(DY') > 1.0
-             then FY' + DY'
+             then FY' + sign(DY')
              else FY'
              fi /\
      DY'' := if abs(DY') > 1.0
