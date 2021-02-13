@@ -423,13 +423,15 @@ fmod GRADIENT-TRAVERSAL is
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
   if FX' := FX + DX /\
      FY' := FY + DY /\
+     X' := float2nat(FX) /\
+     Y' := float2nat(FY) /\
      {X, Y} := closest({FX', FY'}) /\
      (P @ [X, Y]) >= costNeutral /\
-     allNeighborsOpen(CM, {float2nat(FX),float2nat(FY)}, NR, NC) /\
-     < CX, CY, G1 > := update&get(G, P, X, Y, NR, NC) /\
-     < SX, SY, G2 > := update&get(G1, P, s(X), Y, NR, NC) /\
-     < SEX, SEY, G3 > := update&get(G2, P, s(X), s(Y), NR, NC) /\
-     < EX, EY, G' > := update&get(G3, P, X, s(Y), NR, NC) /\
+     allNeighborsOpen(CM, {X',Y'}, NR, NC) /\
+     < CX, CY, G1 > := update&get(G, P, X', Y', NR, NC) /\
+     < SX, SY, G2 > := update&get(G1, P, s(X'), Y', NR, NC) /\
+     < SEX, SEY, G3 > := update&get(G2, P, s(X'), s(Y'), NR, NC) /\
+     < EX, EY, G' > := update&get(G3, P, X', s(Y'), NR, NC) /\
      DDX := _-_(1.0, DX) /\
      DDY := _-_(1.0, DY) /\
      XX := (DDY * (DDX * CX) + (DX * EX)) + DY * ((DDX * SX) + (DX * SEX)) /\
@@ -440,13 +442,15 @@ fmod GRADIENT-TRAVERSAL is
                                computePath(CM, P, GOAL, SS, G', NR, NC, N, {FX'', FY''}, DX'', DY'', PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
      FY' := FY + DY /\
+     X' := float2nat(FX) /\
+     Y' := float2nat(FY) /\
      {X, Y} := closest({FX', FY'}) /\
      (P @ [X, Y]) >= costNeutral /\
-     allNeighborsOpen(CM, {float2nat(FX),float2nat(FY)}, NR, NC) /\
-     < CX, CY, G1 > := update&get(G, P, X, Y, NR, NC) /\
-     < SX, SY, G2 > := update&get(G1, P, s(X), Y, NR, NC) /\
-     < SEX, SEY, G3 > := update&get(G2, P, s(X), s(Y), NR, NC) /\
-     < EX, EY, G' > := update&get(G3, P, X, s(Y), NR, NC) /\
+     allNeighborsOpen(CM, {X',Y'}, NR, NC) /\
+     < CX, CY, G1 > := update&get(G, P, X', Y', NR, NC) /\
+     < SX, SY, G2 > := update&get(G1, P, s(X'), Y', NR, NC) /\
+     < SEX, SEY, G3 > := update&get(G2, P, s(X'), s(Y'), NR, NC) /\
+     < EX, EY, G' > := update&get(G3, P, X', s(Y'), NR, NC) /\
      DDX := _-_(1.0, DX) /\
      DDY := _-_(1.0, DY) /\
      XX := (DDY * (DDX * CX) + (DX * EX)) + DY * ((DDX * SX) + (DX * SEX)) /\
@@ -485,14 +489,14 @@ fmod GRADIENT-TRAVERSAL is
   if G [[X, Y]] == < 0.0, 0.0 > /\
      ((X =/= 0) and (s(X) =/= NR) and (Y =/= 0) and (s(Y) =/= NC)) /\
      (P @ [X, Y]) == infinite /\
-     DX := if (P @ [X, sd(Y, 1)]) < infinite
+     DY := if (P @ [X, sd(Y, 1)]) < infinite
            then - obstacleCost
            else if (P @ [X, s(Y)]) < infinite
                 then obstacleCost
                 else 0.0
                 fi
            fi /\
-     DY := if (P @ [sd(X, 1), Y]) < infinite
+     DX := if (P @ [sd(X, 1), Y]) < infinite
            then - obstacleCost
            else if (P @ [s(X), Y]) < infinite
                 then obstacleCost
@@ -507,14 +511,14 @@ fmod GRADIENT-TRAVERSAL is
   if G [[X, Y]] == < 0.0, 0.0 > /\
      ((X =/= 0) and (s(X) =/= NR) and (Y =/= 0) and (s(Y) =/= NC)) /\
      (P @ [X, Y]) < infinite /\
-     DX := if (P @ [X, s(Y)]) < infinite
+     DY := if (P @ [X, s(Y)]) < infinite
            then _-_((P @ [X, Y]), (P @ [X, s(Y)]))
            else if (P @ [X, sd(Y, 1)]) < infinite
                 then _-_((P @ [X, sd(Y, 1)]), (P @ [X, Y]))
                 else 0.0
                 fi
            fi /\
-     DY := if (P @ [s(X), Y]) < infinite
+     DX := if (P @ [s(X), Y]) < infinite
            then _-_((P @ [X, Y]), (P @ [s(X), Y]))
            else if (P @ [sd(X, 1), Y]) < infinite
                 then _-_((P @ [sd(X, 1), Y]), (P @ [X, Y]))
