@@ -78,20 +78,19 @@ class DirectProfiler:
             self.m.parseTerm("100"),  # TODO Enrique: improve, not a constant
         ]
 
-        """
-        # TODO Enrique: I broke it, fix! Generates TypeError
         # TODO Enrique: improve and create a hook only for get, as Ruben suggested
         class MapHook(maude.Hook):
             def __init__(self, map):
+                super().__init__()
                 self.map = map  # Map stored for future hooked calls
-
+            
             def run(self, term, data):
+                print('>>>>>>>>>>>>>>')
                 x, y, ncols = [int(arg) for arg in term.arguments()]
                 return data.getTerm('trueTerm' if self.map[x + y * ncols] < 50 else 'falseTerm')
 
         self.mapHook = MapHook(self.map_data)
         maude.connectEqHook('open2?', self.mapHook)
-        """
 
         # CSV where results are saved
         # self.csvfile = open('resultsd.csv', 'w')
@@ -125,7 +124,7 @@ class DirectProfiler:
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x), float(y), int(t))),
                 *self.static_args
         )
-        # maude.input('do clear memo .')  # TODO Enrique: shows a warning 'Warning: <standard input>, line 1: syntax error'
+        maude.input('do clear memo .')  # TODO Enrique: shows a warning 'Warning: <standard input>, line 1: syntax error'
         start_time = time.perf_counter()
         call = term.copy()
         term.reduce()
