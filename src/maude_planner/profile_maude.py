@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import time
-import csv
 import maude
 import math
 import sys
+import json
 
 
 class DirectProfiler:
@@ -29,7 +29,6 @@ class DirectProfiler:
             for test in lines[3:]:
                 x0, y0, x1, y1 = [float(c) for c in test.strip().split()]
                 self.test_cases.append(((x0, y0, 0.0), (x1, y1, 0.0)))  # Orientation 0 degrees
-            print(self.test_cases)
     
         maude.init()
         maude.load(self.ASTAR_MAUDE_PATH)
@@ -79,22 +78,42 @@ class DirectProfiler:
             self.m.parseTerm("100"),  # TODO Enrique: improve, not a constant
         ]
 
-        # TODO Enrique: adapt this hook if needed
+        """
+        # TODO Enrique: I broke it, fix! Generates TypeError
+        # TODO Enrique: improve and create a hook only for get, as Ruben suggested
         class MapHook(maude.Hook):
+            def __init__(self, map):
+                self.map = map  # Map stored for future hooked calls
+
             def run(self, term, data):
                 x, y, ncols = [int(arg) for arg in term.arguments()]
-                return data.getTerm('trueTerm' if self.map_data[x + y * ncols] < 50 else 'falseTerm')
+                return data.getTerm('trueTerm' if self.map[x + y * ncols] < 50 else 'falseTerm')
 
-        self.mapHook = MapHook()
+        self.mapHook = MapHook(self.map_data)
         maude.connectEqHook('open2?', self.mapHook)
+        """
 
         # CSV where results are saved
-        self.csvfile = open('resultsd.csv', 'w')
-        self.csvwriter = csv.writer(self.csvfile)
+        # self.csvfile = open('resultsd.csv', 'w')
+        # self.csvwriter = csv.writer(self.csvfile)
 
     def run_test_suite(self):          
         for origin, dest in self.test_cases:
             self.run_astar(origin, dest)
+
+    def show_result(self, initial, goal, duration, length, term):
+        line = dict()
+        line['initial'] = [self.int_float(x) for x in initial]
+        line['goal'] = [self.int_float(x) for x in goal]
+        line['duration'] = duration
+        line['length'] = length
+        path = list()
+        for pose in term.arguments():
+            # Term is always NeList{Pose}
+            x, y, t = self.destruct_pose(pose)
+            path.append([self.int_float(x), self.int_float(y)])
+        line['path'] = path
+        print(json.dumps(line))
 
     def run_astar(self, origin, dest):
         x0, y0, t0 = origin
@@ -106,32 +125,28 @@ class DirectProfiler:
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x), float(y), int(t))),
                 *self.static_args
         )
-        maude.input('do clear memo .')  # TODO Enrique: shows a warning 'Warning: <standard input>, line 1: syntax error'
+        # maude.input('do clear memo .')  # TODO Enrique: shows a warning 'Warning: <standard input>, line 1: syntax error'
         start_time = time.perf_counter()
         call = term.copy()
         term.reduce()
         end_time = time.perf_counter()
 
-        print(term.getSort())  ## 
-        print(self.m.findSort('NeList{Pose}')) ##
-        if term.getSort() != self.m.findSort('Pose') and term.getSort() != self.m.findSort('NeList{Pose}'): ## TODO: fail to obtain the sort NeList{Pose}
-            print(f'ERRROR when reducing {call} -> {term}')
+        if not term.getSort() <= self.m.findSort('NeList`{Pose`}'):
+            print(f'ERROR when reducing {call} -> {term}')
             return     
 
         hmtime = end_time - start_time
+        print('la ruta:', term)
         length, rotation, numrot = self.calculate_length(term)
+        self.show_result([x0, y0], [x, y], hmtime, length, term)
 
-        print('Time:', hmtime)
-        print('Length:', length)
-        print('Acc. rotation:', rotation)
-        print('# rotations:', numrot)
-        self.csvwriter.writerow([False] + list(origin) + list(dest) + [hmtime, length, rotation, numrot])
+    def int_float(self, x):
+        return int(x) if x % 1 == 0.0 else x
 
     def destruct_pose(self, pose):
         '''Obtain the values of a Maude pose'''
         # Match the pose into the pattern (we assume there is always a single match)
         subs = next(pose.match(self.pattern))
-
         return float(str(subs.find('X'))), float(str(subs.find('Y'))), int(str(subs.find('O')))
 
     def calculate_length(self, mresult):
