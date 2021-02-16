@@ -411,7 +411,7 @@ fmod GRADIENT-TRAVERSAL is
  ***                                GOAL STEP SIZE                            DX    DY    ACC
  op computePath : CostMap Potential Pose   Float   Gradient Nat Nat Nat Pose Float Float Path -> Path .
  eq computePath(CM, P, GOAL, SS, G, NR, NC, 0, CURR, DX, DY, PT) = noPath .
- ceq computePath(CM, P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX' + DX, FY' + DY, 0.0} 0) ({FX, FY, 0.0} 0)
+ ceq computePath(CM, P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX, FY, 0.0} 0)
   if {X, Y} := closest({FX' + DX, FY' + DY}) /\
      (P @ [X, Y]) < costNeutral [print "Eq2 " FX' ", " FY'] .
  ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
