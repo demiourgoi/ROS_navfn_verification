@@ -45,7 +45,9 @@ fmod COSTMAP is
   if N := (NC * X) + Y /\
      N' := skipN&Get(CM, N) .
 
- op get : CostMap Nat Nat Nat -> Float .
+ *** Uses faster Python version if available
+ *** op get : CostMap Nat Nat Nat -> Float .
+ op get : CostMap Nat Nat Nat -> Float [special (id-hook SpecialHubSymbol)] .
  ceq get(CM, X, Y, NC) = float(N')
   if N := (NC * X) + Y /\
      N' := skipN&Get(CM, N) .

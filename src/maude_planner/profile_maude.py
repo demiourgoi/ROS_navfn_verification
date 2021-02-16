@@ -78,23 +78,27 @@ class DirectProfiler:
             self.m.parseTerm("100"),  # TODO Enrique: improve, not a constant
         ]
 
-        # TODO Enrique: improve and create a hook only for get, as Ruben suggested
+        # Hook for "op get : CostMap Nat Nat Nat -> Float"
         class MapHook(maude.Hook):
-            def __init__(self, map):
+            def __init__(self, parent):
                 super().__init__()
-                self.map = map  # Map stored for future hooked calls
+                self.parent = parent  # DirectProfiler object to access attributes as the map or the Maude module for parsing
+                self.cache = dict()  # Dictionary int in [0..255] -> Maude term representing the corresponding Float
+                for i in range(0, 256):
+                    self.cache[i] = self.parent.m.parseTerm(str(float(i)))
             
             def run(self, term, data):
-                print('>>>>>>>>>>>>>>')
-                x, y, ncols = [int(arg) for arg in term.arguments()]
-                return data.getTerm('trueTerm' if self.map[x + y * ncols] < 50 else 'falseTerm')
+                try:
+                    _, x, y, ncols = [int(arg) for arg in term.arguments()]
+                    cell = self.parent.map_data[x + y * ncols]
+                    ret_term = self.cache[cell]
+                    # print(f'FAST {term} --> {ret_term}')
+                    return ret_term
+                except Exception as e:
+                    print(e)
 
-        self.mapHook = MapHook(self.map_data)
-        maude.connectEqHook('open2?', self.mapHook)
-
-        # CSV where results are saved
-        # self.csvfile = open('resultsd.csv', 'w')
-        # self.csvwriter = csv.writer(self.csvfile)
+        self.mapHook = MapHook(self)
+        maude.connectEqHook('get', self.mapHook)
 
     def run_test_suite(self):          
         for origin, dest in self.test_cases:
@@ -104,7 +108,7 @@ class DirectProfiler:
         line = dict()
         line['initial'] = [self.int_float(x) for x in initial]
         line['goal'] = [self.int_float(x) for x in goal]
-        line['duration'] = duration
+        # line['duration'] = duration
         line['length'] = length
         path = list()
         for pose in term.arguments():
@@ -124,7 +128,6 @@ class DirectProfiler:
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x), float(y), int(t))),
                 *self.static_args
         )
-        maude.input('do clear memo .')  # TODO Enrique: shows a warning 'Warning: <standard input>, line 1: syntax error'
         start_time = time.perf_counter()
         call = term.copy()
         term.reduce()
@@ -135,7 +138,6 @@ class DirectProfiler:
             return     
 
         hmtime = end_time - start_time
-        print('la ruta:', term)
         length, rotation, numrot = self.calculate_length(term)
         self.show_result([x0, y0], [x, y], hmtime, length, term)
 
@@ -152,8 +154,7 @@ class DirectProfiler:
         '''Calculate the length, total rotation and number of rotations of a path'''
 
         if str(mresult.symbol()) == 'noPath':
-            # TODO Enrique: adapt to new Maude version.
-            # TODO: should return 3 values?
+            # TODO Enrique: adapt to new Maude version. Should return 3 values?
             return 0.0
             
         if mresult.getSort() == self.m.findSort('Pose'):
@@ -188,3 +189,4 @@ class DirectProfiler:
 if __name__ == '__main__':
     dprofiler = DirectProfiler(sys.argv[1])
     dprofiler.run_test_suite()
+
