@@ -41,7 +41,9 @@ fmod COSTMAP is
      NC := float2nat(FNC) .
 
  op open? : CostMap Nat Nat Nat  -> Bool .
- eq open?(CM, X, Y, NC) = check(get(CM, X, Y, NC)) .
+ ceq open?(CM, X, Y, NC) = check(N')
+  if N := (NC * X) + Y /\
+     N' := skipN&Get(CM, N) .
 
  *** Uses faster Python version if available
  *** op get : CostMap Nat Nat Nat -> Float .
@@ -50,13 +52,21 @@ fmod COSTMAP is
   if N := (NC * X) + Y /\
      N' := skipN&Get(CM, N) .
 
+ *** Alternative open? implemented in Python with random access
+ *** to the map (it should be commented when outside Python)
+ op open2? : Float Float Float -> Bool [memo special (
+    id-hook SpecialHubSymbol
+    term-hook trueTerm (true)
+    term-hook falseTerm (false)
+ )] .
+
  op skipN&Get : CostMap Nat -> Int .
  eq skipN&Get({N, NL'}, 0) = N .
  eq skipN&Get({N, NL'}, s(NT)) = skipN&Get({NL'}, NT) .
  eq skipN&Get(CM, NT) = - 1 [owise] .
 
- op check : Float -> Bool .
- eq check(F) = F < 254.0 .
+ op check : Int -> Bool .
+ eq check(N) = N < 254 .
 
  ops movCost diagMovCost cellCost obstacleCost mapCost costNeutral stepSize : -> Float .
  eq movCost = 100.0 .
