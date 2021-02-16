@@ -27,6 +27,8 @@ class DirectProfiler:
                 
             self.test_cases = list()
             for test in lines[3:]:
+                if test.strip().startswith('-1'):
+                    continue
                 x0, y0, x1, y1 = [float(c) for c in test.strip().split()]
                 self.test_cases.append(((x0, y0, 0.0), (x1, y1, 0.0)))  # Orientation 0 degrees
     
@@ -71,11 +73,12 @@ class DirectProfiler:
         for c in self.map_data:
         	map_list = intlist(map_list, int_terms[c])
 
+        cycles = str(max(int(self.w * self.h / 20), self.w + self.h))  # Same number of cycles as ROS
         self.static_args = [
             cmap(map_list),
             self.m.parseTerm(str(int(self.h))),
             self.m.parseTerm(str(int(self.w))),
-            self.m.parseTerm("100"),  # TODO Enrique: improve, not a constant
+            self.m.parseTerm(cycles),
         ]
 
         # Hook for "op get : CostMap Nat Nat Nat -> Float"
@@ -109,10 +112,12 @@ class DirectProfiler:
         line['initial'] = [self.int_float(x) for x in initial]
         line['goal'] = [self.int_float(x) for x in goal]
         # line['duration'] = duration
-        line['length'] = length
+        line['length'] = int(length) if length % 1 == 0.0 else float(f"{length:.5f}")
+
         path = list()
-        for pose in term.arguments():
-            # Term is always NeList{Pose}
+        # Iterable of poses, handles unitary paths
+        poses = [term] if term.getSort() == self.m.findSort('Pose') else term.arguments()
+        for pose in poses:
             x, y, t = self.destruct_pose(pose)
             path.append([self.int_float(x), self.int_float(y)])
         line['path'] = path
@@ -155,7 +160,7 @@ class DirectProfiler:
 
         if str(mresult.symbol()) == 'noPath':
             # TODO Enrique: adapt to new Maude version. Should return 3 values?
-            return 0.0
+            raise NotImplemented
             
         if mresult.getSort() == self.m.findSort('Pose'):
             # Origin and destinationa are the same
@@ -169,7 +174,6 @@ class DirectProfiler:
         first = next(it)
 
         x, y, t = self.destruct_pose(first)
-        deg = next(it)
 
         for pose in it:
             if str(pose.symbol()) == 'noPath':
@@ -185,6 +189,7 @@ class DirectProfiler:
             x, y, t = cx, cy, ct
 
         return s, st, nr
+
 
 if __name__ == '__main__':
     dprofiler = DirectProfiler(sys.argv[1])

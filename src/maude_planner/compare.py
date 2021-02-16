@@ -8,6 +8,8 @@ Author: Enrique Martin
 import json
 import sys
 
+EPSILON = 1E-6
+
 
 def file_to_dict(filename):
     """Loads a file with JSON lines into a dictinary (initial, final) -> path"""
@@ -21,29 +23,36 @@ def file_to_dict(filename):
             initial = tuple(line_dict["initial"])
             goal = tuple(line_dict["goal"])
             path = [tuple(pose) for pose in line_dict["path"]]
-            results[(initial, goal)] = path
+            potentials = line_dict.get("navfn", None)
+            results[(initial, goal)] = {"path": path, "navfn": potentials}
     return results
     
 
 def remove_last(path):
-    """Removes the last pose if duplicated"""
+    """Removes the last pose if duplicated. NOT NEEDED NOW"""
+    res = None
     if len(path) <= 1 or path[-1] != path[-2]:
-        return path
+        res = path
     else:
-        return path[:-1]
+        res = path[:-1]
+    return res
+    
+    
+def equal_epsilon(cell1, cell2, epsilon=EPSILON):
+    """Compares if two cells are equal with a margin of epsilon"""
+    x1, y1 = cell1
+    x2, y2 = cell2
+    ret = abs(x1-x2) <= epsilon and abs(y1-y2) <= epsilon
+    return ret
             
     
 def path_equal(path1, path2):
     """Checks if path1 and path2 are equal"""
-    # Remove duplicates in the goal position
-    path1 = remove_last(path1)
-    path2 = remove_last(path2)
-    
     if len(path1) != len(path2):
         return False
     pos = 0
-    while pos < len(path1) and path1[pos] == path2[pos]:
-      pos += 1 
+    while pos < len(path1) and equal_epsilon(path1[pos], path2[pos]):
+        pos += 1
     return pos == len(path1)
     
   
@@ -65,11 +74,15 @@ def main(file1, file2):
         
     num_diff = 0
     for test in tests:
-        if not path_equal(dict1[test], dict2[test]):
+        # Remove duplicates in the goal position
+        path1 = remove_last(dict1[test]["path"])
+        path2 = remove_last(dict2[test]["path"])
+        if not path_equal(path1, path2):
             num_diff += 1
             print(f'{num_diff}) Differences in the path from {test[0]} to {test[1]}')
-            print(f'ROS  : {dict1[test]}')
-            print(f'Maude: {dict2[test]}\n')
+            print(f'ROS  : {path1}')
+            print(f'Maude: {path2}')
+            print(f'potarr: {dict1[test]["navfn"]}\n')
         
             
 if __name__ == "__main__":
