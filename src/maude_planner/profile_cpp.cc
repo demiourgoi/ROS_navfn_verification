@@ -14,15 +14,50 @@ using namespace std;
 
 #include "nav2_navfn_planner/navfn.hpp"
 
-namespace nav2_navfn_planner {
-	extern int create_nav_plan_astar(unsigned char*, int, int, int*, int*, float*, int);
-}
+using NavFn = nav2_navfn_planner::NavFn;
 
 struct CostMap {
 	COSTTYPE * data;
 	int width;
 	int height;
 };
+
+int create_nav_plan_astar2(COSTTYPE* costmap, int nx, int ny, int* goal, int* start,
+                           float* plan, int nplan, NavFn*& nav) {
+
+	// This is a replica of the ROS's create_nav_plan_astar,
+	// but allowing access to the navigation function
+
+	if (nav == nullptr)
+		nav = new NavFn(nx, ny);
+
+	if (nav->nx != nx || nav->ny != ny) {  // check for compatibility with previous call
+		delete nav;
+		nav = new NavFn(nx, ny);
+	}
+
+	  nav->setGoal(goal);
+	  nav->setStart(start);
+
+	  nav->costarr = costmap;
+	  nav->setupNavFn(true);
+
+	  // calculate the nav fn and path
+	  nav->priInc = 2 * COST_NEUTRAL;
+	  nav->propNavFnAstar(std::max(nx * ny / 20, nx + ny));
+
+	  // path
+	  int len = nav->calcPath(nplan);
+
+	  if (len > 0) {
+		for (int i = 0; i < len; i++) {
+			plan[i * 2] = nav->pathx[i];
+			plan[i * 2 + 1] = nav->pathy[i];
+		}
+	  }
+
+	  return len;
+}
 
 double calculate_distance(float * path, size_t points) {
 	if (points == 0)
@@ -42,10 +77,10 @@ double calculate_distance(float * path, size_t points) {
 	return s;
 }
 
-void runTest(const CostMap &map, float * path, int * tcase) {
+void runTest(const CostMap &map, float* path, int* tcase, NavFn*& navfn) {
 
 	auto start_time = std::chrono::high_resolution_clock::now();
-	int length = nav2_navfn_planner::create_nav_plan_astar(map.data, map.width, map.height, tcase + 2, tcase, path, 4 * max(map.width, map.height));
+	int length = create_nav_plan_astar2(map.data, map.width, map.height, tcase + 2, tcase, path, 4 * max(map.width, map.height), navfn);
 	auto end_time = std::chrono::high_resolution_clock::now();
 
 	std::chrono::duration<double> duration = end_time - start_time;
@@ -60,6 +95,14 @@ void runTest(const CostMap &map, float * path, int * tcase) {
 
 	for (size_t i = 0; i < length; i++)
 		cout << "[" << path[2*i] << ", " << path[2*i+1] << ((i+1 < length) ? "], " : "]");
+
+	cout << "], \"navfn\": [";
+
+	// Write the potential array in the JSON
+	const size_t mapSize = map.width * map.height;
+
+	for (size_t i = 0; i < mapSize; i++)
+		cout << navfn->potarr[i] << ((i+1 < mapSize) ? ", " : "");
 
 	cout << "]}" << endl;
 }
@@ -108,6 +151,8 @@ int main() {
 
 	// Buffer for the calculated paths
 	float * buffer = new float[4 * max(map.width, map.height)];
+	// Navigation function object
+	NavFn* navfn = nullptr;
 
 	// Keep reading cases from the standard input
 	while (true) {
@@ -135,7 +180,7 @@ int main() {
 		for (size_t i = 1; i < 4; i++)
 			cin >> positions[i];
 
-		runTest(map, buffer, positions);
+		runTest(map, buffer, positions, navfn);
 	}
 
 	return 0;
