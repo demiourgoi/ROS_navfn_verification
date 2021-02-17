@@ -11,8 +11,8 @@ fmod QUANTIFIER is
 	protecting BOOLEAN .
 
 	*** Polymorfic quantifiers
-	op forall_._ : Universal Boolean -> Boolean [ctor poly (1)] .
-	op exists_._ : Universal Boolean -> Boolean [ctor poly (1)] .
+	op forall_._ : Universal Boolean -> Boolean [ctor poly (1) prec 52] .
+	op exists_._ : Universal Boolean -> Boolean [ctor poly (1) prec 52] .
 endfm
 
 fmod SMT-ARRAY{X :: TRIV, Y :: TRIV} is
