@@ -55,6 +55,15 @@ fmod ASTAR is
             else empty
             fi .
 
+  op getPotential : Pose Pose CostMap Nat Nat Nat -> Potential .
+  eq getPotential({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NR, NC, I) =
+         getPotential({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
+            {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I) .
+  ceq getPotential({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I)
+   if P := initialP(NR, NC, X', Y') /\
+      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
+      CURR := initCurrent({X', Y'}, CM, NR, NC) .
+
  ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
  op a* : Pose Pose CostMap Potential  Nat     Nat   PoseSet PoseSet PoseSet   Float       Nat  ~> Potential .
  eq a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) = P .
