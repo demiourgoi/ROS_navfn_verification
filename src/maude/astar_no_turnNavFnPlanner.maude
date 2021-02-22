@@ -29,12 +29,12 @@ fmod ASTAR is
          a*({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
             {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I) .
  ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = *** computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
-                                                       computePath(CM, P', {X, Y}, {X', Y'}, stepSize, G, NR, NC, I)
-  if P := initialP(NR, NC, X', Y') /\
+                                                       computePath(P', {X, Y}, {X', Y'}, stepSize, G, NR, NC, I)
+  if P := initialP*(NR, NC, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
      P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) /\
-     G := initialGradient(NR, NC) .
+     G := initialGradient(NR, NC) [print P'] .
 
  op initCurrent : Pose CostMap Nat Nat -> PoseSet .
  ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
@@ -60,7 +60,7 @@ fmod ASTAR is
          getPotential({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
             {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I) .
   ceq getPotential({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I)
-   if P := initialP(NR, NC, X', Y') /\
+   if P := initialP*(NR, NC, X', Y') /\
       T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
       CURR := initCurrent({X', Y'}, CM, NR, NC) .
 
@@ -143,9 +143,15 @@ fmod ASTAR is
 
 endfm
 
-eof
+set print attribute on .
 
-*** set print attribute on .
+red a*({1.0,1.0,0.0} 0, {3.0,2.0,0.0} 0, {254,254,254,254,254,
+                                          254, 50, 50, 50,254,
+                                          254, 50, 50, 50,254,
+                                          254, 50, 50, 50,254,
+                                          254,254,254,254,254}, 5, 5, 100) .
+
+eof
 
 red a*({0.0,0.0,0.0} 0, {1.0,2.0,0.0} 0, {50,50,50,50,50,50,50,50,50}, 3, 3, 100) .
 

@@ -71,58 +71,6 @@ fmod COSTMAP is
  eq float2nat(F) = rat(floor(F)) .
 endfm
 
-fmod POTENTIAL is
- pr FLOAT .
- pr INT .
-
- ops infinite minusInfinite : -> Float .
- eq infinite = 1e10 .
- eq minusInfinite = - 1e10 .
-
- sort Row Potential .
- subsort Float < Row < Potential .
-
- op noNum : -> Row [ctor] .
- op _._ : Row Row -> Row [ctor assoc id: noNum] .
-
- op noRow : -> Potential [ctor] .
- op __ : Potential Potential -> Potential [ctor assoc id: noRow] .
-
- vars I I' F F' : Float .
- vars P P' : Potential .
- vars N N' N1 N2 : Nat .
- vars R R' : Row .
-
- op _@[_,_] : Potential Nat Nat ~> Float .
- eq (R P) @ [0, N] = R [N] .
- eq (R P) @ [s(N), N'] = P @ [N, N'] .
-
- op _[_] : Row Nat ~> Float .
- eq (I . R) [0] = I .
- eq (I . R) [s(N)] = R [N] .
-
- op _[_;_\\_] : Potential Nat Nat Float ~> Potential .
- eq (R P) [0 ; N \\ I] = (R [N \\ I]) P .
- eq (R P) [s(N) ; N' \\ I] = R (P [N ; N' \\ I]) .
-
- op _[_\\_] : Row Nat Float ~> Row .
- eq (I . R) [0 \\ I'] = I' . R .
- eq (I . R) [s(N) \\ I'] = I . (R [N \\ I']) .
-
- ***          Rows Cols  Init Init
- op initialP : Nat  Nat   Nat Nat  -> Potential .
- ceq initialP(N, N', N1, N2) = P [N1 ; N2 \\ 0.0]
-  if P := initial(N, N') .
-
- op initial : Nat Nat -> Potential .
- eq initial(0, N') = noRow .
- eq initial(s(N), N') = initial(N') initial(N, N') .
-
- op initial : Nat -> Row [memo] .
- eq initial(0) = noNum .
- eq initial(s(N)) = infinite . initial(N) .
-endfm
-
 fmod POSE is
  pr EXT-BOOL .
  pr COSTMAP .
@@ -174,66 +122,119 @@ fmod POSE is
                   then ceiling(FX)
                   else floor(FX)
                   fi .
-
- *** It returns true if all exist and are open
- op allNeighborsOpen : CostMap Pose Nat Nat -> Bool .
- eq allNeighborsOpen(CM, NOW, NR, NC) = $allNeighborsOpen(CM, NOW, NR, NC, 0) .
-
- op $allNeighborsOpen : CostMap Pose Nat Nat Nat -> Bool .
- eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 0) =
-               if (s(Y) < NC)
-               then open?(CM, X, s(Y), NC)
-               else false
-               fi and-then
-               $allNeighborsOpen(CM, {X, Y}, NR, NC, 45) .
- eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 45) =
-               if (X > 0) and (s(Y) < NC)
-               then open?(CM, sd(X, 1), s(Y), NC)
-               else false
-               fi and-then
-               $allNeighborsOpen(CM, {X, Y}, NR, NC, 90) .
- eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 90) =
-               if X > 0
-               then open?(CM, sd(X, 1), Y, NC)
-               else false
-               fi and-then
-               $allNeighborsOpen(CM, {X, Y}, NR, NC, 135) .
- eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 135) =
-               if X > 0 and Y > 0
-               then open?(CM, sd(X, 1), sd(Y, 1), NC)
-               else false
-               fi and-then
-               $allNeighborsOpen(CM, {X, Y}, NR, NC, 180) .
- eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 180) =
-               if Y > 0
-               then open?(CM, X,  sd(Y, 1), NC)
-               else false
-               fi and-then
-               $allNeighborsOpen(CM, {X, Y}, NR, NC, 225) .
- eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 225) =
-               if (s(X) < NR) and (Y > 0)
-               then open?(CM, s(X),  sd(Y, 1), NC)
-               else false
-               fi and-then
-               $allNeighborsOpen(CM, {X, Y}, NR, NC, 270) .
- eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 270) =
-               if (s(X) < NR)
-               then open?(CM, s(X),  Y, NC)
-               else false
-               fi and-then
-               $allNeighborsOpen(CM, {X, Y}, NR, NC, 315) .
- eq $allNeighborsOpen(CM, {X, Y}, NR, NC, 315) =
-               if (s(X) < NR) and (s(Y) < NC)
-               then open?(CM, s(X),  s(Y), NC)
-               else false
-               fi and-then
-               $allNeighborsOpen(CM, {X, Y}, NR, NC, 360) .
- eq $allNeighborsOpen(CM, NOW, NR, NC, N) = true [owise] .
 endfm
 
 view Pose from TRIV to POSE is
  sort Elt to Pose .
 endv
+
+fmod POTENTIAL is
+ pr POSE .
+ pr INT .
+
+ ops infinite minusInfinite : -> Float .
+ eq infinite = 1e10 .
+ eq minusInfinite = - 1e10 .
+
+ sort Row Potential .
+ subsort Float < Row < Potential .
+
+ op noNum : -> Row [ctor] .
+ op _._ : Row Row -> Row [ctor assoc id: noNum] .
+
+ op noRow : -> Potential [ctor] .
+ op __ : Potential Potential -> Potential [ctor assoc id: noRow] .
+
+ vars N N' N1 N2 NR NC X Y : Nat .
+ vars I I' F F' : Float .
+ vars P P' : Potential .
+ vars R R' : Row .
+ var  NOW : Pose .
+
+ op _@[_,_] : Potential Nat Nat ~> Float .
+ eq (R P) @ [0, N] = R [N] .
+ eq (R P) @ [s(N), N'] = P @ [N, N'] .
+
+ op _[_] : Row Nat ~> Float .
+ eq (I . R) [0] = I .
+ eq (I . R) [s(N)] = R [N] .
+
+ op _[_;_\\_] : Potential Nat Nat Float ~> Potential .
+ eq (R P) [0 ; N \\ I] = (R [N \\ I]) P .
+ eq (R P) [s(N) ; N' \\ I] = R (P [N ; N' \\ I]) .
+
+ op _[_\\_] : Row Nat Float ~> Row .
+ eq (I . R) [0 \\ I'] = I' . R .
+ eq (I . R) [s(N) \\ I'] = I . (R [N \\ I']) .
+
+ ***          Rows Cols  Init Init
+ op initialP* : Nat  Nat   Nat Nat  -> Potential .
+ ceq initialP*(N, N', N1, N2) = P [N1 ; N2 \\ 0.0]
+  if P := initialP(N, N') .
+
+ op initialP : Nat Nat -> Potential .
+ eq initialP(0, N') = noRow .
+ eq initialP(s(N), N') = initialRow(N') initialP(N, N') .
+
+ op initialRow : Nat -> Row [memo] .
+ eq initialRow(0) = noNum .
+ eq initialRow(s(N)) = infinite . initialRow(N) .
+
+ *** It returns true if all exist and are open
+ op allNeighborsOpen : Potential Pose Nat Nat -> Bool .
+ eq allNeighborsOpen(P, NOW, NR, NC) = $allNeighborsOpen(P, NOW, NR, NC, 0) .
+
+ op $allNeighborsOpen : Potential Pose Nat Nat Nat -> Bool .
+ eq $allNeighborsOpen(P, {X, Y}, NR, NC, 0) =
+               if (s(Y) < NC)
+               then (P @[X, s(Y)] < infinite)
+               else false
+               fi and-then
+               $allNeighborsOpen(P, {X, Y}, NR, NC, 45) .
+ eq $allNeighborsOpen(P, {X, Y}, NR, NC, 45) =
+               if (X > 0) and (s(Y) < NC)
+               then (P @[sd(X, 1), s(Y)] < infinite)
+               else false
+               fi and-then
+               $allNeighborsOpen(P, {X, Y}, NR, NC, 90) .
+ eq $allNeighborsOpen(P, {X, Y}, NR, NC, 90) =
+               if X > 0
+               then (P @[sd(X, 1), Y] < infinite)
+               else false
+               fi and-then
+               $allNeighborsOpen(P, {X, Y}, NR, NC, 135) .
+ eq $allNeighborsOpen(P, {X, Y}, NR, NC, 135) =
+               if X > 0 and Y > 0
+               then (P @[sd(X, 1), sd(Y, 1)] < infinite)
+               else false
+               fi and-then
+               $allNeighborsOpen(P, {X, Y}, NR, NC, 180) .
+ eq $allNeighborsOpen(P, {X, Y}, NR, NC, 180) =
+               if Y > 0
+               then (P @[X,  sd(Y, 1)] < infinite)
+               else false
+               fi and-then
+               $allNeighborsOpen(P, {X, Y}, NR, NC, 225) .
+ eq $allNeighborsOpen(P, {X, Y}, NR, NC, 225) =
+               if (s(X) < NR) and (Y > 0)
+               then (P @[s(X),  sd(Y, 1)] < infinite)
+               else false
+               fi and-then
+               $allNeighborsOpen(P, {X, Y}, NR, NC, 270) .
+ eq $allNeighborsOpen(P, {X, Y}, NR, NC, 270) =
+               if (s(X) < NR)
+               then (P @[s(X),  Y] < infinite)
+               else false
+               fi and-then
+               $allNeighborsOpen(P, {X, Y}, NR, NC, 315) .
+ eq $allNeighborsOpen(P, {X, Y}, NR, NC, 315) =
+               if (s(X) < NR) and (s(Y) < NC)
+               then (P @[s(X), s(Y)] < infinite)
+               else false
+               fi and-then
+               $allNeighborsOpen(P, {X, Y}, NR, NC, 360) .
+ eq $allNeighborsOpen(P, NOW, NR, NC, N) = true [owise] .
+endfm
 
 fmod PATH is
  inc LIST{Pose} * (sort List{Pose} to Path,
@@ -395,31 +396,31 @@ fmod GRADIENT-TRAVERSAL is
  var  PT : Path .
 
  ***                                INIT GOAL STEP SIZE
- op computePath : CostMap Potential Pose Pose   Float   Gradient Nat Nat Nat -> Path .
- eq computePath(CM, P, {X, Y}, {X', Y'}, SS, G, NR, NC, N) = computePath(CM, P, {float(X'), float(Y')}, SS, G, NR, NC, N, {float(X), float(Y)}, 0.0, 0.0, noPath) .
+ op computePath : Potential Pose Pose   Float   Gradient Nat Nat Nat -> Path .
+ eq computePath(P, {X, Y}, {X', Y'}, SS, G, NR, NC, N) = computePath(P, {float(X'), float(Y')}, SS, G, NR, NC, N, {float(X), float(Y)}, 0.0, 0.0, noPath) .
 
  ***                                GOAL STEP SIZE                            DX    DY    ACC
- op computePath : CostMap Potential Pose   Float   Gradient Nat Nat Nat Pose Float Float Path -> Path .
- eq computePath(CM, P, GOAL, SS, G, NR, NC, 0, CURR, DX, DY, PT) = noPath .
- ceq computePath(CM, P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX, FY, 0.0} 0)
+ op computePath : Potential Pose   Float   Gradient Nat Nat Nat Pose Float Float Path -> Path .
+ eq computePath(P, GOAL, SS, G, NR, NC, 0, CURR, DX, DY, PT) = noPath .
+ ceq computePath(P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX, FY, 0.0} 0)
   if {X, Y} := closest({FX' + DX, FY' + DY}) /\
      (P @ [X, Y]) < costNeutral [print "Eq2 " FX' ", " FY'] .
- ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
-                               computePath(CM, P, GOAL, SS, G, NR, NC, N, {float(X'), float(Y')}, 0.0, 0.0, PT ({FX', FY', 0.0} 0))
+ ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
+                               computePath(P, GOAL, SS, G, NR, NC, N, {float(X'), float(Y')}, 0.0, 0.0, PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
      FY' := FY + DY /\
      {X, Y} := closest({FX', FY'}) /\
      (P @ [X, Y]) >= costNeutral /\
-     not allNeighborsOpen(CM, {float2nat(FX),float2nat(FY)}, NR, NC) /\
+     not allNeighborsOpen(P, {float2nat(FX),float2nat(FY)}, NR, NC) /\
      {X', Y'} := getMin({X, Y}, P, NR, NC) [print "Eq3 " FX ", " FY] .
- ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
+ ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
   if FX' := FX + DX /\
      FY' := FY + DY /\
      X' := float2nat(FX) /\
      Y' := float2nat(FY) /\
      {X, Y} := closest({FX', FY'}) /\
      (P @ [X, Y]) >= costNeutral /\
-     allNeighborsOpen(CM, {X',Y'}, NR, NC) /\
+     allNeighborsOpen(P, {X',Y'}, NR, NC) /\
      < CX, CY, G1 > := update&get(G, P, X', Y', NR, NC) /\
      < SX, SY, G2 > := update&get(G1, P, s(X'), Y', NR, NC) /\
      < SEX, SEY, G3 > := update&get(G2, P, s(X'), s(Y'), NR, NC) /\
@@ -430,15 +431,15 @@ fmod GRADIENT-TRAVERSAL is
      YY := (DDY * (DDX * CY) + (DX * EY)) + DY * ((DDX * SY) + (DX * SEY)) /\
      XX == 0.0 /\
      YY == 0.0 [print "Eq4 " FX ", " FY] .
- ceq computePath(CM, P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
-                               computePath(CM, P, GOAL, SS, G', NR, NC, N, {FX'', FY''}, DX'', DY'', PT ({FX', FY', 0.0} 0))
+ ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
+                               computePath(P, GOAL, SS, G', NR, NC, N, {FX'', FY''}, DX'', DY'', PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
      FY' := FY + DY /\
      X' := float2nat(FX) /\
      Y' := float2nat(FY) /\
      {X, Y} := closest({FX', FY'}) /\
      (P @ [X, Y]) >= costNeutral /\
-     allNeighborsOpen(CM, {X',Y'}, NR, NC) /\
+     allNeighborsOpen(P, {X',Y'}, NR, NC) /\
      < CX, CY, G1 > := update&get(G, P, X', Y', NR, NC) /\
      < SX, SY, G2 > := update&get(G1, P, s(X'), Y', NR, NC) /\
      < SEX, SEY, G3 > := update&get(G2, P, s(X'), s(Y'), NR, NC) /\
@@ -481,16 +482,16 @@ fmod GRADIENT-TRAVERSAL is
   if G [[X, Y]] == < 0.0, 0.0 > /\
      ((X =/= 0) and (s(X) =/= NR) and (Y =/= 0) and (s(Y) =/= NC)) /\
      (P @ [X, Y]) == infinite /\
-     DY := if (P @ [X, sd(Y, 1)]) < infinite
+     DX := if (P @ [sd(X, 1), Y]) < infinite
            then - obstacleCost
-           else if (P @ [X, s(Y)]) < infinite
+           else if (P @ [s(X), Y]) < infinite
                 then obstacleCost
                 else 0.0
                 fi
            fi /\
-     DX := if (P @ [sd(X, 1), Y]) < infinite
+     DY := if (P @ [X, sd(Y, 1)]) < infinite
            then - obstacleCost
-           else if (P @ [s(X), Y]) < infinite
+           else if (P @ [X, s(Y)]) < infinite
                 then obstacleCost
                 else 0.0
                 fi
@@ -503,17 +504,17 @@ fmod GRADIENT-TRAVERSAL is
   if G [[X, Y]] == < 0.0, 0.0 > /\
      ((X =/= 0) and (s(X) =/= NR) and (Y =/= 0) and (s(Y) =/= NC)) /\
      (P @ [X, Y]) < infinite /\
-     DY := if (P @ [X, s(Y)]) < infinite
-           then _-_((P @ [X, Y]), (P @ [X, s(Y)]))
-           else if (P @ [X, sd(Y, 1)]) < infinite
-                then _-_((P @ [X, sd(Y, 1)]), (P @ [X, Y]))
-                else 0.0
-                fi
-           fi /\
      DX := if (P @ [s(X), Y]) < infinite
            then _-_((P @ [X, Y]), (P @ [s(X), Y]))
            else if (P @ [sd(X, 1), Y]) < infinite
                 then _-_((P @ [sd(X, 1), Y]), (P @ [X, Y]))
+                else 0.0
+                fi
+           fi /\
+     DY := if (P @ [X, s(Y)]) < infinite
+           then _-_((P @ [X, Y]), (P @ [X, s(Y)]))
+           else if (P @ [X, sd(Y, 1)]) < infinite
+                then _-_((P @ [X, sd(Y, 1)]), (P @ [X, Y]))
                 else 0.0
                 fi
            fi /\
