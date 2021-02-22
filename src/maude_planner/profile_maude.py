@@ -68,7 +68,7 @@ class DirectProfiler:
 
             # op computePath : CostMap Potential Pose Pose Float Gradient Nat Nat Nat -> Path .
             self.compute_path = self.m.findSymbol('computePath',
-                                                  [costmap_kind, potential_kind, pose_kind, pose_kind, float_kind, gradient_kind, nat_kind, nat_kind, nat_kind],
+                                                  [potential_kind, pose_kind, pose_kind, float_kind, gradient_kind, nat_kind, nat_kind, nat_kind],
                                                   path_kind)
 
         intlist      = self.m.findSymbol('_`,_', [int_kind] * 2, int_kind) 
@@ -173,7 +173,6 @@ class DirectProfiler:
             # Only the computePath term will be reduced, but the subterm potarr
             # will get reduced by the way
             term = self.compute_path(
-                self.static_args[0],    # costmap
                 potarr,
                 self.mod.parseTerm(f'{{{int(x0)}, {int(y0)}}}', self.pose_kind),
                 self.mod.parseTerm(f'{{{int(x)}, {int(y)}}}', self.pose_kind),
