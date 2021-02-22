@@ -67,7 +67,7 @@ fmod ASTAR is
  ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
  op a* : Pose Pose CostMap Potential  Nat     Nat   PoseSet PoseSet PoseSet   Float       Nat  ~> Potential .
  eq a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) = P .
- ceq a*({X, Y}, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, I) = P
+ ceq a*({X, Y}, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, I) = P
   if D := P @ [X , Y] /\
      D =/= infinite .
  ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) = a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, s(I))
@@ -145,7 +145,7 @@ endfm
 
 set print attribute on .
 
-red a*({1.0,1.0,0.0} 0, {3.0,2.0,0.0} 0, {254,254,254,254,254,
+red a*({1.0,1.0,0.0} 0, {2.0,3.0,0.0} 0, {254,254,254,254,254,
                                           254, 50, 50, 50,254,
                                           254, 50, 50, 50,254,
                                           254, 50, 50, 50,254,
