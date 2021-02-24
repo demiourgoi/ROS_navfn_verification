@@ -386,7 +386,7 @@ fmod GRADIENT-TRAVERSAL is
  pr PATH .
  pr SIGN .
 
- vars V T D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FX' FY' FX'' FY'' NORM EX SX SEX EY SY SEY CX CY XX YY : Float .
+ vars V T D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FX' FY' FX'' FY'' NORM EX SX SEX EY SY SEY CX CY XX YY DXAUX1 DXAUX2 DYAUX1 DYAUX2 : Float .
  vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
  vars G G' G1 G2 G3 : Gradient .
  vars INIT GOAL : Pose .
@@ -504,20 +504,24 @@ fmod GRADIENT-TRAVERSAL is
   if G [[X, Y]] == < 0.0, 0.0 > /\
      ((X =/= 0) and (s(X) =/= NR) and (Y =/= 0) and (s(Y) =/= NC)) /\
      (P @ [X, Y]) < infinite /\
-     DX := if (P @ [s(X), Y]) < infinite
-           then _-_((P @ [X, Y]), (P @ [s(X), Y]))
-           else if (P @ [sd(X, 1), Y]) < infinite
-                then _-_((P @ [sd(X, 1), Y]), (P @ [X, Y]))
-                else 0.0
-                fi
-           fi /\
-     DY := if (P @ [X, s(Y)]) < infinite
-           then _-_((P @ [X, Y]), (P @ [X, s(Y)]))
-           else if (P @ [X, sd(Y, 1)]) < infinite
-                then _-_((P @ [X, sd(Y, 1)]), (P @ [X, Y]))
-                else 0.0
-                fi
-           fi /\
+     DXAUX1 := if (P @ [s(X), Y]) < infinite
+               then _-_((P @ [X, Y]), (P @ [s(X), Y]))
+               else 0.0
+               fi /\
+     DXAUX2 := if (P @ [sd(X, 1), Y]) < infinite
+               then _-_((P @ [sd(X, 1), Y]), (P @ [X, Y]))
+               else 0.0
+               fi /\
+     DX := DXAUX1 + DXAUX2 /\
+     DYAUX1 := if (P @ [X, sd(Y, 1)]) < infinite
+               then _-_((P @ [X, sd(Y, 1)]), (P @ [X, Y]))
+               else 0.0
+               fi /\
+     DYAUX2 := if (P @ [X, s(Y)]) < infinite
+               then _-_((P @ [X, Y]), (P @ [X, s(Y)]))
+               else 0.0
+               fi /\
+     DY := DYAUX1 + DYAUX2 /\
      NORM := sqrt((DX * DX) + (DY * DY)) /\
      DX' := if NORM > 0.0 then DX / NORM else DX fi /\
      DY' := if NORM > 0.0 then DY / NORM else DY fi /\
