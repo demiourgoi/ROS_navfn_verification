@@ -106,7 +106,7 @@ class Plotter:
 
         # Draw the potential as a image omitting infinity
         # (otherwise, the other differences could not be seen)
-	# (extent is used to make coordinates be in the corners)
+        # (extent is used to make coordinates be in the corners)
         self.plt.imshow(potarr, vmax=vmax, extent=(0, potarr.shape[0], potarr.shape[1], 0))
         self.plt.colorbar()
 
@@ -118,7 +118,7 @@ class Plotter:
                ax.add_patch(self.Rectangle([y, x], 1, 1, edgecolor='red', facecolor='red'))
 
         # Finally, the path
-        self.plt.plot(*zip(*path), color=pcolor)
+        self.plt.plot(*zip(*path), color=pcolor, marker='o')
 
     def draw_diff(self, potarr1, potarr2, path1, path2):
         """Draw the difference of the given potentials and their paths"""
@@ -134,9 +134,6 @@ class Plotter:
         self.plt.imshow(diff, vmin=vmin, vmax=vmax, extent=(0, diff.shape[0], diff.shape[1], 0))
         self.plt.colorbar()
 
-        self.plt.plot(*zip(*path1), color='aqua')
-        self.plt.plot(*zip(*path2), color='red')
-
         # Draw red (green) squares in the infinity values of Maude (ROS)
         ax = self.plt.gca()
 
@@ -144,6 +141,18 @@ class Plotter:
             if abs(value) > 1e5:
                 color = 'red' if value < 0.0 else 'aqua'
                 ax.add_patch(self.Rectangle([y, x], 1, 1, edgecolor=color))
+
+        # Finally, both paths
+        self.plt.plot(*zip(*path1), color='aqua')
+        self.plt.plot(*zip(*path2), color='red')
+
+        # Plot the extra points of each path
+        # (we should probably ignore some epsilon)
+        extra1 = [p for p in path1 if p not in path2]
+        extra2 = [p for p in path2 if p not in path1]
+
+        not extra1 or self.plt.scatter(*zip(*extra1), color='aqua')
+        not extra2 or self.plt.scatter(*zip(*extra2), color='red')
 
     def draw(self, origin, dest, potarr1_raw, potarr2_raw, path1, path2, equal):
         """Plots potentials, paths and their differences"""
