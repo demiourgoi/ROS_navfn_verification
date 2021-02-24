@@ -78,7 +78,7 @@ fmod POSE is
 
  vars N NR NC X Y Z X' Y' Z' : Nat .
  vars Q Q' : Quaternion .
- vars H V FX FY : Float .
+ vars H V FX FY DX DY : Float .
  var  CM : CostMap .
  var  NOW : Pose .
 
@@ -114,14 +114,21 @@ fmod POSE is
   if H := float(sd(X, X')) /\
      V := float(sd(Y, Y')) .
 
+ op closest : BasicPose Float Float ~> BasicPose .
+ eq closest({FX, FY}, DX, DY) = closest({FX + preround(DX), FY + preround(DY)}) .
+
  op closest : BasicPose ~> BasicPose .
  eq closest({FX, FY}) = {float2nat(closest(FX)), float2nat(closest(FY))} .
 
  op closest : Float -> Float .
- eq closest(FX) = if _-_(ceiling(FX), FX) < _-_(FX, floor(FX))
+ eq closest(FX) = if _-_(ceiling(FX), FX) <= _-_(FX, floor(FX))
                   then ceiling(FX)
                   else floor(FX)
                   fi .
+
+ op preround : Float -> Float .
+ eq preround(-5.0e-1) = -5.1e-1 .
+ eq preround(V) = V [owise print "Preround: " V] .
 endfm
 
 view Pose from TRIV to POSE is
@@ -403,22 +410,20 @@ fmod GRADIENT-TRAVERSAL is
  op computePath : Potential Pose   Float   Gradient Nat Nat Nat Pose Float Float Path -> Path .
  eq computePath(P, GOAL, SS, G, NR, NC, 0, CURR, DX, DY, PT) = noPath .
  ceq computePath(P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX, FY, 0.0} 0)
-  if {X, Y} := closest({FX' + DX, FY' + DY}) /\
+  if {X, Y} := closest({FX', FY'}, DX, DY) /\
      (P @ [X, Y]) < costNeutral [print "Eq2 " FX' ", " FY'] .
  ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
                                computePath(P, GOAL, SS, G, NR, NC, N, {float(X'), float(Y')}, 0.0, 0.0, PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
      FY' := FY + DY /\
-     {X, Y} := closest({FX', FY'}) /\
+     {X, Y} := closest({FX, FY}, DX, DY) /\
      (P @ [X, Y]) >= costNeutral /\
      not allNeighborsOpen(P, {float2nat(FX),float2nat(FY)}, NR, NC) /\
      {X', Y'} := getMin({X, Y}, P, NR, NC) [print "Eq3 " FX ", " FY] .
  ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
-  if FX' := FX + DX /\
-     FY' := FY + DY /\
-     X' := float2nat(FX) /\
+  if X' := float2nat(FX) /\
      Y' := float2nat(FY) /\
-     {X, Y} := closest({FX', FY'}) /\
+     {X, Y} := closest({FX, FY}, DX, DY) /\
      (P @ [X, Y]) >= costNeutral /\
      allNeighborsOpen(P, {X',Y'}, NR, NC) /\
      < CX, CY, G1 > := update&get(G, P, X', Y', NR, NC) /\
@@ -437,7 +442,7 @@ fmod GRADIENT-TRAVERSAL is
      FY' := FY + DY /\
      X' := float2nat(FX) /\
      Y' := float2nat(FY) /\
-     {X, Y} := closest({FX', FY'}) /\
+     {X, Y} := closest({FX, FY}, DX, DY) /\
      (P @ [X, Y]) >= costNeutral /\
      allNeighborsOpen(P, {X',Y'}, NR, NC) /\
      < CX, CY, G1 > := update&get(G, P, X', Y', NR, NC) /\
