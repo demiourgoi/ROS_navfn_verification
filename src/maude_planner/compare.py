@@ -106,7 +106,8 @@ class Plotter:
 
         # Draw the potential as a image omitting infinity
         # (otherwise, the other differences could not be seen)
-        self.plt.imshow(potarr, vmax=vmax)
+	# (extent is used to make coordinates be in the corners)
+        self.plt.imshow(potarr, vmax=vmax, extent=(0, potarr.shape[0], potarr.shape[1], 0))
         self.plt.colorbar()
 
         # Draw red squares in the infinity
@@ -114,7 +115,7 @@ class Plotter:
 
         for (x, y), value in self.np.ndenumerate(potarr):
             if abs(value) > 1e5:
-               ax.add_patch(self.Rectangle([y-.5, x-.5], 1, 1, edgecolor='red', facecolor='red'))
+               ax.add_patch(self.Rectangle([y, x], 1, 1, edgecolor='red', facecolor='red'))
 
         # Finally, the path
         self.plt.plot(*zip(*path), color=pcolor)
@@ -130,7 +131,7 @@ class Plotter:
         vmax = diff[support].max()
         vmin = diff[support].min()
 
-        self.plt.imshow(diff, vmin=vmin, vmax=vmax)
+        self.plt.imshow(diff, vmin=vmin, vmax=vmax, extent=(0, diff.shape[0], diff.shape[1], 0))
         self.plt.colorbar()
 
         self.plt.plot(*zip(*path1), color='aqua')
@@ -142,7 +143,7 @@ class Plotter:
         for (x, y), value in self.np.ndenumerate(diff):
             if abs(value) > 1e5:
                 color = 'red' if value < 0.0 else 'aqua'
-                ax.add_patch(self.Rectangle([y-.5, x-.5], 1, 1, edgecolor=color))
+                ax.add_patch(self.Rectangle([y, x], 1, 1, edgecolor=color))
 
     def draw(self, origin, dest, potarr1_raw, potarr2_raw, path1, path2, equal):
         """Plots potentials, paths and their differences"""
