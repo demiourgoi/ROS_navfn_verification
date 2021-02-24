@@ -74,6 +74,7 @@ endfm
 fmod POSE is
  pr EXT-BOOL .
  pr COSTMAP .
+ pr SIGN .
  pr INT .
 
  vars N NR NC X Y Z X' Y' Z' : Nat .
@@ -115,21 +116,20 @@ fmod POSE is
      V := float(sd(Y, Y')) .
 
  op closest : BasicPose Float Float ~> BasicPose .
- eq closest({FX, FY}, DX, DY) = closest({FX + preround(DX), FY + preround(DY)}) .
+ eq closest({FX, FY}, DX, DY) = closest({FX + sign(DX) * closest(abs(DX)), FY + sign(DY) * closest(abs(DY))}) .
 
  op closest : BasicPose ~> BasicPose .
- eq closest({FX, FY}) = {float2nat(closest(FX)), float2nat(closest(FY))} .
+ eq closest({FX, FY}) = {float2nat(FX), float2nat(FY)} .
 
  op closest : Float -> Float .
  eq closest(FX) = if _-_(ceiling(FX), FX) <= _-_(FX, floor(FX))
                   then ceiling(FX)
                   else floor(FX)
                   fi .
-
- op preround : Float -> Float .
- eq preround(-5.0e-1) = -5.1e-1 .
- eq preround(V) = V [owise print "Preround: " V] .
 endfm
+
+red closest(-5.0e-1) .
+red closest(5.0e-1) .
 
 view Pose from TRIV to POSE is
  sort Elt to Pose .
@@ -419,7 +419,7 @@ fmod GRADIENT-TRAVERSAL is
      {X, Y} := closest({FX, FY}, DX, DY) /\
      (P @ [X, Y]) >= costNeutral /\
      not allNeighborsOpen(P, {float2nat(FX),float2nat(FY)}, NR, NC) /\
-     {X', Y'} := getMin({X, Y}, P, NR, NC) [print "Eq3 " FX ", " FY] .
+     {X', Y'} := getMin({X, Y}, P, NR, NC) [print "Eq3 " FX' ", " FY'] .
  ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
   if X' := float2nat(FX) /\
      Y' := float2nat(FY) /\
@@ -471,7 +471,7 @@ fmod GRADIENT-TRAVERSAL is
      DY'' := if abs(DY') > 1.0
              then _-_(DY', sign(DY'))
              else DY'
-             fi [print "Eq5 " FX ", " FY] .
+             fi [print "Eq5 " FX' ", " FY' " con " FX ", " FY " y " DX ", " DY] .
 
  sort GradientUpdateRes .
  op <_,_,_> : Float Float Gradient -> GradientUpdateRes [ctor] .
