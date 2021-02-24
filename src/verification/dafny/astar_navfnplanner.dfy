@@ -10,6 +10,7 @@ type PotentialMap = seq<seq<RealInf>>
 const obstacleCost: real := 254.0
 const mapCost: real := 50.0
 
+
 predicate method open(costMap: CostMap, row: int, col: int)
 {
   costMap.value(Point(row, col))  < obstacleCost
@@ -43,6 +44,7 @@ predicate AdjacentVertical(p1: Pose, p2: Pose)
   (p1.pos.col == p2.pos.col && p1.pos.row == p2.pos.row - 1)
   || (p1.pos.col == p2.pos.col && p1.pos.row == p2.pos.row + 1)
 }
+
 predicate Adjacent(p1: Pose, p2: Pose, costMap: CostMap)
 {
   AdjacentHorizontal(p1, p2) || AdjacentVertical(p1, p2)
@@ -58,6 +60,7 @@ predicate HasSomeAdjacentReal(p: Pose, pot: PotentialMap, numRows: nat, numCols:
       || (p.pos.col + 1 < numCols && pot[p.pos.row][p.pos.col + 1].Real?)
 }
 
+
 predicate ValidQueue(queue: seq<Pose>, pot: PotentialMap, costMap: CostMap)
   requires PotentialMapHasDimensions(pot, costMap.numRows, costMap.numCols)
 {
@@ -72,7 +75,6 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat) retu
   requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
   requires open(costMap, goal.pos.row, goal.pos.col)
   requires ValidCostMap(costMap)
-  decreases *
 {
   var pot := BuildInitialPotentialMap(costMap.numRows, costMap.numCols, goal.pos.row, goal.pos.col);
   var initialThreshold := EuclidDistance(start.pos, goal.pos);
@@ -92,6 +94,7 @@ method AStarIteration(start: Pose, goal: Pose,
   requires ValidCostMap(costMap)
   requires 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
   requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
+  ensures ValidPotentialMap(pot', costMap)
   decreases numIterations, |current|
 {
   if (numIterations == 0) {
@@ -162,7 +165,8 @@ method UpdatePotential(pot: PotentialMap, p: Pose, goal: Pose, costMap: CostMap,
   requires min.Real?
   requires open(costMap, p.pos.row, p.pos.col)
   ensures ValidPotentialMap(pot', costMap)
-  ensures forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols && (i != p.pos.row || j != p.pos.col) :: pot'[i][j] == pot[i][j]
+  ensures forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols ::
+    pot[i][j].Real? ==> pot'[i][j].Real?
   ensures pot'[p.pos.row][p.pos.col].Real?
 {
   var hf := costMap.value(Point(p.pos.row, p.pos.col));
@@ -229,7 +233,6 @@ method TraverseNeighbor(p: Pose, newP: Pose, start: Pose, costMap: CostMap, pot:
 {
   var h := EuclidDistance(p.pos, start.pos);
   if (!GreaterThan(pot[newP.pos.row][newP.pos.col], Real(pot[p.pos.row][p.pos.col].r + h + (1.0 / 1.41421) * costMap.value(Point(newP.pos.row, newP.pos.col))))) {
-    // No update vecino, mi amol
     next' := [];
     excess' := [];
   } else {
