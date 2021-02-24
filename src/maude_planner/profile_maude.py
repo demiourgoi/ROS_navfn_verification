@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import argparse
 import time
 import maude
 import math
@@ -12,7 +13,7 @@ class DirectProfiler:
 
     ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner.maude'
 
-    def __init__(self, test_path):
+    def __init__(self, test_path, obtain_navfn=True):
         with open(test_path, 'r') as ftest:
             lines = ftest.readlines()
             self.w, self.h = lines[0].strip().split()
@@ -31,7 +32,7 @@ class DirectProfiler:
                     continue
                 x0, y0, x1, y1 = [float(c) for c in test.strip().split()]
                 self.test_cases.append(((x0, y0, 0.0), (x1, y1, 0.0)))  # Orientation 0 degrees
-    
+
         maude.init()
         maude.load(self.ASTAR_MAUDE_PATH)
 
@@ -43,11 +44,32 @@ class DirectProfiler:
         path_kind    = self.m.findSort('Path').kind()
         int_kind     = self.m.findSort('IntList').kind()
         nat_kind     = self.m.findSort('Nat').kind()
-        
-        
-        self.astar = self.m.findSymbol('a*', [pose_kind, pose_kind, costmap_kind,
-                                         nat_kind, nat_kind, nat_kind], 
-                                         path_kind)
+        potential_kind = self.m.findSort('Potential').kind()
+        gradient_kind = self.m.findSort('Gradient').kind()
+
+        # We need it to solve an ambiguity later
+        self.pose_kind = pose_kind
+
+        # Use different functions whether obtaining the potential or not
+        if not obtain_navfn:
+            self.astar = self.m.findSymbol('a*', [pose_kind, pose_kind, costmap_kind,
+                                             nat_kind, nat_kind, nat_kind], 
+                                             path_kind)
+            self.get_potential = None
+            self.compute_path = None
+
+        else:
+            self.astar = None
+
+            # op getPotential : Pose Pose CostMap Nat Nat Nat -> Potential .
+            self.get_potential = self.m.findSymbol('getPotential',
+                                                   [pose_kind, pose_kind, costmap_kind, nat_kind, nat_kind, nat_kind],
+                                                   potential_kind)
+
+            # op computePath : CostMap Potential Pose Pose Float Gradient Nat Nat Nat -> Path .
+            self.compute_path = self.m.findSymbol('computePath',
+                                                  [potential_kind, pose_kind, pose_kind, float_kind, gradient_kind, nat_kind, nat_kind, nat_kind],
+                                                  path_kind)
 
         intlist      = self.m.findSymbol('_`,_', [int_kind] * 2, int_kind) 
         cmap         = self.m.findSymbol('`{_`}', [int_kind], costmap_kind)
@@ -65,13 +87,13 @@ class DirectProfiler:
         # when constructing the map_list in Maude
         int_terms = dict()
         for i in range(0,256):
-        	int_terms[i] = self.m.parseTerm(str(i))
+            int_terms[i] = self.m.parseTerm(str(i))
 
         # Build the IntList with the costmap data
         map_list = mtIL
 
         for c in self.map_data:
-        	map_list = intlist(map_list, int_terms[c])
+            map_list = intlist(map_list, int_terms[c])
 
         cycles = str(max(int(self.w * self.h / 20), self.w + self.h))  # Same number of cycles as ROS
         self.static_args = [
@@ -107,7 +129,7 @@ class DirectProfiler:
         for origin, dest in self.test_cases:
             self.run_astar(origin, dest)
 
-    def show_result(self, initial, goal, duration, length, term):
+    def show_result(self, initial, goal, duration, length, term, potarr):
         line = dict()
         line['initial'] = [self.int_float(x) for x in initial]
         line['goal'] = [self.int_float(x) for x in goal]
@@ -121,18 +143,44 @@ class DirectProfiler:
             x, y, t = self.destruct_pose(pose)
             path.append([self.int_float(x), self.int_float(y)])
         line['path'] = path
+        if potarr is not None:
+            line['navfn'] = [float(entry) for row in potarr.arguments() for entry in row.arguments()]
         print(json.dumps(line))
 
     def run_astar(self, origin, dest):
         x0, y0, t0 = origin
         x,  y,  t  = dest
 
-        # Build the a* term with makeTerm
-        term = self.astar(
+        # Build the a* or computePath term with makeTerm
+        if self.astar is not None:
+            # The a* function is directly call because we are not interested in the potential
+            term = self.astar(
+                    self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x0), float(y0), int(t0))),
+                    self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x), float(y), int(t))),
+                    *self.static_args
+            )
+
+            potarr = None
+        else:
+            # The calculation is decomposed in getPotential and computePath, so that we can obtain
+            # the potential calculated by Maude
+            potarr = self.get_potential(
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x0), float(y0), int(t0))),
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x), float(y), int(t))),
                 *self.static_args
-        )
+            )
+
+            # Only the computePath term will be reduced, but the subterm potarr
+            # will get reduced by the way
+            term = self.compute_path(
+                potarr,
+                self.mod.parseTerm(f'{{{int(x0)}, {int(y0)}}}', self.pose_kind),
+                self.mod.parseTerm(f'{{{int(x)}, {int(y)}}}', self.pose_kind),
+                self.mod.parseTerm('stepSize'),
+                self.mod.parseTerm(f'initialGradient({self.h}, {self.w})'),
+                *self.static_args[-3:]
+            )
+
         start_time = time.perf_counter()
         call = term.copy()
         term.reduce()
@@ -144,7 +192,7 @@ class DirectProfiler:
 
         hmtime = end_time - start_time
         length, rotation, numrot = self.calculate_length(term)
-        self.show_result([x0, y0], [x, y], hmtime, length, term)
+        self.show_result([x0, y0], [x, y], hmtime, length, term, potarr)
 
     def int_float(self, x):
         return int(x) if x % 1 == 0.0 else x
@@ -192,6 +240,12 @@ class DirectProfiler:
 
 
 if __name__ == '__main__':
-    dprofiler = DirectProfiler(sys.argv[1])
+    parser = argparse.ArgumentParser(description='Test the Maude implementation of the A* algorithm')
+    parser.add_argument('test_file', help='File specifying the test cases (using the syntax of profile_cpp)')
+    parser.add_argument('--no-navfn', dest='navfn', action='store_false', help='Do not obtain the navigation function')
+
+    args = parser.parse_args()
+
+    dprofiler = DirectProfiler(args.test_file, args.navfn)
     dprofiler.run_test_suite()
 
