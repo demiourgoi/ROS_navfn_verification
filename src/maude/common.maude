@@ -118,7 +118,7 @@ fmod POSE is
  eq closest({FX, FY}) = {float2nat(closest(FX)), float2nat(closest(FY))} .
 
  op closest : Float -> Float .
- eq closest(FX) = if _-_(ceiling(FX), FX) <= _-_(FX, floor(FX))
+ eq closest(FX) = if _-_(ceiling(FX), FX) < _-_(FX, floor(FX))
                   then ceiling(FX)
                   else floor(FX)
                   fi .
