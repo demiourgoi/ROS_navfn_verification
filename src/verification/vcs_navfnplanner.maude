@@ -6,7 +6,8 @@ fmod POSE-VERIF is
   protecting QUANTIFIER .
   protecting REAL-INTEGER .
 
-  sorts Pose Point .
+  sort Pose .
+  sort Point .
 
   op _===_ : Point Point -> Boolean [ctor gather (e E) prec 51] .
   op _=/==_ : Point Point -> Boolean [ctor gather (e E) prec 51] .
@@ -17,7 +18,6 @@ fmod POSE-VERIF is
 
   op point-axiom : Point -> Boolean .
   eq point-axiom(P:Point) = true .
-
 
   
   op pose : Point -> Pose [ctor] .
@@ -30,7 +30,7 @@ fmod POSE-VERIF is
   
   op pose-axiom : Pose -> Boolean .
 
-  eq pose-axiom(P:Pose) = true .
+  eq pose-axiom(P:Pose) = point-axiom(pose-position(P:Pose)) .
 
   op adjacent-horizontal : Pose Pose -> Boolean .  
   op adjacent-vertical : Pose Pose -> Boolean .  
@@ -71,15 +71,22 @@ fmod COSTMAP-VERIF is
   
   op obstacle-cost : -> Real .
   eq obstacle-cost = toReal(254) .
+
+  op map-cost : -> Real .
+  eq map-cost = toReal(50) .
+
   
   op value : CostMap Point -> Real .
   op num-rows : CostMap -> Integer .
   op num-cols : CostMap -> Integer .
-  
+
+  op costmap-axiom : CostMap -> Boolean .
   op costmap-valid : CostMap -> Boolean .
 
   var CM : CostMap .
-
+  
+  eq costmap-axiom(CM) =
+    num-rows(CM) >= 0 and num-cols(CM) >= 0 .
 
   
   eq costmap-valid(CM) = 
@@ -97,8 +104,8 @@ fmod COSTMAP-VERIF is
   
   op open : CostMap Integer Integer -> Boolean .
   eq open(CM:CostMap, I, J:Integer) =
-    forall P! . (point-row(P!) === I and point-col(P!) === J:Integer) implies
-      value(CM:CostMap, P!) < obstacle-cost .
+    forall P! . ((point-row(P!) === I and point-col(P!) === J:Integer) implies
+      value(CM:CostMap, P!) < obstacle-cost) .
 endfm
 
 
@@ -112,13 +119,24 @@ fmod POTENTIALMAP-VERIF is
   protecting COSTMAP-VERIF .
 
   sort RealInf .
+
+  op _===_ : RealInf RealInf -> Boolean [ctor gather (e E) prec 51] .
+  op _=/==_ : RealInf RealInf -> Boolean [ctor gather (e E) prec 51] .
+  op _?_:_ : Boolean RealInf RealInf -> RealInf [ctor gather (e e e) prec 71 ] .
   
   op isInfinity : RealInf -> Boolean .
   op unwrapReal : RealInf -> Real .
   
   sort PotentialMap .
   
+  op _===_ : PotentialMap PotentialMap -> Boolean [ctor gather (e E) prec 51] .
+  op _=/==_ : PotentialMap PotentialMap -> Boolean [ctor gather (e E) prec 51] .
+  op _?_:_ : Boolean PotentialMap PotentialMap -> PotentialMap [ctor gather (e e e) prec 71] .
+  
+  
   op elem : PotentialMap Integer Integer -> RealInf .
+  
+  op potentialmap-axiom : PotentialMap -> Boolean .
   
   op potentialmap-valid : PotentialMap CostMap -> Boolean .
   op has-adjacent-real : Pose PotentialMap Integer Integer -> Boolean .
@@ -129,10 +147,13 @@ fmod POTENTIALMAP-VERIF is
   var P : Pose .
   var NR NC : Integer .
   
+  eq potentialmap-axiom(PM) =
+    true .
+  
   eq potentialmap-valid(PM, CM) =
     forall I! .
     forall J! .
-      (0 <= I! and I! < num-rows(CM) and 0 <= J! and J! < num-cols(CM) and (not isInfinity(elem(PM, I!, J!)))) implies open(CM, I!, J!) .
+      ((0 <= I! and I! < num-rows(CM) and 0 <= J! and J! < num-cols(CM) and (not isInfinity(elem(PM, I!, J!)))) implies open(CM, I!, J!)) .
 
   eq has-adjacent-real(P, PM, NR, NC) = 
     0 <= point-row(pose-position(P)) and point-row(pose-position(P)) < NR 
@@ -153,23 +174,26 @@ fmod POTENTIALMAP-VERIF is
 endfm
 
 
-fmod POSE_QUEUE is
+fmod POSE-QUEUE-VERIF is
   protecting BOOLEAN .
   protecting SMT-ARRAY{Integer, Pose} .
   protecting POTENTIALMAP-VERIF .
   protecting COSTMAP-VERIF .
 
   sort PoseQueue .
-  subsort Array{Integer, Pose} < PoseQueue .
+  
+  subsort Array{Integer,Pose} < PoseQueue .
   
   op length : PoseQueue -> Integer .
+  op queue-array : PoseQueue -> Array{Integer,Pose} .
   
   op enqueue : Pose PoseQueue PoseQueue -> Boolean .
   op dequeue : PoseQueue PoseQueue -> Boolean .
   op empty : PoseQueue -> Boolean .
   op front : PoseQueue Pose -> Boolean .
   
-  op valid-queue : PoseQueue PotentialMap CostMap -> Boolean .
+  op queue-axiom : PoseQueue -> Boolean .
+  op queue-valid : PoseQueue PotentialMap CostMap -> Boolean .
   
   op _===_ : PoseQueue PoseQueue -> Boolean [ctor gather (e E) prec 51] .
   op _=/==_ : PoseQueue PoseQueue -> Boolean [ctor gather (e E) prec 51] .
@@ -181,29 +205,867 @@ fmod POSE_QUEUE is
   var PM : PotentialMap .
   var CM : CostMap .
   
+  eq queue-axiom(Q) =
+    length(Q) >= 0 and forall I! . pose-axiom(queue-array(Q)[I!]) .
+  
   eq enqueue(P, Q1, Q2) =
     length(Q2) === length(Q1) + 1 
-    and Q2 === Q1[length(Q2) -> P] .
+    and queue-array(Q2) === queue-array(Q1)[length(Q2) -> P] .
     
   eq dequeue(Q1, Q2) = 
     length(Q2) > 0 
     and length(Q2) === length(Q1) - 1
-    and (forall I! . (0 <= I! and I! < length(Q2)) implies (Q2[I!] === Q1[I! + 1])) .
+    and (forall I! . ((0 <= I! and I! < length(Q2)) implies (queue-array(Q2)[I!] === queue-array(Q1)[I! + 1]))) .
   
   eq empty(Q) = length(Q) === 0 .
   
-  eq front(Q, P) = length(Q) > 0 and Q[0] === P .
+  eq front(Q, P) = length(Q) > 0 and queue-array(Q)[0] === P .
   
   
-  eq valid-queue(Q, PM, CM) =
-    forall I! . (0 <= I! and I! < length(Q)) 
+  eq queue-valid(Q, PM, CM) =
+    forall I! . ((0 <= I! and I! < length(Q)) 
       implies
         (
-          0 <= point-row(pose-position(Q[I!])) and point-row(pose-position(Q[I!])) < num-rows(CM)
+          0 <= point-row(pose-position(queue-array(Q)[I!])) and point-row(pose-position(queue-array(Q)[I!])) < num-rows(CM)
         and 
-          0 <= point-col(pose-position(Q[I!])) and point-col(pose-position(Q[I!])) < num-cols(CM)
+          0 <= point-col(pose-position(queue-array(Q)[I!])) and point-col(pose-position(queue-array(Q)[I!])) < num-cols(CM)
          and
-          has-adjacent-real(Q[I!], PM, num-rows(CM), num-cols(CM))          
-        ) .
+          has-adjacent-real(queue-array(Q)[I!], PM, num-rows(CM), num-cols(CM))          
+        )) .
 endfm
 
+
+fmod BUILD-INITIAL-POTENTIAL-MAP-VERIF is
+  protecting POTENTIALMAP-VERIF .
+  
+  op build-initial-potential-map-precond : 
+    Integer Integer Integer Integer -> Boolean .
+    
+  op build-initial-potential-map-postcond : 
+    Integer Integer Integer Integer PotentialMap -> Boolean .
+  
+  var NR NC INITR INITC : Integer .
+  var PM : PotentialMap .
+  
+  eq build-initial-potential-map-precond(NR, NC, INITR, INITC) =
+    *** requires 0 <= initRow < numRows && 0 <= initCol < numCols
+    0 <= INITR and INITR < NR and 0 <= INITC and INITC < NC .
+    
+  eq build-initial-potential-map-postcond(NR, NC, INITR, INITC, PM) =
+    *** ensures PotentialMapHasDimensions(p, numRows, numCols)
+    *** ensures forall i, j | 0 <= i < numRows && 0 <= j < numCols 
+    ***           && (i != initRow || j != initCol) :: p[i][j] == Infinity
+    (forall I! . forall J! . 
+      ((
+        0 <= I! and I! < NR and 0 <= J! 
+        and J! < NC and (I! =/== INITR or J! =/== INITC)
+      )
+      implies (
+          isInfinity(elem(PM, I!, J!))
+      )))
+    *** ensures p[initRow][initCol] == Real(0.0)
+    and (not isInfinity(elem(PM, INITR, INITC))) 
+    and (unwrapReal(elem(PM, INITR, INITC)) === toReal(0)) .
+endfm
+
+
+fmod EUCLID-DISTANCE-VERIF is
+  protecting POSE-VERIF .
+  protecting REAL-INTEGER .
+  
+  
+  vars P1 P2 : Point .
+  var D : Real .
+  
+  op euclid-distance-precond : Point Point -> Boolean .
+  op euclid-distance-postcond : Point Point Real -> Boolean .
+  
+  eq euclid-distance-precond(P1, P2) = true .
+  eq euclid-distance-postcond(P1, P2, D) = true .
+endfm
+
+fmod INIT-CURRENT-QUEUE-VERIF is
+  protecting POSE-VERIF .
+  protecting POTENTIALMAP-VERIF .
+  protecting COSTMAP-VERIF .
+  protecting POSE-QUEUE-VERIF .
+  
+  op init-current-queue-precond : Pose PotentialMap CostMap -> Boolean .
+  op init-current-queue-postcond : Pose PotentialMap CostMap PoseQueue -> Boolean .
+  
+  var P : Pose .
+  var PM : PotentialMap .
+  var CM : CostMap .
+  var PQ : PoseQueue .
+  
+  eq init-current-queue-precond(P, PM, CM) =
+    *** Input invariants
+    pose-axiom(P)
+    and potentialmap-axiom(PM)
+    and costmap-axiom(CM)
+    *** requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
+    and 0 <= point-row(pose-position(P))
+    and point-row(pose-position(P)) < num-rows(CM)
+    and 0 <= point-col(pose-position(P))
+    and point-col(pose-position(P)) < num-cols(CM)
+    *** requires pot[p.pos.row][p.pos.col].Real?
+    and not isInfinity(elem(PM, point-row(pose-position(P)), point-col(pose-position(P)))) .
+
+
+  eq init-current-queue-postcond(P, PM, CM, PQ) =
+    *** Output invariants
+    queue-axiom(PQ)
+    *** ensures ValidQueue(current, pot, costMap)
+    and queue-valid(PQ, PM, CM) .
+
+endfm
+
+fmod MIN-INFINITY-VERIF  is
+  protecting POTENTIALMAP-VERIF .
+  
+  op min-infinity : RealInf RealInf RealInf -> Boolean .
+  
+  vars X1 X2 MIN : RealInf . 
+
+  eq min-infinity(X1, X2, MIN) =
+    (isInfinity(X1) implies MIN === X2)
+    and
+    ((not isInfinity(X1) and isInfinity(X2)) implies MIN === X1)
+    and
+    ((not isInfinity(X1) and not isInfinity(X2) and unwrapReal(X1) <= unwrapReal(X2)) implies MIN === X1)
+    and
+    ((not isInfinity(X1) and not isInfinity(X2) and not unwrapReal(X1) <= unwrapReal(X2)) implies MIN === X2) .
+endfm
+
+fmod MAX-INFINITY-VERIF  is
+  protecting POTENTIALMAP-VERIF .
+  
+  op max-infinity : RealInf RealInf RealInf -> Boolean .
+  
+  vars X1 X2 MAX : RealInf . 
+
+  eq max-infinity(X1, X2, MAX) =
+    (isInfinity(X1) implies MAX === X1)
+    and
+    ((not isInfinity(X1) and isInfinity(X2)) implies MAX === X2)
+    and
+    ((not isInfinity(X1) and not isInfinity(X2) and unwrapReal(X1) >= unwrapReal(X2)) implies MAX === X1)
+    and
+    ((not isInfinity(X1) and not isInfinity(X2) and not unwrapReal(X1) >= unwrapReal(X2)) implies MAX === X2) .
+endfm
+
+fmod MIN-HORIZONTAL-VERIF is
+  protecting POSE-VERIF .
+  protecting POTENTIALMAP-VERIF .
+  protecting MIN-INFINITY-VERIF  .
+  
+  op min-horizontal-precond : Pose PotentialMap CostMap Integer -> Boolean .
+  
+  op min-horizontal-postcond : Pose PotentialMap CostMap Integer RealInf -> Boolean .
+  
+  var P : Pose .
+  var PM : PotentialMap .
+  var CM : CostMap .
+  var NC : Integer .
+  var RESULT : RealInf .
+  
+  eq min-horizontal-precond(P, PM, CM, NC) =
+    NC >= 0
+    and potentialmap-valid(PM, CM)
+    and num-cols(CM) === NC
+    and 0 <= point-row(pose-position(P))
+    and point-row(pose-position(P)) < num-rows(CM)
+    and 0 <= point-col(pose-position(P))
+    and point-col(pose-position(P)) < NC .
+  
+  ops LEFT! RIGHT! : -> RealInf .
+  
+  eq min-horizontal-postcond(P, PM, CM, NC, RESULT) = 
+    forall LEFT! . forall RIGHT! .
+      ((
+       (point-col(pose-position(P)) > 0 implies LEFT! === elem(PM, point-row(pose-position(P)), point-col(pose-position(P)) - 1))
+       and
+       ((not point-col(pose-position(P)) > 0) implies isInfinity(LEFT!))
+       and
+       (point-col(pose-position(P)) + 1 < NC implies RIGHT! === elem(PM, point-row(pose-position(P)), point-col(pose-position(P)) + 1))
+       and
+       ((not point-col(pose-position(P)) + 1 < NC) implies isInfinity(RIGHT!))
+      ) implies (
+        min-infinity(LEFT!, RIGHT!, RESULT)
+      )) .
+endfm
+
+fmod MIN-VERTICAL-VERIF is
+  protecting POSE-VERIF .
+  protecting POTENTIALMAP-VERIF .
+  protecting MIN-INFINITY-VERIF .
+  
+  op min-vertical-precond : Pose PotentialMap CostMap Integer -> Boolean .  
+  op min-vertical-postcond : Pose PotentialMap CostMap Integer RealInf -> Boolean .
+   
+  var P : Pose .
+  var PM : PotentialMap .
+  var CM : CostMap .
+  var NR : Integer .
+  var RESULT : RealInf .
+  
+    
+  
+  eq min-vertical-precond(P, PM, CM, NR) =
+    NR >= 0
+    and num-rows(CM) === NR
+    and potentialmap-valid(PM, CM)
+    and 0 <= point-row(pose-position(P))
+    and point-row(pose-position(P)) < NR
+    and 0 <= point-col(pose-position(P))
+    and point-col(pose-position(P)) < num-cols(CM) .
+  
+  ops UP! DOWN! : -> RealInf .
+  
+  eq min-vertical-postcond(P, PM, CM, NR, RESULT) = 
+    forall UP! . forall DOWN! .
+      ((
+       (point-row(pose-position(P)) > 0 implies UP! === elem(PM, point-row(pose-position(P)) - 1, point-col(pose-position(P))))
+       and
+       ((not point-row(pose-position(P)) > 0) implies isInfinity(UP!))
+       and
+       (point-row(pose-position(P)) + 1 < NR implies DOWN! === elem(PM, point-row(pose-position(P)) + 1, point-col(pose-position(P))))
+       and
+       ((not point-row(pose-position(P)) + 1 < NR) implies isInfinity(DOWN!))
+      ) implies (
+        min-infinity(UP!, DOWN!, RESULT)
+      )) .
+endfm
+
+
+fmod UPDATE-POTENTIAL-VERIF is
+  protecting POTENTIALMAP-VERIF .
+  protecting POSE-VERIF .
+  protecting COSTMAP-VERIF .
+  protecting REAL-INTEGER .
+  
+  op update-potential-precond : PotentialMap Pose Pose CostMap RealInf RealInf -> Boolean .
+  op update-potential-postcond : PotentialMap Pose Pose CostMap RealInf RealInf PotentialMap -> Boolean .
+  
+  var PM PM' : PotentialMap .
+  vars P GOAL : Pose .
+  var CM : CostMap .
+  vars MIN SND : RealInf .
+  
+  eq update-potential-precond(PM, P, GOAL, CM, MIN, SND) =
+    *** Datatype axioms
+    potentialmap-axiom(PM)
+    and pose-axiom(P)
+    and pose-axiom(GOAL)
+    and costmap-axiom(CM)
+    *** requires ValidPotentialMap(pot, costMap)
+    and potentialmap-valid(PM, CM)
+    *** requires ValidCostMap(costMap)
+    and costmap-valid(CM)
+    *** requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
+    and 0 <= point-row(pose-position(P))
+    and point-row(pose-position(P)) < num-rows(CM)
+    and 0 <= point-col(pose-position(P))
+    and point-col(pose-position(P)) < num-cols(CM)
+    *** requires min.Real?
+    and not isInfinity(MIN)
+    *** requires open(costMap, p.pos.row, p.pos.col)
+    and open(CM, point-row(pose-position(P)), point-col(pose-position(P))) 
+    .
+    
+  eq update-potential-postcond(PM, P, GOAL, CM, MIN, SND, PM') =
+    *** Datatype axioms
+    potentialmap-axiom(PM')
+    *** ensures ValidPotentialMap(pot', costMap)
+    and potentialmap-valid(PM', CM)
+    *** ensures forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols ::
+    ***                           pot[i][j].Real? ==> pot'[i][j].Real?
+    and (forall I! . forall J! . 
+      ((
+        0 <= I! and I! < num-rows(CM)
+        and 0 <= J! and J! < num-cols(CM)
+        and not isInfinity(elem(PM, I!, J!))
+      ) implies (
+        not isInfinity(elem(PM', I!, J!))
+      )))
+    *** ensures pot'[p.pos.row][p.pos.col].Real?
+    and not isInfinity(elem(PM', point-row(pose-position(P)), point-col(pose-position(P))))
+    .
+endfm
+
+fmod TRAVERSE-NEIGHBOURS-VERIF is
+  protecting POSE-VERIF .
+  protecting COSTMAP-VERIF .
+  protecting POTENTIALMAP-VERIF .
+  protecting REAL-INTEGER .
+  protecting POSE-QUEUE-VERIF .
+  
+  op traverse-neighbours-precond : Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue -> Boolean .
+  op traverse-neighbours-postcond : Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+  
+  
+  vars P START : Pose .
+  var CM : CostMap .
+  var PM : PotentialMap .
+  var TH : Real .
+  var NEXT EXCESS NEXT' EXCESS' : PoseQueue .
+  
+  eq traverse-neighbours-precond(P, START, CM, PM, TH, NEXT, EXCESS) =
+    *** Datatype axioms
+    pose-axiom(P)
+    and pose-axiom(START)
+    and costmap-axiom(CM)
+    and potentialmap-axiom(PM)
+    and queue-axiom(NEXT)
+    and queue-axiom(EXCESS)
+    *** requires ValidPotentialMap(pot, costMap)
+    and potentialmap-valid(PM, CM)
+    *** requires ValidQueue(next, pot, costMap) && ValidQueue(excess, pot, costMap)
+    and queue-valid(NEXT, PM, CM) and queue-valid(EXCESS, PM, CM)    
+    *** requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
+    and 0 <= point-row(pose-position(P))
+    and point-row(pose-position(P)) < num-rows(CM)
+    and 0 <= point-col(pose-position(P))
+    and point-col(pose-position(P)) < num-cols(CM)
+    *** requires pot[p.pos.row][p.pos.col].Real?
+    and not isInfinity(elem(PM, point-row(pose-position(P)), point-col(pose-position(P))))
+    .
+    
+  eq traverse-neighbours-postcond(P, START, CM, PM, TH, NEXT, EXCESS, NEXT', EXCESS') =
+    *** Datatype axioms
+    queue-axiom(NEXT')
+    and queue-axiom(EXCESS')
+    *** ensures ValidQueue(next', pot, costMap) && ValidQueue(excess', pot, costMap)
+    and queue-valid(NEXT', PM, CM) and queue-valid(EXCESS', PM, CM)    
+    .
+endfm
+
+
+fmod ASTAR-ITERATION-VERIF is
+  protecting POSE-VERIF .
+  protecting COSTMAP-VERIF .
+  protecting POTENTIALMAP-VERIF .
+  protecting POSE-QUEUE-VERIF .
+  protecting MIN-VERTICAL-VERIF .
+  protecting MIN-HORIZONTAL-VERIF .
+  protecting MIN-INFINITY-VERIF .
+  protecting MAX-INFINITY-VERIF .
+  protecting UPDATE-POTENTIAL-VERIF .
+  protecting TRAVERSE-NEIGHBOURS-VERIF .
+  protecting REAL-INTEGER .
+  
+  op astar-iteration-precond : 
+    Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer -> Boolean .
+  op astar-iteration-postcond : 
+    Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+  vars START GOAL : Pose .
+  var CM : CostMap .
+  var PM PM' : PotentialMap .
+  vars CUR NEXT EXCESS : PoseQueue .
+  var THRESHOLD : Real .
+  var NIT : Integer .
+  
+  eq astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT) =
+    *** Input invariants
+    pose-axiom(START)
+    and pose-axiom(GOAL)
+    and costmap-axiom(CM)
+    and potentialmap-axiom(PM)
+    and queue-axiom(CUR)
+    and queue-axiom(NEXT)
+    and queue-axiom(EXCESS)
+    and NIT >= 0
+    ***  requires ValidPotentialMap(pot, costMap)
+    and potentialmap-valid(PM, CM)
+    ***  requires ValidQueue(current, pot, costMap) && ValidQueue(next, pot, costMap) && ValidQueue(excess, pot, costMap)
+    and queue-valid(CUR, PM, CM)
+    and queue-valid(NEXT, PM, CM)
+    and queue-valid(EXCESS, PM, CM)
+    ***  requires ValidCostMap(costMap)
+    and costmap-valid(CM)
+    ***  requires 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
+    and 0 <= point-row(pose-position(START))
+    and point-row(pose-position(START)) < num-rows(CM)
+    and 0 <= point-col(pose-position(START))
+    and point-col(pose-position(START)) < num-cols(CM)
+    ***  requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
+    and 0 <= point-row(pose-position(GOAL))
+    and point-row(pose-position(GOAL)) < num-rows(CM)
+    and 0 <= point-col(pose-position(GOAL))
+    and point-col(pose-position(GOAL)) < num-cols(CM)    
+    .
+
+    
+    eq astar-iteration-postcond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') = 
+      potentialmap-valid(PM', CM) .
+      
+
+    
+    *** Case in which numIterations == 0
+    op astar-iteration-vc1 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc1(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      (
+        astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+        and NIT === 0
+        and PM' === PM
+      ) implies (
+        astar-iteration-postcond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM')
+      ) .
+
+
+    *** Case in which the starting position has potential lower than infinity
+    op astar-iteration-vc2 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc2(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      (
+        astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+        and not (NIT === 0)
+        and not isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+        and PM' === PM
+      ) implies (      
+        astar-iteration-postcond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM')
+      ) .
+      
+    op CUR0! : -> Pose .
+    op CURT! : -> PoseQueue .
+    op EMPTYQ! : -> PoseQueue .
+    
+    *** Case in which current queue is non-empty, and front position is closed
+    *** Check precondition of recursive call
+    op astar-iteration-vc3 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc3(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and not open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+          and dequeue(CUR, CURT!)          
+        ) implies (      
+          astar-iteration-precond(START, GOAL, CM, PM, CURT!, NEXT, EXCESS, THRESHOLD, NIT))) .      
+
+    *** Case in which current queue is non-empty, and front position is closed
+    *** From recursive call follows postcondition
+    op astar-iteration-vc4 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc4(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and not open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+          and dequeue(CUR, CURT!)          
+          and astar-iteration-postcond(START, GOAL, CM, PM, CURT!, NEXT, EXCESS, THRESHOLD, NIT, PM')
+        ) implies (  
+          astar-iteration-postcond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM')
+        )) .      
+        
+    *** Case in which current queue is non-empty, and front position is open
+    *** Precondition of call to MinVertical holds
+    op astar-iteration-vc5 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc5(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+        ) implies (  
+          min-vertical-precond(CUR0!, PM, CM, num-rows(CM))
+        )) .
+        
+        
+    ops MINV! MINH! : -> RealInf .
+
+    *** Case in which current queue is non-empty, and front position is open
+    *** Precondition of call to MinVertical holds
+    op astar-iteration-vc6 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc6(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! . forall MINV! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+          and min-vertical-postcond(CUR0!, PM, CM, num-rows(CM), MINV!)
+        ) implies (  
+          min-horizontal-precond(CUR0!, PM, CM, num-cols(CM))
+        )) .
+        
+    
+        
+    *** Case in which current queue is non-empty, and front position is open
+    *** assert minV != Infinity || minH != Infinity;
+    op astar-iteration-vc7 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc7(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! . forall MINV! . forall MINH! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+          and min-vertical-postcond(CUR0!, PM, CM, num-rows(CM), MINV!)
+          and min-horizontal-postcond(CUR0!, PM, CM, num-cols(CM), MINH!)
+        ) implies (  
+          (not isInfinity(MINV!)) or (not isInfinity(MINH!))
+        )) .
+        
+    
+    ops MIN! SND! : -> RealInf .
+    
+    *** Case in which current queue is non-empty, and front position is open
+    *** Precondition of UpdatePotential  holds
+    op astar-iteration-vc8 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc8(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! . forall MINV! . forall MINH! . 
+      forall MIN! . forall SND! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+          and min-vertical-postcond(CUR0!, PM, CM, num-rows(CM), MINV!)
+          and min-horizontal-postcond(CUR0!, PM, CM, num-cols(CM), MINH!)
+          and ((not isInfinity(MINV!)) or (not isInfinity(MINH!)))
+          and min-infinity(MINV!, MINH!, MIN!)
+          and max-infinity(MINV!, MINH!, SND!)
+        ) implies (  
+          update-potential-precond(PM, CUR0!, GOAL, CM, MIN!, SND!)
+        )) .
+    
+    
+    op POTAUX! : -> PotentialMap .
+    
+    *** Case in which current queue is non-empty, and front position is open
+    *** assert ValidQueue(current, potAux, costMap);
+    *** assert ValidQueue(next, potAux, costMap);
+    *** assert ValidQueue(excess, potAux, costMap);
+    op astar-iteration-vc9 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    
+    eq astar-iteration-vc9(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! . forall MINV! . forall MINH! . 
+      forall MIN! . forall SND! . forall POTAUX! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+          and min-vertical-postcond(CUR0!, PM, CM, num-rows(CM), MINV!)
+          and min-horizontal-postcond(CUR0!, PM, CM, num-cols(CM), MINH!)
+          and ((not isInfinity(MINV!)) or (not isInfinity(MINH!)))
+          and min-infinity(MINV!, MINH!, MIN!)
+          and max-infinity(MINV!, MINH!, SND!)
+          and update-potential-postcond(PM, CUR0!, GOAL, CM, MIN!, SND!, POTAUX!)
+        ) implies (  
+          queue-valid(CUR, POTAUX!, CM)
+          and queue-valid(NEXT, POTAUX!, CM)
+          and queue-valid(EXCESS, POTAUX!, CM)
+        )) .
+        
+    *** Case in which current queue is non-empty, and front position is open
+    *** Precondition of call to TraverseNeighbours holds
+    op astar-iteration-vc10 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+        
+    eq astar-iteration-vc10(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! . forall MINV! . forall MINH! . 
+      forall MIN! . forall SND! . forall POTAUX! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+          and min-vertical-postcond(CUR0!, PM, CM, num-rows(CM), MINV!)
+          and min-horizontal-postcond(CUR0!, PM, CM, num-cols(CM), MINH!)
+          and ((not isInfinity(MINV!)) or (not isInfinity(MINH!)))
+          and min-infinity(MINV!, MINH!, MIN!)
+          and max-infinity(MINV!, MINH!, SND!)
+          and update-potential-postcond(PM, CUR0!, GOAL, CM, MIN!, SND!, POTAUX!)
+          and queue-valid(CUR, POTAUX!, CM)
+          and queue-valid(NEXT, POTAUX!, CM)
+          and queue-valid(EXCESS, POTAUX!, CM)
+        ) implies (
+          traverse-neighbours-precond(CUR0!, START, CM, POTAUX!, THRESHOLD, NEXT, EXCESS)
+        )) .        
+
+        
+    ops NEXT'! EXCESS'! : -> PoseQueue .
+    
+    *** Case in which current queue is non-empty, and front position is open
+    *** assert ValidQueue(next', potAux, costMap);
+    *** assert ValidQueue(excess', potAux, costMap);
+    op astar-iteration-vc11 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+        
+    eq astar-iteration-vc11(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! . forall MINV! . forall MINH! . 
+      forall MIN! . forall SND! . forall POTAUX! .
+      forall NEXT'! . forall EXCESS'! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+          and min-vertical-postcond(CUR0!, PM, CM, num-rows(CM), MINV!)
+          and min-horizontal-postcond(CUR0!, PM, CM, num-cols(CM), MINH!)
+          and ((not isInfinity(MINV!)) or (not isInfinity(MINH!)))
+          and min-infinity(MINV!, MINH!, MIN!)
+          and max-infinity(MINV!, MINH!, SND!)
+          and update-potential-postcond(PM, CUR0!, GOAL, CM, MIN!, SND!, POTAUX!)
+          and queue-valid(CUR, POTAUX!, CM)
+          and queue-valid(NEXT, POTAUX!, CM)
+          and queue-valid(EXCESS, POTAUX!, CM)
+          and traverse-neighbours-postcond(CUR0!, START, CM, POTAUX!, THRESHOLD, NEXT, EXCESS, NEXT'!, EXCESS'!)
+        ) implies (
+          queue-valid(NEXT'!, POTAUX!, CM)
+          and queue-valid(EXCESS'!, POTAUX!, CM)
+        )) .        
+
+    *** Case in which current queue is non-empty, and front position is open
+    *** Precondition of recursive call holds
+    op astar-iteration-vc12 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+        
+    eq astar-iteration-vc12(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! . forall MINV! . forall MINH! . 
+      forall MIN! . forall SND! . forall POTAUX! .
+      forall NEXT'! . forall EXCESS'! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+          and min-vertical-postcond(CUR0!, PM, CM, num-rows(CM), MINV!)
+          and min-horizontal-postcond(CUR0!, PM, CM, num-cols(CM), MINH!)
+          and ((not isInfinity(MINV!)) or (not isInfinity(MINH!)))
+          and min-infinity(MINV!, MINH!, MIN!)
+          and max-infinity(MINV!, MINH!, SND!)
+          and update-potential-postcond(PM, CUR0!, GOAL, CM, MIN!, SND!, POTAUX!)
+          and queue-valid(CUR, POTAUX!, CM)
+          and queue-valid(NEXT, POTAUX!, CM)
+          and queue-valid(EXCESS, POTAUX!, CM)
+          and traverse-neighbours-postcond(CUR0!, START, CM, POTAUX!, THRESHOLD, NEXT, EXCESS, NEXT'!, EXCESS'!)
+          and queue-valid(NEXT'!, POTAUX!, CM)
+          and queue-valid(EXCESS'!, POTAUX!, CM)
+          and dequeue(CUR, CURT!)
+        ) implies (
+          astar-iteration-precond(START, GOAL, CM, POTAUX!, CURT!, NEXT'!, EXCESS'!, THRESHOLD, NIT)
+        )) .
+
+    *** Case in which current queue is non-empty, and front position is open
+    *** Postcondition follows from recursive call
+    op astar-iteration-vc13 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+        
+    eq astar-iteration-vc13(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall CUR0! . forall CURT! . forall MINV! . forall MINH! . 
+      forall MIN! . forall SND! . forall POTAUX! .
+      forall NEXT'! . forall EXCESS'! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and not empty(CUR)
+          and front(CUR, CUR0!)
+          and open(CM, point-row(pose-position(CUR0!)), point-col(pose-position(CUR0!)))
+          and min-vertical-postcond(CUR0!, PM, CM, num-rows(CM), MINV!)
+          and min-horizontal-postcond(CUR0!, PM, CM, num-cols(CM), MINH!)
+          and ((not isInfinity(MINV!)) or (not isInfinity(MINH!)))
+          and min-infinity(MINV!, MINH!, MIN!)
+          and max-infinity(MINV!, MINH!, SND!)
+          and update-potential-postcond(PM, CUR0!, GOAL, CM, MIN!, SND!, POTAUX!)
+          and queue-valid(CUR, POTAUX!, CM)
+          and queue-valid(NEXT, POTAUX!, CM)
+          and queue-valid(EXCESS, POTAUX!, CM)
+          and traverse-neighbours-postcond(CUR0!, START, CM, POTAUX!, THRESHOLD, NEXT, EXCESS, NEXT'!, EXCESS'!)
+          and queue-valid(NEXT'!, POTAUX!, CM)
+          and queue-valid(EXCESS'!, POTAUX!, CM)
+          and dequeue(CUR, CURT!)
+          and astar-iteration-postcond(START, GOAL, CM, POTAUX!, CURT!, NEXT'!, EXCESS'!, THRESHOLD, NIT, PM')
+        ) implies (
+          astar-iteration-postcond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM')
+        )) .
+        
+    *** Case in which current queue is empty, and so is next queue
+    *** Check precondition of recursive call
+    op astar-iteration-vc14 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc14(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall EMPTYQ! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and empty(CUR)
+          and empty(NEXT)
+          and empty(EMPTYQ!)
+        ) implies (  
+          astar-iteration-precond(START, GOAL, CM, PM, EXCESS, EMPTYQ!, NEXT, THRESHOLD + toReal(2) * map-cost , NIT - 1)
+        )) .      
+
+    *** Case in which current queue is empty, and so is next queue
+    *** From recursive call follows postcondition
+    op astar-iteration-vc15 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc15(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall EMPTYQ! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and empty(CUR)
+          and empty(NEXT)
+          and empty(EMPTYQ!)
+          and astar-iteration-postcond(START, GOAL, CM, PM, EXCESS, EMPTYQ!, NEXT, THRESHOLD + toReal(2) * map-cost , NIT - 1, PM')
+        ) implies (  
+          astar-iteration-postcond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM')
+        )) .      
+        
+    *** Case in which current queue is empty, but next is not
+    *** Check precondition of recursive call
+    op astar-iteration-vc16 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc16(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall EMPTYQ! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and empty(CUR)
+          and not empty(NEXT)
+          and empty(EMPTYQ!)
+        ) implies (  
+          astar-iteration-precond(START, GOAL, CM, PM, NEXT, EMPTYQ!, EXCESS, THRESHOLD, NIT - 1)
+        )) .
+        
+    
+    *** Case in which current queue is empty, but next is not
+    *** From recursive call follows postcondition
+    op astar-iteration-vc17 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
+    
+    eq astar-iteration-vc17(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
+      forall EMPTYQ! .
+        ((
+          astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT)
+          and not (NIT === 0)
+          and isInfinity(elem(PM, point-row(pose-position(START)), point-col(pose-position(START))))
+          and empty(CUR)
+          and not empty(NEXT)
+          and empty(EMPTYQ!)
+          and astar-iteration-postcond(START, GOAL, CM, PM, NEXT, EMPTYQ!, EXCESS, THRESHOLD, NIT - 1, PM')
+        ) implies (  
+          astar-iteration-postcond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM')
+        )) .
+endfm
+
+
+fmod ASTAR-VERIF is
+  protecting POSE-VERIF .
+  protecting POTENTIALMAP-VERIF .
+  protecting COSTMAP-VERIF .
+  protecting POSE-QUEUE-VERIF .
+  protecting BUILD-INITIAL-POTENTIAL-MAP-VERIF .
+  protecting EUCLID-DISTANCE-VERIF .
+  protecting INIT-CURRENT-QUEUE-VERIF .
+  protecting ASTAR-ITERATION-VERIF .
+  
+  op astar-precond : Pose Pose CostMap Integer -> Boolean .
+  
+  var START GOAL : Pose .
+  var CM : CostMap .
+  var NI : Integer .
+  var PM : PotentialMap .
+  vars ITHR ITHR' : Real .
+  var CUR NEXT EXCESS : PoseQueue .
+  
+
+  
+  eq astar-precond(START, GOAL, CM, NI) =
+    *** Input invariants
+        NI >= 0
+    and pose-axiom(START)
+    and pose-axiom(GOAL)
+    *** Preconditions
+    and 0 <= point-row(pose-position(START))        
+    and point-row(pose-position(START)) < num-rows(CM)
+    and 0 <= point-col(pose-position(START))
+    and point-col(pose-position(START)) < num-cols(CM)
+    and 0 <= point-row(pose-position(GOAL))        
+    and point-row(pose-position(GOAL)) < num-rows(CM)
+    and 0 <= point-col(pose-position(GOAL))
+    and point-col(pose-position(GOAL)) < num-cols(CM)
+    and open(CM, point-row(pose-position(GOAL)), point-col(pose-position(GOAL)))
+    and costmap-valid(CM) .
+  
+  *** Call to BuildInitialPotentialMap meets preconditions
+  op astar-vc1 : Pose Pose CostMap Integer -> Boolean .
+  eq astar-vc1(START, GOAL, CM, NI) =
+    (
+      astar-precond(START, GOAL, CM, NI)
+    ) implies (
+      build-initial-potential-map-precond(num-rows(CM), num-cols(CM), point-row(pose-position(GOAL)), point-col(pose-position(GOAL))) 
+    ) .
+    
+  *** Call to EuclidDistance meets preconditions
+  op astar-vc2 : Pose Pose CostMap Integer PotentialMap -> Boolean .
+  eq astar-vc2(START, GOAL, CM, NI, PM) =
+    (
+      astar-precond(START, GOAL, CM, NI)
+      and build-initial-potential-map-postcond(num-rows(CM), num-cols(CM), point-row(pose-position(GOAL)), point-col(pose-position(GOAL)), PM)
+    ) implies (
+      euclid-distance-precond(pose-position(START), pose-position(GOAL))
+    ) .
+  
+  *** Call to InitCurrentQueue meets preconditions
+  op astar-vc3 : Pose Pose CostMap Integer PotentialMap Real Real -> Boolean .
+  eq astar-vc3(START, GOAL, CM, NI, PM, ITHR, ITHR') =
+    (
+      astar-precond(START, GOAL, CM, NI)
+      and build-initial-potential-map-postcond(num-rows(CM), num-cols(CM), point-row(pose-position(GOAL)), point-col(pose-position(GOAL)), PM)
+      and euclid-distance-postcond(pose-position(START), pose-position(GOAL), ITHR)
+      and ITHR' === ITHR + obstacle-cost
+    ) implies (
+      init-current-queue-precond(GOAL, PM, CM)
+    ) .
+  
+  *** Call to AStarIteration meets preconditions
+  op astar-vc4 : Pose Pose CostMap Integer PotentialMap Real Real PoseQueue PoseQueue PoseQueue -> Boolean .
+  eq astar-vc4(START, GOAL, CM, NI, PM, ITHR, ITHR', CUR, NEXT, EXCESS) =
+    (
+      astar-precond(START, GOAL, CM, NI)
+      and build-initial-potential-map-postcond(num-rows(CM), num-cols(CM), point-row(pose-position(GOAL)), point-col(pose-position(GOAL)), PM)
+      and euclid-distance-postcond(pose-position(START), pose-position(GOAL), ITHR)
+      and ITHR' === ITHR + obstacle-cost
+      and init-current-queue-postcond(GOAL, PM, CM, CUR)
+      and empty(NEXT)
+      and empty(EXCESS)
+    ) implies (
+      astar-iteration-precond(START, GOAL, CM, PM, CUR, NEXT, EXCESS, ITHR', NI)
+    ) .
+  
+endfm
