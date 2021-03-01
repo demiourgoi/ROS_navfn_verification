@@ -322,6 +322,7 @@ endfm
 
 fmod BASIC-TRAVERSE is
  pr POTENTIAL .
+ pr LIST{Nat} .
  pr POSE-SET .
  pr PATH .
 
@@ -330,6 +331,7 @@ fmod BASIC-TRAVERSE is
  vars INIT GOAL ACCP NOW : Pose .
  vars Q Q' : Quaternion .
  vars P P' : Potential .
+ var  LN : List{Nat} .
  var  CM : CostMap .
  var  PT : Path .
 
@@ -344,21 +346,19 @@ fmod BASIC-TRAVERSE is
  ceq $computePath({X, Y}, GOAL, P, NR, NC, PT) = $computePath(ACCP, GOAL, P, NR, NC, PT ({X, Y, 0} 0))
   if ACCP := getMin({X, Y}, P, NR, NC) [owise] .
 
- op getMin : Pose Potential Nat Nat -> Pose .
- eq getMin(INIT, P, NR, NC) = getMin(INIT, P, NR, NC, noPose, infinite, 0) .
+ op getMin : Pose Potential Nat List{Nat} -> Pose .
+ eq getMin(INIT, P, NR, NC) = getMin(INIT, P, NR, NC, noPose, infinite, 135 90 45 180 0 225 270 315) .
 
- op getMin : Pose Potential Nat Nat Pose Float Nat -> Pose .
- ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = if V < MINV
-                                                then getMin({X, Y}, P, NR, NC, {X', Y'}, V, N + 45)
-                                                else getMin({X, Y}, P, NR, NC, ACCP, MINV, N + 45)
-                                                fi
-  if N < 360 /\
-     < X', Y' > := getMove({X, Y}, N, NR, NC) /\
+ op getMin : Pose Potential Nat Nat Pose Float List{Nat} -> Pose .
+ ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N LN) = if V < MINV
+                                                   then getMin({X, Y}, P, NR, NC, {X', Y'}, V, LN)
+                                                   else getMin({X, Y}, P, NR, NC, ACCP, MINV, LN)
+                                                   fi
+  if < X', Y' > := getMove({X, Y}, N, NR, NC) /\
      V := (P @ [X', Y']) .
- ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = getMin({X, Y}, P, NR, NC, ACCP, MINV, N + 45)
-  if N < 360 /\
-     not (getMove({X, Y}, N, NR, NC) :: Pair) .
- eq getMin({X, Y}, P, NR, NC, ACCP, MINV, N) = ACCP [owise] .
+ ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N LN) = getMin({X, Y}, P, NR, NC, ACCP, MINV, LN)
+  if not (getMove({X, Y}, N, NR, NC) :: Pair) .
+ eq getMin(INIT, P, NR, NC, ACCP, MINV, nil) = ACCP .
 
  sort Pair .
  op <_,_> : Nat Nat -> Pair [ctor] .
