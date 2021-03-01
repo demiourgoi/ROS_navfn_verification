@@ -6,6 +6,7 @@ import maude
 import math
 import sys
 import json
+import os.path
 
 
 class DirectProfiler:
@@ -19,8 +20,13 @@ class DirectProfiler:
             self.w, self.h = lines[0].strip().split()
             self.w = int(self.w)
             self.h = int(self.h)
-            self.map_bin_file = lines[1].strip()
-            self.map_data = [0] * (self.w * self.h)
+            self.map_bin_file = lines[1].strip()  # Filename relative to the test case
+            self.map_data = [0] * (self.w * self.h)  # Avoid appending
+            test_full_path = os.path.abspath(ftest.name)
+            test_dir = os.path.dirname(test_full_path)
+            map_full_map_path = os.path.join(test_dir, self.map_bin_file)
+            self.map_bin_file = map_full_map_path  # Full path
+
             with open(self.map_bin_file, 'rb') as fmap:
                 for i in range(self.w * self.h):
                     cell = fmap.read(1)

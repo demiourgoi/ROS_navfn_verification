@@ -9,8 +9,10 @@ import argparse
 import json
 import math
 import sys
+import re
 
 EPSILON = 1E-5
+JSON_REGEX = re.compile(r"(^\{.+\})")
 
 
 def file_to_dict(filename):
@@ -19,9 +21,13 @@ def file_to_dict(filename):
     with open(filename, 'r') as json_file:
         lines = json_file.readlines()
         for line in lines:
-            line_dict = json.loads(line)
+            result = re.search(JSON_REGEX, line.strip()) 
+            if not result:  # Ignores lines with debug information
+                continue
+            line_dict = json.loads(result.group(1))
             # Line has the following format:
-            # {"initial": [1, 1], "goal": [1, 1], "length": 0, "path": [[1, 1], [1, 1]]}
+            # {"initial": [1, 1], "goal": [1, 1], "duration": 6.21e-07, "length": 0, "path": [[1, 1], [1, 1]], 
+            #  "navfn": [10000000000.0, 10000000000.0, 50, 10000000000.0,...] }
             initial = tuple(line_dict["initial"])
             goal = tuple(line_dict["goal"])
             path = [tuple(pose) for pose in line_dict["path"]]
@@ -212,10 +218,8 @@ def main(args):
     num_diff = 0
     with Plotter('potentials.pdf', args.draw, args.width) as plotter:
         for test in tests:
-            # Remove duplicates in the goal position
-            # TODO Rubén: remove_last is no longer neededs
-            path1 = remove_last(dict1[test]["path"])
-            path2 = remove_last(dict2[test]["path"])
+            path1 = dict1[test]["path"]
+            path2 = dict2[test]["path"]
 
             potarr1 = dict1[test]["navfn"]
             potarr2 = dict2[test].get("navfn")
@@ -231,6 +235,9 @@ def main(args):
 
             # Draw the potentials and paths
             plotter.draw(test[0], test[1], potarr1, potarr2, path1, path2, equal)
+            
+        if num_diff > 0:
+            exit(-1)
 
 
 if __name__ == "__main__":
