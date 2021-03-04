@@ -128,9 +128,6 @@ fmod POSE is
                   fi .
 endfm
 
-red closest(-5.0e-1) .
-red closest(5.0e-1) .
-
 view Pose from TRIV to POSE is
  sort Elt to Pose .
 endv
@@ -347,7 +344,7 @@ fmod BASIC-TRAVERSE is
   if ACCP := getMin({X, Y}, P, NR, NC) [owise] .
 
  op getMin : Pose Potential Nat List{Nat} -> Pose .
- eq getMin(INIT, P, NR, NC) = getMin(INIT, P, NR, NC, noPose, infinite, 135 90 45 180 0 225 270 315) .
+ eq getMin(INIT, P, NR, NC) = getMin(INIT, P, NR, NC, noPose, infinite, 135 180 225 90 270 45 0 315) .
 
  op getMin : Pose Potential Nat Nat Pose Float List{Nat} -> Pose .
  ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N LN) = if V < MINV

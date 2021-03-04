@@ -10,6 +10,9 @@
 #include <chrono>
 #include <string>
 
+#include <unistd.h>	// chdir
+#include <libgen.h>	// dirname
+
 using namespace std;
 
 #include "nav2_navfn_planner/navfn.hpp"
@@ -107,7 +110,7 @@ void runTest(const CostMap &map, float* path, int* tcase, NavFn*& navfn) {
 	cout << "]}" << endl;
 }
 
-int main() {
+int readTestFile(istream &in) {
 
 	// Read the configuration data from standard input
 	//
@@ -118,15 +121,15 @@ int main() {
 	CostMap map;
 	string map_path;
 
-	cin >> map.width >> map.height;
+	in >> map.width >> map.height;
 
 	// The next line is the filename (just in case it contain spaces)
-	while (isspace(cin.peek()))
-		cin.get();
+	while (isspace(in.peek()))
+		in.get();
 
-	getline(cin, map_path);
+	getline(in, map_path);
 
-	if (!cin) {
+	if (!in) {
 		cerr << "Errors while parsing the initial configuration." << endl;
 		return 1;
 	}
@@ -160,28 +163,50 @@ int main() {
 		// from the standard input
 		int positions[4];
 
-		cin >> positions[0];
+		in >> positions[0];
 
 		// We finish at the end of file
-		if (cin.eof()) {
+		if (in.eof()) {
 			break;
 		}
 		// Format errors also interrupt the execution
-		else if (cin.fail()) {
+		else if (in.fail()) {
 			cerr << "Error while reading the test cases." << endl;
 			return 4;
 		}
 		// An initial -1 discards the line as a comment
 		else if (positions[0] == -1) {
-			cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+			in.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 			continue;
 		}
 
 		for (size_t i = 1; i < 4; i++)
-			cin >> positions[i];
+			in >> positions[i];
 
 		runTest(map, buffer, positions, navfn);
 	}
 
 	return 0;
+}
+
+int main(int argc, char* argv[]) {
+	// The first argument (if any) is seen as input file,
+	// but the standard input is used if omitted
+
+	if (argc < 2)
+		return readTestFile(cin);
+
+	ifstream testfile(argv[1]);
+
+	if (!testfile.is_open()) {
+		cerr << "Cannot find " << argv[1] << " test file." << endl;
+		return 2;
+	}
+
+	// The directory where the test file is contained will be
+	// the base for its paths (i.e. the path to the map)
+	if (chdir(dirname(argv[1])) == -1)
+		cerr << "Cannot change to the test directory." << endl;
+
+	return readTestFile(testfile);
 }
