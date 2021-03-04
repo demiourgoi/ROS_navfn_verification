@@ -195,7 +195,7 @@ class Plotter:
 
         # Difference and paths
         self.draw_diff(potarr1, potarr2, path1, path2)
-        self.plt.title(f'{origin} to {dest} {"☺" if equal else "☹"}')
+        self.plt.title(f'{origin} to {dest} {"EQ" if equal else "DIFF"}')
         self.pdf.savefig()
         self.plt.close()
 
