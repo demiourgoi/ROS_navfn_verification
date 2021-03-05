@@ -88,6 +88,8 @@ class DirectProfiler:
         zero = self.m.parseTerm('0')
         one  = self.m.parseTerm('1')
         mtIL = self.m.parseTerm('mtIL')
+        self.noPath = self.m.parseTerm('noPath')
+        self.empyList = self.m.parseTerm('nil')
         
         # Dictionary with Maude integer terms from 0 to 255 to avoid parsing 
         # when constructing the map_list in Maude
@@ -139,12 +141,18 @@ class DirectProfiler:
         line = dict()
         line['initial'] = [self.int_float(x) for x in initial]
         line['goal'] = [self.int_float(x) for x in goal]
-        # line['duration'] = duration
+        line['duration'] = duration
         line['length'] = int(length) if length % 1 == 0.0 else float(f"{length:.5f}")
 
         path = list()
         # Iterable of poses, handles unitary paths
-        poses = [term] if term.getSort() == self.m.findSort('Pose') else term.arguments()
+        if term == self.noPath:
+            poses = []
+        elif term.getSort() == self.m.findSort('Pose'):
+            poses = [term] 
+        else: 
+            poses = term.arguments()
+            
         for pose in poses:
             x, y, t = self.destruct_pose(pose)
             path.append([self.int_float(x), self.int_float(y)])
@@ -192,9 +200,9 @@ class DirectProfiler:
         term.reduce()
         end_time = time.perf_counter()
 
-        if not term.getSort() <= self.m.findSort('NeList`{Pose`}'):
+        if not term.getSort() <= self.m.findSort('Path'):
             print(f'ERROR when reducing {call} -> {term}')
-            return     
+            return
 
         hmtime = end_time - start_time
         length, rotation, numrot = self.calculate_length(term)
@@ -212,13 +220,8 @@ class DirectProfiler:
     def calculate_length(self, mresult):
         '''Calculate the length, total rotation and number of rotations of a path'''
 
-        if str(mresult.symbol()) == 'noPath':
-            # TODO Enrique: adapt to new Maude version. Should return 3 values?
-            raise NotImplemented
-            
-        if mresult.getSort() == self.m.findSort('Pose'):
-            # Origin and destinationa are the same
-            return 0, 0, 0
+        if mresult == self.noPath or mresult.getSort() == self.m.findSort('Pose'):
+            return 0, 0, 0	          
 
         s  = 0.0     # Length
         st = 0.0     # Total rotation

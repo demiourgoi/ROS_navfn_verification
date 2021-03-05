@@ -207,13 +207,16 @@ def main(args):
     dict1 = file_to_dict(args.ros_output)
     dict2 = file_to_dict(args.maude_output)
     key_set1 = set(dict1.keys())
-    key_set2 = set(dict1.keys())
+    key_set2 = set(dict2.keys())
     
     tests = sorted(list(key_set1))
     if key_set1 != key_set2:
-        print(f"{file1} - {file2}: {key_set1 - key_set2}")
-        print(f"{file2} - {file1}: {key_set2 - key_set1}")
-        tests = sorted(list(key_set1.intersect(key_set2)))
+        print(f"{args.ros_output} and {args.maude_output} contain different tests")
+        print("==================================================================")
+        print(f"{args.ros_output} \\ {args.maude_output}: {key_set1 - key_set2}")
+        print(f"{args.maude_output} \\ {args.ros_output}: {key_set2 - key_set1}")
+        tests = sorted(list(key_set1 &key_set2))
+        exit(-2)
 
     num_diff = 0
     with Plotter('potentials.pdf', args.draw, args.width) as plotter:
