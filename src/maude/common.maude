@@ -242,6 +242,7 @@ endfm
 
 fmod PATH is
  inc LIST{Pose} * (sort List{Pose} to Path,
+                   sort NeList{Pose} to NePath,
                    op nil to noPath) .
 endfm
 
