@@ -401,7 +401,8 @@ fmod GRADIENT-TRAVERSAL is
 
  ***                                INIT GOAL STEP SIZE
  op computePath : Potential Pose Pose   Float   Gradient Nat Nat Nat -> Path .
- eq computePath(P, {X, Y}, {X', Y'}, SS, G, NR, NC, N) = computePath(P, {float(X'), float(Y')}, SS, G, NR, NC, N, {float(X), float(Y)}, 0.0, 0.0, noPath) .
+ eq computePath(P, {X, Y}, {X', Y'}, SS, G, NR, NC, N) = if P @ [X, Y] == infinite then noPath else
+      computePath(P, {float(X'), float(Y')}, SS, G, NR, NC, N, {float(X), float(Y)}, 0.0, 0.0, noPath) fi .
 
  ***                                GOAL STEP SIZE                            DX    DY    ACC
  op computePath : Potential Pose   Float   Gradient Nat Nat Nat Pose Float Float Path -> Path .
