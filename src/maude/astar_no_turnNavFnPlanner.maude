@@ -34,7 +34,14 @@ fmod ASTAR is
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
      P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) /\
+     (P' @ [X , Y]) < infinite /\
      G := initialGradient(NR, NC) [print P'] .
+ ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = noPath
+  if P := initialP*(NR, NC, X', Y') /\
+     T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
+     CURR := initCurrent({X', Y'}, CM, NR, NC) /\
+     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) /\
+     (P' @ [X , Y]) == infinite .
 
  op initCurrent : Pose CostMap Nat Nat -> PoseSet .
  ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
