@@ -214,7 +214,8 @@ class DirectProfiler:
     def destruct_pose(self, pose):
         '''Obtain the values of a Maude pose'''
         # Match the pose into the pattern (we assume there is always a single match)
-        subs = next(pose.match(self.pattern))
+        it = pose.match(self.pattern)
+        subs = next(it)
         return float(str(subs.find('X'))), float(str(subs.find('Y'))), int(str(subs.find('O')))
 
     def calculate_length(self, mresult):
