@@ -1,5 +1,5 @@
 5 5
-3x3_wall_1.bin
+3x3_wall_v.bin
 
 1 1 1 1
 1 1 1 2
