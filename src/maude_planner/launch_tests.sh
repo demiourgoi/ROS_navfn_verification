@@ -3,9 +3,11 @@
 # Check all the tests in the tests/ directory stopping as soon as it finds
 # one discrepancy
 
-for test in $(find tests/ -name 'test_*.txt')
+COUNTER=1
+for test in $(find tests/ -name 'test*.txt')
 do
-    echo "Testing $test"
+    echo "$COUNTER) Testing $test"
+    let COUNTER=COUNTER+1
     DIRNAME=$(dirname $test)
     ROS_OUT="$DIRNAME/ros.txt"
     MAUDE_OUT="$DIRNAME/maude.txt"
@@ -16,8 +18,10 @@ do
     then
         echo "... OK"
     else 
-        echo "... ERROR"
+        echo "... ERROR. Generating potentials:"
+        TEST_NAME=$(basename $DIRNAME)
+        python compare.py $ROS_OUT $MAUDE_OUT --draw
+        mv potentials.pdf ${TEST_NAME}.pdf
         exit
     fi
-    echo
 done
