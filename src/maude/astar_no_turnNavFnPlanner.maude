@@ -95,7 +95,7 @@ fmod ASTAR is
 
  ***                   Current  INIT
  op traverseNeighbors : Pose    Pose CostMap Potential Nat Nat Float Path Path -> TraversalResult .
- ceq traverseNeighbors({X, Y}, INIT, CM, P, NR, NC, T, NEXT, EXC) = < (NEXT P4L P3L P1L P2L), (EXC P4R P3R P1R P2R) > *** < NEXT P2L P1L P3L P4L, EXC P2R P1R P3R P4R >
+ ceq traverseNeighbors({X, Y}, INIT, CM, P, NR, NC, T, NEXT, EXC) = < (P4L P3L P1L P2L NEXT), (P4R P3R P1R P2R EXC) > *** < NEXT P2L P1L P3L P4L, EXC P2R P1R P3R P4R >
   if < P1L, P1R > := if (X > 0) and-then open?(CM, sd(X,1), Y, NC) and-then not ({sd(X,1), Y} in NEXT) and-then not ({sd(X,1), Y} in EXC)
                      then traverseNeighbor({X, Y}, {sd(X,1), Y}, INIT, CM, P, NC, T)
                      else < noPath, noPath >
