@@ -43,7 +43,7 @@ fmod ASTAR is
      (P' @ [X , Y]) == infinite .
 
  op initCurrent : Pose CostMap Nat Nat -> Path .
- ceq initCurrent({X, Y}, CM, NR, NC) = P4L P3L P1L P2L *** P2L P1L P3L P4L
+ ceq initCurrent({X, Y}, CM, NR, NC) = P2L P1L P3L P4L
   if P1L := if (X > 0) and-then open?(CM, sd(X, 1), Y, NC)
             then {sd(X, 1), Y}
             else noPath
@@ -95,7 +95,7 @@ fmod ASTAR is
 
  ***                   Current  INIT
  op traverseNeighbors : Pose    Pose CostMap Potential Nat Nat Float Path Path -> TraversalResult .
- ceq traverseNeighbors({X, Y}, INIT, CM, P, NR, NC, T, NEXT, EXC) = < (P4L P3L P1L P2L NEXT), (P4R P3R P1R P2R EXC) > *** < NEXT P2L P1L P3L P4L, EXC P2R P1R P3R P4R >
+ ceq traverseNeighbors({X, Y}, INIT, CM, P, NR, NC, T, NEXT, EXC) = < NEXT P2L P1L P3L P4L, EXC P2R P1R P3R P4R >
   if < P1L, P1R > := if (X > 0) and-then open?(CM, sd(X,1), Y, NC) and-then not ({sd(X,1), Y} in NEXT) and-then not ({sd(X,1), Y} in EXC)
                      then traverseNeighbor({X, Y}, {sd(X,1), Y}, INIT, CM, P, NC, T)
                      else < noPath, noPath >
@@ -149,6 +149,8 @@ fmod ASTAR is
 
 endfm
 
+eof
+
 set print attribute on .
 
 red a*({1.0,1.0,0.0} 0, {3.0,2.0,0.0} 0, {254,254,254,254,254,
@@ -156,8 +158,6 @@ red a*({1.0,1.0,0.0} 0, {3.0,2.0,0.0} 0, {254,254,254,254,254,
                                           254,146, 61,193,254,
                                           254,203,213,234,254,
                                           254,254,254,254,254}, 5, 5, 100) .
-
-eof
 
 red a*({1.0,1.0,0.0} 0, {2.0,3.0,0.0} 0, {254,254,254,254,254,
                                           254, 50, 50, 50,254,
