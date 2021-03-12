@@ -4,6 +4,8 @@
 # one discrepancy
 
 COUNTER=1
+ERRORS=()
+
 for test in $(find tests/ -name 'test*.txt')
 do
     echo "$COUNTER) Testing $test"
@@ -17,11 +19,19 @@ do
     if [ $? = "0" ]
     then
         echo "... OK"
-    else 
-        echo "... ERROR. Generating potentials:"
-        TEST_NAME=$(basename $DIRNAME)
-        python compare.py $ROS_OUT $MAUDE_OUT --draw
-        mv potentials.pdf ${TEST_NAME}.pdf
-        exit
+    else
+        ERRORS+=( "$test" )
+        echo "... ERROR"
+        # echo "Generating potentials..."
+        # TEST_NAME=$(basename $DIRNAME)
+        # python compare.py $ROS_OUT $MAUDE_OUT --draw
+        # mv potentials.pdf ${TEST_NAME}.pdf
+        # exit
     fi
+done
+
+echo
+echo "Test that failed:"
+for t in ${ERRORS[@]}; do
+  echo "* $t"
 done
