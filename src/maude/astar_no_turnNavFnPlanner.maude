@@ -11,17 +11,16 @@ fmod ASTAR is
  pr COSTMAP .
 
  vars V V' T FI FI' MINV SNDV DC HF D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FZ FX' FY' FZ' : Float .
- vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R : PoseSet .
+ vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R PT : Path .
  vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
  vars INIT GOAL ACCP : Pose .
  vars Q Q' : Quaternion .
  vars P P' : Potential .
  var  G : Gradient .
  var  CM : CostMap .
- var  PT : Path .
 
  sort TraversalResult .
- op <_,_> : PoseSet PoseSet -> TraversalResult [ctor] .
+ op <_,_> : Path Path -> TraversalResult [ctor] .
 
  ***     Init Goal         NumRow NumCol Iterations
  op a* : Pose Pose CostMap  Nat    Nat      Nat -> Path .
@@ -33,53 +32,53 @@ fmod ASTAR is
   if P := initialP*(NR, NC, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
-     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) /\
+     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, noPath, noPath, T, I) /\
      (P' @ [X , Y]) < infinite /\
      G := initialGradient(NR, NC) [print P'] .
  ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = noPath
   if P := initialP*(NR, NC, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
-     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) /\
+     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, noPath, noPath, T, I) /\
      (P' @ [X , Y]) == infinite .
 
- op initCurrent : Pose CostMap Nat Nat -> PoseSet .
- ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
+ op initCurrent : Pose CostMap Nat Nat -> Path .
+ ceq initCurrent({X, Y}, CM, NR, NC) = P4L P3L P1L P2L *** P2L P1L P3L P4L
   if P1L := if (X > 0) and-then open?(CM, sd(X, 1), Y, NC)
             then {sd(X, 1), Y}
-            else empty
+            else noPath
             fi /\
      P2L := if (s(X) < NR) and-then open?(CM, s(X), Y, NC)
             then {s(X), Y}
-            else empty
+            else noPath
             fi /\
      P3L := if (Y > 0) and-then open?(CM, X, sd(Y, 1), NC)
             then {X, sd(Y, 1)}
-            else empty
+            else noPath
             fi /\
      P4L := if (s(Y) < NC) and-then open?(CM, X, s(Y), NC)
             then {X, s(Y)}
-            else empty
+            else noPath
             fi .
 
   op getPotential : Pose Pose CostMap Nat Nat Nat -> Potential .
   eq getPotential({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NR, NC, I) =
          getPotential({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
             {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I) .
-  ceq getPotential({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I)
+  ceq getPotential({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, noPath, noPath, T, I)
    if P := initialP*(NR, NC, X', Y') /\
       T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
       CURR := initCurrent({X', Y'}, CM, NR, NC) .
 
  ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
- op a* : Pose Pose CostMap Potential  Nat     Nat   PoseSet PoseSet PoseSet   Float       Nat  ~> Potential .
+ op a* : Pose Pose CostMap Potential  Nat     Nat   Path Path Path   Float       Nat  ~> Potential .
  eq a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) = P .
- ceq a*({X, Y}, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, I) = P
+ ceq a*({X, Y}, GOAL, CM, P, NR, NC, noPath, NEXT, EXC, T, I) = P
   if D := P @ [X , Y] /\
      D =/= infinite .
- ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) = a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, s(I))
+ ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y} CURR), NEXT, EXC, T, s(I)) = a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, s(I))
   if not open?(CM, X, Y, NC) .
- ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) =
+ ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y} CURR), NEXT, EXC, T, s(I)) =
                         a*(INIT, GOAL, CM, P', NR, NC, CURR, NEXT', EXC', T, s(I))
   if open?(CM, X, Y, NC) /\
      FI := minv({X, Y}, P, NR) /\
@@ -88,38 +87,38 @@ fmod ASTAR is
      SNDV := max(FI, FI') /\
      P' := updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) /\
      < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NR, NC, T, NEXT, EXC) .
- eq a*(INIT, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, s(I)) =
-         if NEXT == empty
-         then a*(INIT, GOAL, CM, P, NR, NC, EXC, empty, NEXT, T + 2.0 * mapCost, I)
-         else a*(INIT, GOAL, CM, P, NR, NC, NEXT, empty, EXC, T, I)
+ eq a*(INIT, GOAL, CM, P, NR, NC, noPath, NEXT, EXC, T, s(I)) =
+         if NEXT == noPath
+         then a*(INIT, GOAL, CM, P, NR, NC, EXC, noPath, NEXT, T + 2.0 * mapCost, I)
+         else a*(INIT, GOAL, CM, P, NR, NC, NEXT, noPath, EXC, T, I)
          fi .
 
  ***                   Current  INIT
- op traverseNeighbors : Pose    Pose CostMap Potential Nat Nat Float PoseSet PoseSet -> TraversalResult .
- ceq traverseNeighbors({X, Y}, INIT, CM, P, NR, NC, T, NEXT, EXC) = < (NEXT, P1L, P2L, P3L, P4L), (EXC, P1R, P2R, P3R, P4R) >
-  if < P1L, P1R > := if (X > 0) and-then open?(CM, sd(X,1), Y, NC)
+ op traverseNeighbors : Pose    Pose CostMap Potential Nat Nat Float Path Path -> TraversalResult .
+ ceq traverseNeighbors({X, Y}, INIT, CM, P, NR, NC, T, NEXT, EXC) = < (NEXT P4L P3L P1L P2L), (EXC P4R P3R P1R P2R) > *** < NEXT P2L P1L P3L P4L, EXC P2R P1R P3R P4R >
+  if < P1L, P1R > := if (X > 0) and-then open?(CM, sd(X,1), Y, NC) and-then not ({sd(X,1), Y} in NEXT) and-then not ({sd(X,1), Y} in EXC)
                      then traverseNeighbor({X, Y}, {sd(X,1), Y}, INIT, CM, P, NC, T)
-                     else < empty, empty >
+                     else < noPath, noPath >
                      fi /\
-     < P2L, P2R > := if (s(X) < NR) and-then open?(CM, s(X), Y, NC)
+     < P2L, P2R > := if (s(X) < NR) and-then open?(CM, s(X), Y, NC) and-then not ({s(X), Y} in NEXT) and-then not ({s(X), Y} in EXC)
                      then traverseNeighbor({X, Y}, {s(X), Y}, INIT, CM, P, NC, T)
-                     else < empty, empty >
+                     else < noPath, noPath >
                      fi /\
-     < P3L, P3R > := if Y > 0 and-then open?(CM, X, sd(Y,1), NC)
+     < P3L, P3R > := if Y > 0 and-then open?(CM, X, sd(Y,1), NC) and-then not ({X, sd(Y,1)} in NEXT) and-then not ({X, sd(Y,1)} in EXC)
                      then traverseNeighbor({X, Y}, {X, sd(Y,1)}, INIT, CM, P, NC, T)
-                     else < empty, empty >
+                     else < noPath, noPath >
                      fi /\
-     < P4L, P4R > := if s(Y) < NC and-then open?(CM, X, s(Y), NC)
+     < P4L, P4R > := if s(Y) < NC and-then open?(CM, X, s(Y), NC) and-then not ({X, s(Y)} in NEXT) and-then not ({X, s(Y)} in EXC)
                      then traverseNeighbor({X, Y}, {X, s(Y)}, INIT, CM, P, NC, T)
-                     else < empty, empty > fi .
+                     else < noPath, noPath > fi .
 
  op traverseNeighbor : Pose Pose Pose CostMap Potential Nat Float -> TraversalResult .
- ceq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) = < empty, empty >
+ ceq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) = < noPath, noPath >
   if (P @ [XN, YN]) <= (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) + (1.0 / sqrt(2.0)) * get(CM, XN, YN, NC) [print "No update vecino"] .
  eq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) =
                                    if (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) < T
-                                   then < {XN, YN}, empty >
-                                   else < empty, {XN, YN} >
+                                   then < {XN, YN}, noPath >
+                                   else < noPath, {XN, YN} >
                                    fi [owise] .
 
  ***                                                   MINV  SNDV
@@ -149,6 +148,22 @@ fmod ASTAR is
      FI' := if s(Y) < NC then P @ [X, s(Y)] else infinite fi .
 
 endfm
+
+set print attribute on .
+
+red a*({1.0,1.0,0.0} 0, {3.0,2.0,0.0} 0, {254,254,254,254,254,
+                                          254,149, 87,166,254,
+                                          254,146, 61,193,254,
+                                          254,203,213,234,254,
+                                          254,254,254,254,254}, 5, 5, 100) .
+
+eof
+
+red a*({1.0,1.0,0.0} 0, {2.0,3.0,0.0} 0, {254,254,254,254,254,
+                                          254, 50, 50, 50,254,
+                                          254, 50, 50, 50,254,
+                                          254, 50, 50, 50,254,
+                                          254,254,254,254,254}, 5, 5, 100) .
 
 eof
 

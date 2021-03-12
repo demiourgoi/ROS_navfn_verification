@@ -244,28 +244,14 @@ fmod PATH is
  inc LIST{Pose} * (sort List{Pose} to Path,
                    sort NeList{Pose} to NePath,
                    op nil to noPath) .
-endfm
+ vars PT PT' : Path .
+ var  P : Pose .
 
-fmod POSE-SET is
- pr SET{Pose} * (sort Set{Pose} to PoseSet) .
+ eq P PT P = P PT .
 
- eq (P:Pose, P:Pose) = P:Pose .
-
- vars X Y N N' : Nat .
- var  PS : PoseSet .
-
- op createComplete : Nat Nat -> PoseSet .
- eq createComplete(0, N) = empty .
- eq createComplete(s(N), N') = createComplete*(N, N'),
-                               createComplete(N, N') .
-
- op createComplete* : Nat Nat -> PoseSet .
- eq createComplete*(N, 0) = empty .
- eq createComplete*(N, s(N')) = {N, N'}, createComplete*(N, N') .
-
- op _\[_,_] : PoseSet Nat Nat -> PoseSet .
- eq ({X, Y}, PS)\[X, Y] = PS .
- eq PS \[X, Y] = PS [owise] .
+ op _in_ : Pose Path -> Bool .
+ eq P in (PT P PT') = true .
+ eq P in PT = false [owise] .
 endfm
 
 fmod GRADIENT is
@@ -321,7 +307,6 @@ endfm
 fmod BASIC-TRAVERSE is
  pr POTENTIAL .
  pr LIST{Nat} .
- pr POSE-SET .
  pr PATH .
 
  vars H V V' T MINV D DX DY SS FX FY FX' FY' FX'' FY'' : Float .
@@ -387,15 +372,13 @@ fmod GRADIENT-TRAVERSAL is
  pr BASIC-TRAVERSE .
  pr POTENTIAL .
  pr GRADIENT .
- pr POSE-SET .
  pr PATH .
  pr SIGN .
 
  vars V T D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FX' FY' FX'' FY'' NORM EX SX SEX EY SY SEY CX CY XX YY DXAUX1 DXAUX2 DYAUX1 DYAUX2 : Float .
  vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
  vars G G' G1 G2 G3 : Gradient .
- vars INIT GOAL : Pose .
- vars CURR : PoseSet .
+ vars INIT GOAL CURR : Pose .
  var  P : Potential .
  var  CM : CostMap .
  var  PT : Path .
