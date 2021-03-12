@@ -4,7 +4,6 @@ import argparse
 import time
 import maude
 import math
-import sys
 import json
 import os.path
 

@@ -59,6 +59,29 @@ def map_free_random_test(cols, rows, mapfilename="map.bin", testfilename="test.t
     store_test(im, testfilename, mapfilename, paths)
 
 
+def cells(cols, rows, ratio):
+    """ Selects a number of cells in the map with a given ratio """
+    selected_cells = [(c, r) for c in range(1, cols+1) for r in range(1, rows+1)]
+    return random.sample(selected_cells, int(cols*rows*ratio))
+
+
+def map_obstacle_random_test(cols, rows, obstacle_ratio=0.2, mapfilename="map.bin", testfilename="test.txt"):
+    """ Generates a map file (binary) with num_cols x rows cells surrounded with
+        obstacles in the border (1 pixel). Cells are obstacles with 'prob_obstacle' probability and if they
+        are not obstacle their value is between 50 and 253 (uniformly).
+        Stores the map and all the possible paths in files
+    """
+    im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
+    obstacles = cells(cols, rows, obstacle_ratio)
+    for x in range(1, rows + 1):
+        for y in range(1, cols + 1):
+            if (y, x) not in obstacles:
+                cell = random.choice(range(FREE_INI, FREE_END+1))
+                im.putpixel((y, x), cell)
+    paths = all_paths_image(im)
+    store_test(im, testfilename, mapfilename, paths)
+
+
 def all_paths_image(im):
     """Returns a list with all the (start, end) cells that are not in
        an obstacle
@@ -88,7 +111,8 @@ def main():
     # map_free_test(5, 5, "5x5_free.bin", "test_5x5_free.txt")
     # map_free_random_test(3, 3, "3x3_free_random.bin", "test_3x3_free_random.txt")
     # map_free_random_test(4, 4)
-    map_free_test(4, 4)
+    # map_free_test(4, 4)
+    map_obstacle_random_test(4, 4, 0.6)
 
 
 if __name__ == "__main__":

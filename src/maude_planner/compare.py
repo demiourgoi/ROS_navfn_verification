@@ -7,8 +7,6 @@ Author: Enrique Martin
 
 import argparse
 import json
-import math
-import sys
 import re
 
 EPSILON = 1E-5
@@ -39,7 +37,6 @@ def file_to_dict(filename):
 
 def remove_last(path):
     """Removes the last pose if duplicated. NOT NEEDED NOW"""
-    res = None
     if len(path) <= 1 or path[-1] != path[-2]:
         res = path
     else:
@@ -127,7 +124,7 @@ class Plotter:
 
         for (x, y), value in self.np.ndenumerate(potarr):
             if abs(value) > 1e5:
-               ax.add_patch(self.Rectangle([y, x], 1, 1, edgecolor='red', facecolor='red'))
+                ax.add_patch(self.Rectangle([y, x], 1, 1, edgecolor='red', facecolor='red'))
 
         # Finally, the path
         self.plt.plot(*zip(*path), color=pcolor, marker='o')
@@ -241,7 +238,7 @@ def main(args):
         print("==================================================================")
         print(f"{args.ros_output} \\ {args.maude_output}: {key_set1 - key_set2}")
         print(f"{args.maude_output} \\ {args.ros_output}: {key_set2 - key_set1}")
-        tests = sorted(list(key_set1 &key_set2))
+        tests = sorted(list(key_set1 & key_set2))
         exit(-2)
 
     num_diff = 0
@@ -276,7 +273,7 @@ if __name__ == "__main__":
     parser.add_argument('ros_output', help='JSON test results produced by profile_cpp')
     parser.add_argument('maude_output', help='JSON test results produced by profile_maude')
     parser.add_argument('--draw', help='Draw navigation functions and paths (requires matplotlib)', nargs='?',
-                        choices=['none', 'failed', 'all'], default='none', const='failed')#, action='store_const', const='failed', default='none')
+                        choices=['none', 'failed', 'all'], default='none', const='failed')
     parser.add_argument('--width', '-w', help='Width of the map (if not square)', type=int)
 
     args = parser.parse_args()
