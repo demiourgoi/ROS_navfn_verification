@@ -1,7 +1,6 @@
 #! /bin/bash
 
-# Check all the tests in the tests/ directory stopping as soon as it finds
-# one discrepancy
+# Check all the tests in the tests/ directory, showing a final summary of erorrs
 
 COUNTER=1
 ERRORS=()
@@ -22,10 +21,10 @@ do
     else
         ERRORS+=( "$test" )
         echo "... ERROR"
-        # echo "Generating potentials..."
-        # TEST_NAME=$(basename $DIRNAME)
-        # python compare.py $ROS_OUT $MAUDE_OUT --draw
-        # mv potentials.pdf ${TEST_NAME}.pdf
+        echo "Generating potentials..."
+        TEST_NAME=$(basename $DIRNAME)
+        python compare.py $ROS_OUT $MAUDE_OUT --draw
+        mv potentials.pdf ${DIRNAME}/${TEST_NAME}.pdf
         # exit
     fi
 done

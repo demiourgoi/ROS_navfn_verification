@@ -77,6 +77,8 @@ class Plotter:
                 import matplotlib.pyplot as plt
                 from matplotlib.patches import Rectangle
                 from matplotlib.backends.backend_pdf import PdfPages
+                import matplotlib
+                matplotlib.use('PDF')  # Avoids loading any GUI, may increase speed
 
             except ImportError as ie:
                 print(f'Some required packages for plotting are missing: {ie}')
