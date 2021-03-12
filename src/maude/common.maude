@@ -108,10 +108,10 @@ fmod POSE is
  op noPose : -> Pose [ctor] .
 
  op h : Pose Pose -> Float .
- ceq h({X, Y, Z} Q, {X', Y', Z'} Q') = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
+ ceq h({X, Y, Z} Q, {X', Y', Z'} Q') = sqrt((H ^ 2.0) + (V ^ 2.0)) * costNeutral
   if H := float(sd(X, X')) /\
      V := float(sd(Y, Y')) .
- ceq h({X, Y}, {X', Y'}) = sqrt((H ^ 2.0) + (V ^ 2.0)) * movCost
+ ceq h({X, Y}, {X', Y'}) = sqrt((H ^ 2.0) + (V ^ 2.0)) * costNeutral
   if H := float(sd(X, X')) /\
      V := float(sd(Y, Y')) .
 

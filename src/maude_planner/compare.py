@@ -12,6 +12,7 @@ import sys
 import re
 
 EPSILON = 1E-5
+POT_EPSILON = 1E-3
 JSON_REGEX = re.compile(r"(^\{.+\})")
 
 
@@ -69,10 +70,11 @@ class Plotter:
 
     def __init__(self, name, draw, width):
         self.width = width
-        
+        self.mode = draw
+
         # This may be a dummy plotter if draw is false. The packages are only
         # imported if drawing is required.
-        if draw:
+        if draw != 'none':
             try:
                 import numpy as np
                 import matplotlib.pyplot as plt
@@ -81,10 +83,10 @@ class Plotter:
 
             except ImportError as ie:
                 print(f'Some required packages for plotting are missing: {ie}')
-                draw = False
+                draw = 'none'
 
         # We want and we can draw
-        if draw:
+        if draw != 'none':
             self.np = np
             self.plt = plt
             self.Rectangle = Rectangle
@@ -95,6 +97,10 @@ class Plotter:
             self.plt = None
             self.Rectangle = None
             self.pdf = None
+
+        # Difference between potentials
+        self.dist2 = []
+        self.distInf = []
 
     def __enter__(self):
         return self
@@ -126,10 +132,9 @@ class Plotter:
         # Finally, the path
         self.plt.plot(*zip(*path), color=pcolor, marker='o')
 
-    def draw_diff(self, potarr1, potarr2, path1, path2):
-        """Draw the difference of the given potentials and their paths"""
+    def draw_diff(self, diff, path1, path2):
+        """Draw the given difference of two potentials and their paths"""
 
-        diff = potarr1 - potarr2
         support = self.np.abs(diff) < 1e5
 
         # The maximum and minimum value where infinity is not present
@@ -181,6 +186,15 @@ class Plotter:
         # Maude's potentials are transposed
         potarr2 = self.np.transpose(potarr2)
 
+        # Difference of the two potentials and its norm
+        diff = potarr1 - potarr2
+        self.distInf.append(self.np.linalg.norm(diff, self.np.inf))
+        self.dist2.append(self.np.linalg.norm(diff, 2))
+
+        # Skip drawing if they are equal and the differences are negligible
+        if self.mode == 'failed' and equal and self.dist2[-1] < POT_EPSILON:
+            return
+
         # ROS potential and path
         self.draw_potential(potarr1, path1, pcolor='aqua')
         self.plt.title(f'{origin} to {dest} — ROS')
@@ -194,8 +208,20 @@ class Plotter:
         self.plt.close()
 
         # Difference and paths
-        self.draw_diff(potarr1, potarr2, path1, path2)
-        self.plt.title(f'{origin} to {dest} {"EQ" if equal else "DIFF"}')
+        self.draw_diff(diff, path1, path2)
+        self.plt.title(f'{origin} to {dest} {"EQ" if equal else "DIFF"} ({self.dist2[-1]:.2e})')
+        self.pdf.savefig()
+        self.plt.close()
+
+    def draw_summary(self):
+        """Plot a summary of the data collected for each case"""
+
+        if self.np is None:
+            return
+
+        # print(f'{max(self.distInf):.2e}', file=sys.stderr)
+        self.plt.title(f'Potential distance plot')
+        self.plt.boxplot([self.distInf, self.dist2], labels=['d_inf', 'd_2'])
         self.pdf.savefig()
         self.plt.close()
 
@@ -238,7 +264,9 @@ def main(args):
 
             # Draw the potentials and paths
             plotter.draw(test[0], test[1], potarr1, potarr2, path1, path2, equal)
-            
+
+        plotter.draw_summary()
+
         if num_diff > 0:
             exit(-1)
 
@@ -247,7 +275,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Compare ROS and Maude results')
     parser.add_argument('ros_output', help='JSON test results produced by profile_cpp')
     parser.add_argument('maude_output', help='JSON test results produced by profile_maude')
-    parser.add_argument('--draw', help='Draw navigation functions and paths (requires matplotlib)', action='store_true')
+    parser.add_argument('--draw', help='Draw navigation functions and paths (requires matplotlib)', nargs='?',
+                        choices=['none', 'failed', 'all'], default='none', const='failed')#, action='store_const', const='failed', default='none')
     parser.add_argument('--width', '-w', help='Width of the map (if not square)', type=int)
 
     args = parser.parse_args()
