@@ -30,9 +30,10 @@ def store_test(im, testfilename, mapfilename, paths):
             testfile.write(f"{start[0]} {start[1]} {end[0]} {end[1]}\n")
 
 
-def map_free_test(cols, rows, mapfilename="map.bin", testfilename="test.txt"):
+def map_free_test(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):
     """Generates a map file (binary) with num_cols x rows cells surrounded with 
-       obstacles in the border (1 pixel) and all the cells completely free
+       obstacles in the border (1 pixel) and all the cells completely free.
+       Generates a random subset of the possible valid paths to test, with ratio "path_ratio".
        Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols+2, rows+2), OBSTACLE)
@@ -40,14 +41,15 @@ def map_free_test(cols, rows, mapfilename="map.bin", testfilename="test.txt"):
         for x in range(1, cols + 1):
             im.putpixel((x, y), FREE_INI)
 
-    paths = all_paths_image(im)
+    paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
 
 
-def map_free_random_test(cols, rows, mapfilename="map.bin", testfilename="test.txt"):
-    """Generates a map file (binary) with num_cols x rows cells surrounded with
-       obstacles in the border (1 pixel) and the cells free with random values
-       Stores the map and all the possible paths in files
+def map_free_random_test(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):
+    """ Generates a map file (binary) with num_cols x rows cells surrounded with
+        obstacles in the border (1 pixel) and the cells free with random values.
+        Generates a random subset of the possible valid paths to test, with ratio "path_ratio".
+        Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
     for x in range(1, rows + 1):
@@ -55,7 +57,7 @@ def map_free_random_test(cols, rows, mapfilename="map.bin", testfilename="test.t
             cell = random.choice(range(FREE_INI, FREE_END+1))
             im.putpixel((y, x), cell)
 
-    paths = all_paths_image(im)
+    paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
 
 
@@ -65,10 +67,12 @@ def cells(cols, rows, ratio):
     return random.sample(selected_cells, int(cols*rows*ratio))
 
 
-def map_obstacle_random_test(cols, rows, obstacle_ratio=0.2, mapfilename="map.bin", testfilename="test.txt"):
+def map_obstacle_random_test(cols, rows, path_ratio=1.0, obstacle_ratio=0.2,
+                             mapfilename="map.bin", testfilename="test.txt"):
     """ Generates a map file (binary) with num_cols x rows cells surrounded with
         obstacles in the border (1 pixel). Cells are obstacles with 'prob_obstacle' probability and if they
         are not obstacle their value is between 50 and 253 (uniformly).
+        Generates a random subset of the possible valid paths to test, with ratio "path_ratio".
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
@@ -78,13 +82,14 @@ def map_obstacle_random_test(cols, rows, obstacle_ratio=0.2, mapfilename="map.bi
             if (y, x) not in obstacles:
                 cell = random.choice(range(FREE_INI, FREE_END+1))
                 im.putpixel((y, x), cell)
-    paths = all_paths_image(im)
+    paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
 
 
-def map_spiral(cols, rows, mapfilename="map.bin", testfilename="test.txt"):
+def map_spiral(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):
     """ Generates a map file (binary) with num_cols x rows cells surrounded with
         obstacles in the border (1 pixel). Cells forms an clockwise spiral starting from (1, 1).
+        Generates a random subset of the possible valid paths to test, with ratio "path_ratio".
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols + 2, rows + 2), FREE_INI)
@@ -105,7 +110,7 @@ def map_spiral(cols, rows, mapfilename="map.bin", testfilename="test.txt"):
         delta = turn_right(delta)
         pos = next_cell(pos, delta)
 
-    paths = all_paths_image(im)
+    paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
 
 
@@ -131,9 +136,9 @@ def obstacle_right(im, pos, delta):
         im.putpixel(right_cell, OBSTACLE)
 
 
-def all_paths_image(im):
-    """Returns a list with all the (start, end) cells that are not in
-       an obstacle
+def all_paths_image(im, path_ratio=1.0):
+    """ Returns a list with paths (start, end) that do not start or end in obstacles.
+        Generates a random subset of the valid paths in the map with ratio path_ratio
     """
     w, h = im.size
     all_cells = [(x0, y0) for x0 in range(w) for y0 in range(h)]
@@ -142,15 +147,13 @@ def all_paths_image(im):
         for end in all_cells:
             if im.getpixel(start) != OBSTACLE and im.getpixel(end) != OBSTACLE:
                 ret.append((start, end))
-    return ret
+    num_paths = round(len(ret) * path_ratio)
+    if len(ret) < num_paths:
+        return ret
+    else:
+        return random.sample(ret, num_paths)
     
 
-def all_paths(cell_list):
-    """Generates all the combinations start-end using the cells in cell_list"""
-    [print(x0, y0, x1, y1) for x0, y0 in cell_list for x1, y1 in cell_list]
-    return [(start, end) for start in cell_list for end in cell_list]
-    
-    
 def main():
     # 3x3 Descencing diagonal
     # cells = [(1,2), (1,3), (2,3), (2,1), (3,1), (3,2)]   
@@ -161,7 +164,10 @@ def main():
     # map_free_random_test(3, 3, "3x3_free_random.bin", "test_3x3_free_random.txt")
     # map_free_random_test(4, 4)
     # map_free_test(4, 4)
-    map_spiral(5, 5)
+    # map_spiral(5, 5)
+
+    # map_free_test(10, 10, path_ratio=0.025)
+    map_free_random_test(10, 10, path_ratio=0.025)
 
 
 if __name__ == "__main__":

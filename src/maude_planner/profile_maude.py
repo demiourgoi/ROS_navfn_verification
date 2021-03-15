@@ -122,8 +122,8 @@ class DirectProfiler:
             def run(self, term, data):
                 try:
                     _, x, y, ncols = [int(arg) for arg in term.arguments()]
-                    cell = self.parent.map_data[x + y * ncols]
-                    ret_term = self.cache[cell]
+                    cell_value = self.parent.map_data[x + y * ncols]
+                    ret_term = self.cache[cell_value]
                     # print(f'FAST {term} --> {ret_term}')
                     return ret_term
                 except Exception as e:
@@ -134,6 +134,7 @@ class DirectProfiler:
 
     def run_test_suite(self):          
         for origin, dest in self.test_cases:
+            print(origin, dest)
             self.run_astar(origin, dest)
 
     def show_result(self, initial, goal, duration, length, term, potarr):
@@ -211,14 +212,14 @@ class DirectProfiler:
         return int(x) if x % 1 == 0.0 else x
 
     def destruct_pose(self, pose):
-        '''Obtain the values of a Maude pose'''
+        """ Obtain the values of a Maude pose """
         # Match the pose into the pattern (we assume there is always a single match)
         it = pose.match(self.pattern)
         subs = next(it)
         return float(str(subs.find('X'))), float(str(subs.find('Y'))), int(str(subs.find('O')))
 
     def calculate_length(self, mresult):
-        '''Calculate the length, total rotation and number of rotations of a path'''
+        """ Calculate the length, total rotation and number of rotations of a path """
 
         if mresult == self.noPath or mresult.getSort() == self.m.findSort('Pose'):
             return 0, 0, 0	          

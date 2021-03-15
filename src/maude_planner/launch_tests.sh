@@ -2,13 +2,13 @@
 
 # Check all the tests in the tests/ directory, showing a final summary of erorrs
 
-COUNTER=1
+COUNTER=0
 ERRORS=()
 
 for test in $(find tests/ -name 'test*.txt')
 do
-    echo "$COUNTER) Testing $test"
     let COUNTER=COUNTER+1
+    echo "$COUNTER) Testing $test" 
     DIRNAME=$(dirname $test)
     ROS_OUT="$DIRNAME/ros.txt"
     MAUDE_OUT="$DIRNAME/maude.txt"
@@ -29,8 +29,11 @@ do
     fi
 done
 
+FAILED=0
 echo
 echo "Test that failed:"
 for t in ${ERRORS[@]}; do
+  let FAILED=FAILED+1
   echo "* $t"
 done
+echo "Failed ${FAILED}/${COUNTER}"

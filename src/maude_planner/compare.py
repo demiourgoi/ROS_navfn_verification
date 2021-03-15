@@ -149,12 +149,12 @@ class Plotter:
 
         for (x, y), value in self.np.ndenumerate(diff):
             if abs(value) > 1e5:
-                color = 'red' if value < 0.0 else 'aqua'
+                color = 'blue' if value < 0.0 else 'aqua'
                 ax.add_patch(self.Rectangle([y, x], 1, 1, edgecolor=color))
 
         # Finally, both paths
         self.plt.plot(*zip(*path1), color='aqua')
-        self.plt.plot(*zip(*path2), color='red')
+        self.plt.plot(*zip(*path2), color='blue')
 
         # Plot the extra points of each path
         # (we should probably ignore some epsilon)
@@ -162,7 +162,7 @@ class Plotter:
         extra2 = [p for p in path2 if p not in path1]
 
         not extra1 or self.plt.scatter(*zip(*extra1), color='aqua')
-        not extra2 or self.plt.scatter(*zip(*extra2), color='red')
+        not extra2 or self.plt.scatter(*zip(*extra2), color='blue')
 
     def draw(self, origin, dest, potarr1_raw, potarr2_raw, path1, path2, equal):
         """Plots potentials, paths and their differences"""
@@ -201,7 +201,7 @@ class Plotter:
         self.plt.close()
 
         # Maude potential and path
-        self.draw_potential(potarr2, path2, pcolor='red')
+        self.draw_potential(potarr2, path2, pcolor='blue')
         self.plt.title(f'{origin} to {dest} — Maude')
         self.pdf.savefig()
         self.plt.close()
