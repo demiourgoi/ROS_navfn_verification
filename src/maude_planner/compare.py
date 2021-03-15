@@ -10,7 +10,7 @@ import json
 import re
 
 EPSILON = 1E-5
-POT_EPSILON = 1E-3
+POT_EPSILON = 5E-3
 JSON_REGEX = re.compile(r"(^\{.+\})")
 
 

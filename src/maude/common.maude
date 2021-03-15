@@ -433,8 +433,8 @@ fmod GRADIENT-TRAVERSAL is
      < EX, EY, G' > := update&get(G3, P, X', s(Y'), NR, NC) /\
      DDX := _-_(1.0, DX) /\
      DDY := _-_(1.0, DY) /\
-     XX := (DDY * (DDX * CX) + (DX * EX)) + DY * ((DDX * SX) + (DX * SEX)) /\
-     YY := (DDY * (DDX * CY) + (DX * EY)) + DY * ((DDX * SY) + (DX * SEY)) /\
+     XX := DDY * (DDX * CX + DX * SX) + DY * (DDX * EX + DX * SEX) /\
+     YY := DDY * (DDX * CY + DX * SY) + DY * (DDX * EY + DX * SEY) /\
      ((XX =/= 0.0) or (YY =/= 0.0)) /\
      DX' := DX + XX * (SS / sqrt((XX * XX) + (YY * YY))) /\
      DY' := DY + YY * (SS / sqrt((XX * XX) + (YY * YY))) /\
