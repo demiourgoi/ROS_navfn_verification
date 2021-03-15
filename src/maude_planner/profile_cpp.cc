@@ -83,7 +83,7 @@ double calculate_distance(float * path, size_t points) {
 void runTest(const CostMap &map, float* path, int* tcase, NavFn*& navfn) {
 
 	auto start_time = std::chrono::high_resolution_clock::now();
-	int length = create_nav_plan_astar2(map.data, map.width, map.height, tcase + 2, tcase, path, 4 * max(map.width, map.height), navfn);
+	int length = create_nav_plan_astar2(map.data, map.width, map.height, tcase + 2, tcase, path, 4 * map.width, navfn);
 	auto end_time = std::chrono::high_resolution_clock::now();
 
 	std::chrono::duration<double> duration = end_time - start_time;
@@ -153,7 +153,7 @@ int readTestFile(istream &in) {
 	costmapfile.close();
 
 	// Buffer for the calculated paths
-	float * buffer = new float[4 * max(map.width, map.height)];
+	float * buffer = new float[8 * map.width];
 	// Navigation function object
 	NavFn* navfn = nullptr;
 
@@ -185,6 +185,9 @@ int readTestFile(istream &in) {
 
 		runTest(map, buffer, positions, navfn);
 	}
+
+	delete [] buffer;
+	delete navfn;
 
 	return 0;
 }
