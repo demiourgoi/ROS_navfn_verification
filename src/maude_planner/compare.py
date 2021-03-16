@@ -261,8 +261,8 @@ def main(args):
                 print(f'Maude: {path2}')
                 print(f'potarr: {dict1[test]["navfn"]}\n')
 
-            # Draw the potentials and paths
-            plotter.draw(test[0], test[1], potarr1, potarr2, path1, path2, equal)
+                # Draw the potentials and paths only for different paths
+                plotter.draw(test[0], test[1], potarr1, potarr2, path1, path2, equal)
 
         plotter.draw_summary()
 

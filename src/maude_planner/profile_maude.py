@@ -9,7 +9,7 @@ import os.path
 
 
 class DirectProfiler:
-    '''Profile the Maude A* algorithm directly'''
+    """ Profile the Maude A* algorithm directly """
 
     ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner.maude'
 
@@ -203,6 +203,7 @@ class DirectProfiler:
         if not term.getSort() <= self.m.findSort('Path'):
             print(f'ERROR when reducing {call} -> {term}')
             return
+        print(f'OK when reducing {call} -> {term}')
 
         hmtime = end_time - start_time
         length, rotation, numrot = self.calculate_length(term)

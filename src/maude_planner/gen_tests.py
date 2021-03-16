@@ -10,6 +10,7 @@ Author: Enrique Martin
 
 from PIL import Image
 import random
+import math
 
 OBSTACLE = 254
 FREE_INI = 50
@@ -114,6 +115,33 @@ def map_spiral(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="
     store_test(im, testfilename, mapfilename, paths)
 
 
+def map_radial(cols, rows, path_ratio=1.0, center=(1, 1), radius=25, mapfilename="map.bin", testfilename="test.txt"):
+    """ Generates a map file (binary) with num_cols x rows cells surrounded with
+        obstacles in the border (1 pixel). Generate a radial gradient from FREE_INI to FREE_END starting in
+        center with radius.
+        Generates a random subset of the possible valid paths to test, with ratio "path_ratio".
+        Stores the map and all the possible paths in files
+    """
+    im = Image.new("L", (cols + 2, rows + 2), FREE_INI)
+    for x in range(0, rows + 2):
+        im.putpixel((0, x), OBSTACLE)
+        im.putpixel((cols+1, x), OBSTACLE)
+    for y in range(0, cols + 2):
+        im.putpixel((y, 0), OBSTACLE)
+        im.putpixel((y, rows+1), OBSTACLE)
+
+    for x in range(1, rows + 1):
+        for y in range(1, cols + 1):
+            dist = math.dist(center, (y, x))
+            cell_value = OBSTACLE
+            if dist < radius:
+                cell_value = int((dist/radius) * (FREE_END - FREE_INI) + FREE_INI)
+            im.putpixel((y, x), cell_value)
+
+    paths = all_paths_image(im, path_ratio)
+    store_test(im, testfilename, mapfilename, paths)
+
+
 def next_cell(pos, delta):
     """ Returns the next cell from pos in delta direction """
     return pos[0] + delta[0], pos[1] + delta[1]
@@ -167,7 +195,9 @@ def main():
     # map_spiral(5, 5)
 
     # map_free_test(10, 10, path_ratio=0.025)
-    map_free_random_test(10, 10, path_ratio=0.025)
+    # map_free_random_test(10, 10, path_ratio=0.025)
+
+    map_radial(9, 9, path_ratio=0.05, center=(5, 5), radius=5)
 
 
 if __name__ == "__main__":
