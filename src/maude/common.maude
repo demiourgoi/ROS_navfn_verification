@@ -47,7 +47,7 @@ fmod COSTMAP is
  *** op get : CostMap Nat Nat Nat -> Float .
  op get : CostMap Nat Nat Nat -> Float [special (id-hook SpecialHubSymbol)] .
  ceq get(CM, X, Y, NC) = float(N')
-  if N := (NC * X) + Y /\
+  if N := (NC * Y) + X /\
      N' := skipN&Get(CM, N) .
 
  op skipN&Get : CostMap Nat -> Int .
