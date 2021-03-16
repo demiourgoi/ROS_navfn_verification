@@ -122,7 +122,7 @@ class DirectProfiler:
             def run(self, term, data):
                 try:
                     _, x, y, ncols = [int(arg) for arg in term.arguments()]
-                    cell_value = self.parent.map_data[x + y * ncols]
+                    cell_value = self.parent.map_data[y + x * ncols]
                     ret_term = self.cache[cell_value]
                     # print(f'FAST {term} --> {ret_term}')
                     return ret_term
