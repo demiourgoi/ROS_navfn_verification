@@ -9,7 +9,7 @@ import argparse
 import json
 import re
 
-EPSILON = 1E-5
+EPSILON = 1E-2
 POT_EPSILON = 5E-3
 JSON_REGEX = re.compile(r"(^\{.+\})")
 
