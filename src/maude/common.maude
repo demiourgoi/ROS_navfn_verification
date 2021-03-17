@@ -58,7 +58,7 @@ fmod COSTMAP is
  op check : Float -> Bool .
  eq check(F) = F < 254.0 .
 
- ops movCost diagMovCost cellCost obstacleCost mapCost costNeutral stepSize : -> Float .
+ ops movCost diagMovCost cellCost obstacleCost mapCost costNeutral stepSize pathEpsilon : -> Float .
  eq movCost = 100.0 .
  eq diagMovCost = 140.0 .
  eq cellCost = 50.0 .
@@ -66,6 +66,7 @@ fmod COSTMAP is
  eq mapCost = 50.0 .
  eq costNeutral = 50.0 .
  eq stepSize = 0.5 .
+ eq pathEpsilon = 0.01 .
 
  op float2nat : Float -> Nat [memo] .
  eq float2nat(F) = rat(floor(F)) .
@@ -375,10 +376,10 @@ fmod GRADIENT-TRAVERSAL is
  pr PATH .
  pr SIGN .
 
- vars V T D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FX' FY' FX'' FY'' NORM EX SX SEX EY SY SEY CX CY XX YY DXAUX1 DXAUX2 DYAUX1 DYAUX2 : Float .
+ vars V T D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FX' FY' FX'' FY'' FZ FZ' NORM EX SX SEX EY SY SEY CX CY XX YY DXAUX1 DXAUX2 DYAUX1 DYAUX2 : Float .
  vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
  vars G G' G1 G2 G3 : Gradient .
- vars INIT GOAL CURR : Pose .
+ vars INIT GOAL CURR PS : Pose .
  var  P : Potential .
  var  CM : CostMap .
  var  PT : Path .
@@ -400,7 +401,7 @@ fmod GRADIENT-TRAVERSAL is
      FY' := FY + DY /\
      {X, Y} := closest({FX, FY}, DX, DY) /\
      (P @ [X, Y]) >= costNeutral /\
-     not allNeighborsOpen(P, {float2nat(FX),float2nat(FY)}, NR, NC) /\
+     ((not allNeighborsOpen(P, {float2nat(FX),float2nat(FY)}, NR, NC)) or loop(PT)) /\
      {X', Y'} := getMin({X, Y}, P, NR, NC) [print "Eq3 " FX' ", " FY'] .
  ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
   if X' := float2nat(FX) /\
@@ -408,6 +409,7 @@ fmod GRADIENT-TRAVERSAL is
      {X, Y} := closest({FX, FY}, DX, DY) /\
      (P @ [X, Y]) >= costNeutral /\
      allNeighborsOpen(P, {X',Y'}, NR, NC) /\
+     not loop(PT) /\
      < CX, CY, G1 > := update&get(G, P, X', Y', NR, NC) /\
      < SX, SY, G2 > := update&get(G1, P, s(X'), Y', NR, NC) /\
      < SEX, SEY, G3 > := update&get(G2, P, s(X'), s(Y'), NR, NC) /\
@@ -427,6 +429,7 @@ fmod GRADIENT-TRAVERSAL is
      {X, Y} := closest({FX, FY}, DX, DY) /\
      (P @ [X, Y]) >= costNeutral /\
      allNeighborsOpen(P, {X',Y'}, NR, NC) /\
+     not loop(PT) /\
      < CX, CY, G1 > := update&get(G, P, X', Y', NR, NC) /\
      < SX, SY, G2 > := update&get(G1, P, s(X'), Y', NR, NC) /\
      < SEX, SEY, G3 > := update&get(G2, P, s(X'), s(Y'), NR, NC) /\
@@ -513,21 +516,8 @@ fmod GRADIENT-TRAVERSAL is
      DX' := if NORM > 0.0 then DX / NORM else DX fi /\
      DY' := if NORM > 0.0 then DY / NORM else DY fi /\
      G' := (G | X, Y |-> < DX', DY' >) .
+
+ op loop : Path -> Bool .
+ eq loop(PT ({FX, FY, FZ} 0) PS ({FX', FY', FZ'} 0)) = (abs(_-_(FX, FX')) < pathEpsilon) and (abs(_-_(FY, FY')) < pathEpsilon) .
+ eq loop(PT) = false [owise] .
 endfm
-
-eof
-
-set print attribute on .
-
-red
-computePath({50,50,50,50,50,50,50,50,50},
-            (1.2724633791999999e+2 . 8.5199999999999989e+1 . 5.0e+1)
-            (1.0e+2 . 5.0e+1 . 0.0)
-            (1.0e+10 . 8.5199999999999989e+1 . 5.0e+1),
-            {1.0,2.0}, 5.0e-1,
-            ((< 0.0,0.0 > < 0.0,0.0 > < 0.0,0.0 >),
-             (< 0.0,0.0 > < 0.0,0.0 > < 0.0,0.0 >),
-             (< 0.0,0.0 > < 0.0,0.0 > < 0.0,0.0 >)), 3, 3, 99, {1.0,1.0}, 0.0, 0.0,
-            {0.0,0.0,0.0} 0) .
-
-
