@@ -248,7 +248,8 @@ fmod PATH is
  vars PT PT' : Path .
  var  P : Pose .
 
- eq P PT P = P PT .
+ *** We cannot remove poses because we need repetitions for detecting loops
+ *** eq P PT P = P PT .
 
  op _in_ : Pose Path -> Bool .
  eq P in (PT P PT') = true .
