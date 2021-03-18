@@ -392,7 +392,7 @@ fmod GRADIENT-TRAVERSAL is
  ***                                GOAL STEP SIZE                            DX    DY    ACC
  op computePath : Potential Pose   Float   Gradient Nat Nat Nat Pose Float Float Path -> Path .
  eq computePath(P, GOAL, SS, G, NR, NC, 0, CURR, DX, DY, PT) = noPath .
- ceq computePath(P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX, FY, 0.0} 0)
+ ceq computePath(P, {FX, FY}, SS, G, NR, NC, s(N), {FX', FY'}, DX, DY, PT) = PT ({FX, FY, 0.0} 0) *** ({FX', FY', 0.0} 0)
   if {X, Y} := closest({FX', FY'}, DX, DY) /\
      (P @ [X, Y]) < costNeutral [print "Eq2 " FX' ", " FY'] .
  ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
@@ -402,7 +402,7 @@ fmod GRADIENT-TRAVERSAL is
      {X, Y} := closest({FX, FY}, DX, DY) /\
      (P @ [X, Y]) >= costNeutral /\
      ((not allNeighborsOpen(P, {float2nat(FX),float2nat(FY)}, NR, NC)) or loop(PT)) /\
-     {X', Y'} := getMin({X, Y}, P, NR, NC) [print "Eq3 " FX' ", " FY'] .
+     {X', Y'} := getMin({float2nat(FX),float2nat(FY)}, P, NR, NC) [print "Eq3 " FX ", " FY " Con desplazamiento: " FX' ", " FY' " Cercano: " X ", " Y] .
  ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) = noPath
   if X' := float2nat(FX) /\
      Y' := float2nat(FY) /\
@@ -419,7 +419,7 @@ fmod GRADIENT-TRAVERSAL is
      XX := (DDY * (DDX * CX) + (DX * EX)) + DY * ((DDX * SX) + (DX * SEX)) /\
      YY := (DDY * (DDX * CY) + (DX * EY)) + DY * ((DDX * SY) + (DX * SEY)) /\
      XX == 0.0 /\
-     YY == 0.0 [print "Eq4 " FX ", " FY] .
+     YY == 0.0 [print "Eq4 " FX ", " FY " Con desplazamiento: " FX' ", " FY' ] .
  ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
                                computePath(P, GOAL, SS, G', NR, NC, N, {FX'', FY''}, DX'', DY'', PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
@@ -456,7 +456,7 @@ fmod GRADIENT-TRAVERSAL is
      DY'' := if abs(DY') > 1.0
              then _-_(DY', sign(DY'))
              else DY'
-             fi [print "Eq5 " FX' ", " FY' " con " FX ", " FY " y " DX ", " DY] .
+             fi [print "Eq3 " FX ", " FY " Con desplazamiento: " FX' ", " FY' " y " DX ", " DY] .
 
  sort GradientUpdateRes .
  op <_,_,_> : Float Float Gradient -> GradientUpdateRes [ctor] .
