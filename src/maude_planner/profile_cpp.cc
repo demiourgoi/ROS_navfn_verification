@@ -9,6 +9,7 @@
 #include <fstream>
 #include <chrono>
 #include <string>
+#include <utility>
 
 #include <unistd.h>	// chdir
 #include <libgen.h>	// dirname
@@ -18,6 +19,8 @@ using namespace std;
 #include "nav2_navfn_planner/navfn.hpp"
 
 using NavFn = nav2_navfn_planner::NavFn;
+// The floating-point number type is that of the getLastPathCost result
+using fpnumber = decltype(std::declval<NavFn>().getLastPathCost());
 
 struct CostMap {
 	COSTTYPE * data;
@@ -26,7 +29,7 @@ struct CostMap {
 };
 
 int create_nav_plan_astar2(COSTTYPE* costmap, int nx, int ny, int* goal, int* start,
-                           float* plan, int nplan, NavFn*& nav) {
+                           fpnumber* plan, int nplan, NavFn*& nav) {
 
 	// This is a replica of the ROS's create_nav_plan_astar,
 	// but allowing access to the navigation function
@@ -62,14 +65,14 @@ int create_nav_plan_astar2(COSTTYPE* costmap, int nx, int ny, int* goal, int* st
 	  return len;
 }
 
-double calculate_distance(float * path, size_t points) {
+double calculate_distance(fpnumber * path, size_t points) {
 	if (points == 0)
 		return 0.0;
 
 	double s = 0.0;
 
-	float x = path[0];
-	float y = path[1];
+	fpnumber x = path[0];
+	fpnumber y = path[1];
 
 	for (size_t i = 1; i < points; i++) {
 		s += sqrt(pow(path[2 * i] - x, 2) + pow(path[2 * i + 1] - y, 2));
@@ -80,7 +83,7 @@ double calculate_distance(float * path, size_t points) {
 	return s;
 }
 
-void runTest(const CostMap &map, float* path, int* tcase, NavFn*& navfn) {
+void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn) {
 
 	auto start_time = std::chrono::high_resolution_clock::now();
 	int length = create_nav_plan_astar2(map.data, map.width, map.height, tcase + 2, tcase, path, 4 * map.width, navfn);
@@ -153,7 +156,7 @@ int readTestFile(istream &in) {
 	costmapfile.close();
 
 	// Buffer for the calculated paths
-	float * buffer = new float[8 * map.width];
+	fpnumber * buffer = new fpnumber[8 * map.width];
 	// Navigation function object
 	NavFn* navfn = nullptr;
 
