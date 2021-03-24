@@ -12,7 +12,7 @@ fmod ASTAR is
 
  vars V V' T FI FI' MINV SNDV DC HF D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FZ FX' FY' FZ' : Float .
  vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R PT : Path .
- vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
+ vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I IPATH NEW N : Nat .
  vars INIT GOAL ACCP : Pose .
  vars Q Q' : Quaternion .
  vars P P' : Potential .
@@ -22,20 +22,20 @@ fmod ASTAR is
  sort TraversalResult .
  op <_,_> : Path Path -> TraversalResult [ctor] .
 
- ***     Init Goal         NumRow NumCol Iterations
- op a* : Pose Pose CostMap  Nat    Nat      Nat -> Path .
- eq a*({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NR, NC, I) =
+ ***     Init Goal         NumRow NumCol Iterations Iterations path
+ op a* : Pose Pose CostMap  Nat    Nat      Nat     Nat -> Path .
+ eq a*({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NR, NC, I, IPATH) =
          a*({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
-            {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I) .
- ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = *** computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
-                                                       computePath(P', {X, Y}, {X', Y'}, stepSize, G, NR, NC, I)
+            {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I, IPATH) .
+ ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I, IPATH) = *** computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
+                                                       computePath(P', {X, Y}, {X', Y'}, stepSize, G, NR, NC, IPATH)
   if P := initialP*(NR, NC, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
      P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, noPath, noPath, T, I) /\
      (P' @ [X , Y]) < infinite /\
      G := initialGradient(NR, NC) .
- ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = noPath
+ ceq a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I, IPATH) = noPath
   if P := initialP*(NR, NC, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\

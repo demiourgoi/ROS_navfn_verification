@@ -420,7 +420,7 @@ fmod GRADIENT-TRAVERSAL is
      XX := (DDY * (DDX * CX) + (DX * EX)) + DY * ((DDX * SX) + (DX * SEX)) /\
      YY := (DDY * (DDX * CY) + (DX * EY)) + DY * ((DDX * SY) + (DX * SEY)) /\
      XX == 0.0 /\
-     YY == 0.0 [print "Eq4 " FX ", " FY " Con desplazamiento: " FX' ", " FY' ] .
+     YY == 0.0 . *** [print "Eq4 " FX ", " FY " Con desplazamiento: " FX' ", " FY' ] .
  ceq computePath(P, GOAL, SS, G, NR, NC, s(N), {FX, FY}, DX, DY, PT) =
                                computePath(P, GOAL, SS, G', NR, NC, N, {FX'', FY''}, DX'', DY'', PT ({FX', FY', 0.0} 0))
   if FX' := FX + DX /\
