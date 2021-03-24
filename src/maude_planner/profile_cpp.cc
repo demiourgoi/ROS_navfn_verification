@@ -10,6 +10,7 @@
 #include <chrono>
 #include <string>
 #include <utility>
+#include <type_traits>
 
 #include <unistd.h>	// chdir
 #include <libgen.h>	// dirname
@@ -201,6 +202,11 @@ int main(int argc, char* argv[]) {
 
 	if (argc < 2)
 		return readTestFile(cin);
+
+	else if (strcmp(argv[1],  "-v") == 0) {
+		cerr << (std::is_same<fpnumber, float>::value ? "float" : "double") << endl;
+		return 0;
+	}
 
 	ifstream testfile(argv[1]);
 

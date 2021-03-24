@@ -103,11 +103,13 @@ class DirectProfiler:
             map_list = intlist(map_list, int_terms[c])
 
         cycles = str(max(int(self.w * self.h / 20), self.w + self.h))  # Same number of cycles as ROS
+        path_cycles = str(4 * self.w)
         self.static_args = [
             cmap(map_list),
             self.m.parseTerm(str(int(self.h))),
             self.m.parseTerm(str(int(self.w))),
             self.m.parseTerm(cycles),
+            self.m.parseTerm(path_cycles),
         ]
 
         # Hook for "op get : CostMap Nat Nat Nat -> Float"
@@ -181,7 +183,7 @@ class DirectProfiler:
             potarr = self.get_potential(
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x0), float(y0), int(t0))),
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x), float(y), int(t))),
-                *self.static_args
+                *self.static_args[:-1]
             )
 
             # Only the computePath term will be reduced, but the subterm potarr
@@ -192,7 +194,8 @@ class DirectProfiler:
                 self.mod.parseTerm(f'{{{int(x)}, {int(y)}}}', self.pose_kind),
                 self.mod.parseTerm('stepSize'),
                 self.mod.parseTerm(f'initialGradient({self.h}, {self.w})'),
-                *self.static_args[-3:]
+                *self.static_args[-4:-2],
+                self.static_args[-1],
             )
 
         start_time = time.perf_counter()
