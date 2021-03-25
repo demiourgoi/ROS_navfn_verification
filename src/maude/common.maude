@@ -66,7 +66,7 @@ fmod COSTMAP is
  eq mapCost = 50.0 .
  eq costNeutral = 50.0 .
  eq stepSize = 0.5 .
- eq pathEpsilon = 0.0 .
+ eq pathEpsilon = 1.1920928955078125e-07 .
 
  op float2nat : Float -> Nat [memo] .
  eq float2nat(F) = rat(floor(F)) .
