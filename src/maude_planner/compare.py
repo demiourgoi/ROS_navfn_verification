@@ -9,8 +9,9 @@ import argparse
 import json
 import re
 
-EPSILON = 1E-2
-POT_EPSILON = 5E-3
+# EPSILON = 1.1920928955078125e-07
+EPSILON = 0.01  # Epsilon to decide when two positions are the same
+POT_EPSILON = 5E-3  # Epsilon to draw or not dots in the plot
 JSON_REGEX = re.compile(r"(^\{.+\})")
 
 
@@ -42,9 +43,31 @@ def remove_last(path):
     else:
         res = path[:-1]
     return res
-    
-    
-def equal_epsilon(cell1, cell2, epsilon=EPSILON):
+
+
+def detect_oscillation(path, epsilon):
+    """ Detects the first oscillation in the path. An oscillation starts when path[i] ~ path[i+2] and finishes in the
+        first j > i+2 such that path[j] ~/~ path[j-2], i.e., the oscillation to remove is [i+1, j)
+    """
+    for (i, cell) in enumerate(path):
+        if i + 2 < len(path) and equal_epsilon(path[i], path[i + 2], epsilon):
+            for j in range(i + 3, len(path)):
+                if not equal_epsilon(path[j], path[j - 2], epsilon):
+                    return i+1, j
+    return None  # No oscillation found
+
+
+def remove_oscillations(path, epsilon):
+    """ Removes the oscillations in the path. An oscillation starts when path[i] ~ path[i+2] and finishes in the
+        first j > i+2 such that path[j] ~/~ path[j-2], i.e., the oscillation is [i, j-1] and the fragment of path
+        removed is [i+1, j-1]"""
+    oscillation = detect_oscillation(path, epsilon)
+    if oscillation is not None:
+        return remove_oscillations(path[:oscillation[0]] + path[oscillation[1]:], epsilon)
+    return path  # No oscillation found
+
+
+def equal_epsilon(cell1, cell2, epsilon):
     """Compares if two cells are equal with a margin of epsilon"""
     x1, y1 = cell1
     x2, y2 = cell2
@@ -52,14 +75,18 @@ def equal_epsilon(cell1, cell2, epsilon=EPSILON):
     return ret
             
     
-def path_equal(path1, path2):
-    """Checks if path1 and path2 are equal"""
-    if len(path1) != len(path2):
+def path_equal(path1, path2, epsilon):
+    """ Checks if path1 and path2 are equal, using epsilon to check if two positions are equal and removing
+        oscillatoins
+    """
+    clean_path1 = remove_oscillations(path1, epsilon)
+    clean_path2 = remove_oscillations(path2, epsilon)
+    if len(clean_path1) != len(clean_path2):
         return False
     pos = 0
-    while pos < len(path1) and equal_epsilon(path1[pos], path2[pos]):
+    while pos < len(clean_path1) and equal_epsilon(clean_path1[pos], clean_path2[pos], EPSILON):
         pos += 1
-    return pos == len(path1)
+    return pos == len(clean_path1)
 
 
 class Plotter:
@@ -158,14 +185,14 @@ class Plotter:
 
         # Plot the extra points of each path
         # (probably this should be done more efficiently)
-        extra1 = [p for p in path1 if not any((equal_epsilon(p, q) for q in path2))]
-        extra2 = [p for p in path2 if not any((equal_epsilon(p, q) for q in path1))]
+        extra1 = [p for p in path1 if not any((equal_epsilon(p, q, EPSILON) for q in path2))]
+        extra2 = [p for p in path2 if not any((equal_epsilon(p, q, EPSILON) for q in path1))]
 
         not extra1 or self.plt.scatter(*zip(*extra1), color='aqua')
         not extra2 or self.plt.scatter(*zip(*extra2), color='blue')
 
     def draw(self, origin, dest, potarr1_raw, potarr2_raw, path1, path2, equal):
-        """Plots potentials, paths and their differences"""
+        """ Plots potentials, paths and their differences """
 
         # If we are not drawing or do not have enough information
         if self.np is None or potarr2_raw is None:
@@ -252,17 +279,20 @@ def main(args):
             potarr1 = dict1[test]["navfn"]
             potarr2 = dict2[test].get("navfn")
 
-            equal = path_equal(path1, path2)
+            equal = path_equal(path1, path2, EPSILON)
 
             if not equal:
                 num_diff += 1
                 print(f'{num_diff}) Differences in the path from {test[0]} to {test[1]}')
-                print(f'ROS  : {path1}')
-                print(f'Maude: {path2}')
+                ros_osc = "(removed oscillations)" if detect_oscillation(path1, EPSILON) is not None else ""
+                maude_osc = "(removed oscillations)" if detect_oscillation(path2, EPSILON) is not None else ""
+                print(f'ROS {ros_osc} : {path1}')
+                print(f'Maude {maude_osc}: {path2}')
                 print(f'potarr: {dict1[test]["navfn"]}\n')
 
-                # Draw the potentials and paths only for different paths
-                plotter.draw(test[0], test[1], potarr1, potarr2, path1, path2, equal)
+                # Draw the potentials and paths only for different paths, removing any oscillation in those paths
+                plotter.draw(test[0], test[1], potarr1, potarr2, remove_oscillations(path1, EPSILON),
+                             remove_oscillations(path2, EPSILON), equal)
 
         plotter.draw_summary()
 
