@@ -143,7 +143,8 @@ class DirectProfiler:
         line = dict()
         line['initial'] = [self.int_float(x) for x in initial]
         line['goal'] = [self.int_float(x) for x in goal]
-        line['duration'] = duration
+        # Omit duration for reproducibility
+        # line['duration'] = duration
         line['length'] = int(length) if length % 1 == 0.0 else float(f"{length:.5f}")
 
         path = list()

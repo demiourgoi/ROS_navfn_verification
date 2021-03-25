@@ -5,6 +5,11 @@
 COUNTER=0
 ERRORS=()
 
+# Make the generated PDF reproducible by omitting the creation date
+# (the Matplotlib version may also be omitted)
+# (https://matplotlib.org/2.1.1/users/whats_new.html#reproducible-ps-pdf-and-svg-output)
+export SOURCE_DATE_EPOCH="0"
+
 for test in $(find tests/ -name 'test*.txt')
 do
     let COUNTER=COUNTER+1
@@ -23,7 +28,7 @@ do
         echo "... ERROR"
         echo "Generating potentials..."
         TEST_NAME=$(basename $DIRNAME)
-        python compare.py $ROS_OUT $MAUDE_OUT --draw
+        python compare.py $ROS_OUT $MAUDE_OUT --draw > /dev/null
         mv potentials.pdf ${DIRNAME}/${TEST_NAME}.pdf
         # exit
     fi

@@ -84,7 +84,7 @@ double calculate_distance(fpnumber * path, size_t points) {
 	return s;
 }
 
-void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn) {
+void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn, bool outputDuration) {
 
 	auto start_time = std::chrono::high_resolution_clock::now();
 	int length = create_nav_plan_astar2(map.data, map.width, map.height, tcase + 2, tcase, path, 4 * map.width, navfn);
@@ -95,9 +95,12 @@ void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn) {
 
 	// Print a JSON object
 	cout << "{\"initial\": [" << tcase[0] << ", " << tcase[1] << "], "
-	     << "\"goal\": [" << tcase[2] << ", " << tcase[3] << "], "
-	     << "\"duration\": " << duration.count() << ", "
-	     << "\"length\": " << distance << ", "
+	     << "\"goal\": [" << tcase[2] << ", " << tcase[3] << "], ";
+
+	if (outputDuration)
+	     cout << "\"duration\": " << duration.count() << ", ";
+
+	cout << "\"length\": " << distance << ", "
 	     << "\"path\": [";
 
 	for (size_t i = 0; i < length; i++)
@@ -114,7 +117,7 @@ void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn) {
 	cout << "]}" << endl;
 }
 
-int readTestFile(istream &in) {
+int readTestFile(istream &in, bool outputDuration) {
 
 	// Read the configuration data from standard input
 	//
@@ -187,7 +190,7 @@ int readTestFile(istream &in) {
 		for (size_t i = 1; i < 4; i++)
 			in >> positions[i];
 
-		runTest(map, buffer, positions, navfn);
+		runTest(map, buffer, positions, navfn, outputDuration);
 	}
 
 	delete [] buffer;
@@ -197,28 +200,38 @@ int readTestFile(istream &in) {
 }
 
 int main(int argc, char* argv[]) {
-	// The first argument (if any) is seen as input file,
-	// but the standard input is used if omitted
+	// The last argument not being -v or -d (if any) is the input file
 
-	if (argc < 2)
-		return readTestFile(cin);
+	char* filename = nullptr;
+	bool outputDuration = false;
 
-	else if (strcmp(argv[1],  "-v") == 0) {
-		cerr << (std::is_same<fpnumber, float>::value ? "float" : "double") << endl;
-		return 0;
+	for (int i = 1; i < argc; i++) {
+		// Print the name of the floating-point type
+		if (strcmp(argv[i], "-v") == 0)
+			cerr << (std::is_same<fpnumber, float>::value ? "float" : "double") << endl;
+		// Include the duration of the test case computation in the JSON output
+		else if (strcmp(argv[i], "-d") == 0)
+			outputDuration = true;
+		// Otherwise, it is the filename
+		else
+			filename = argv[i];
 	}
 
-	ifstream testfile(argv[1]);
+	// If not file name is provided, we read from the standard input
+	if (filename == nullptr)
+		return readTestFile(cin, outputDuration);
+
+	ifstream testfile(filename);
 
 	if (!testfile.is_open()) {
-		cerr << "Cannot find " << argv[1] << " test file." << endl;
+		cerr << "Cannot find " << filename << " test file." << endl;
 		return 2;
 	}
 
 	// The directory where the test file is contained will be
 	// the base for its paths (i.e. the path to the map)
-	if (chdir(dirname(argv[1])) == -1)
+	if (chdir(dirname(filename)) == -1)
 		cerr << "Cannot change to the test directory." << endl;
 
-	return readTestFile(testfile);
+	return readTestFile(testfile, outputDuration);
 }
