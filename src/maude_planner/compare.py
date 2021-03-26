@@ -184,9 +184,8 @@ class Plotter:
         self.plt.plot(*zip(*path2), color='blue')
 
         # Plot the extra points of each path
-        # (probably this should be done more efficiently)
-        extra1 = [p for p in path1 if not any((equal_epsilon(p, q, EPSILON) for q in path2))]
-        extra2 = [p for p in path2 if not any((equal_epsilon(p, q, EPSILON) for q in path1))]
+        extra1 = [p for k, p in enumerate(path1) if k >= len(path2) or not equal_epsilon(p, path2[k], EPSILON)]
+        extra2 = [p for k, p in enumerate(path2) if k >= len(path1) or not equal_epsilon(p, path1[k], EPSILON)]
 
         not extra1 or self.plt.scatter(*zip(*extra1), color='aqua')
         not extra2 or self.plt.scatter(*zip(*extra2), color='blue')

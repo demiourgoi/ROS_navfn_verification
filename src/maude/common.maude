@@ -66,6 +66,11 @@ fmod COSTMAP is
  eq mapCost = 50.0 .
  eq costNeutral = 50.0 .
  eq stepSize = 0.5 .
+ *** This number (2.0 ^ -23.0) is the machine epsilon of the single precision
+ *** floating-point type in IEEE 754 (the float type of C++ used by ROS).
+ *** No constant can be found such that all oscillations are detected exactly
+ *** as in ROS, because 5.5 times this number makes some be detected earlier
+ *** and some others later.
  eq pathEpsilon = 1.1920928955078125e-07 .
 
  op float2nat : Float -> Nat [memo] .
@@ -332,7 +337,7 @@ fmod BASIC-TRAVERSE is
   if ACCP := getMin({X, Y}, P, NR, NC) [owise] .
 
  op getMin : Pose Potential Nat List{Nat} -> Pose .
- eq getMin(INIT, P, NR, NC) = getMin(INIT, P, NR, NC, noPose, infinite, 135 180 225 90 270 45 0 315) .
+ eq getMin({X, Y}, P, NR, NC) = getMin({X, Y}, P, NR, NC, {X, Y}, P @ [X, Y], 135 180 225 90 270 45 0 315) .
 
  op getMin : Pose Potential Nat Nat Pose Float List{Nat} -> Pose .
  ceq getMin({X, Y}, P, NR, NC, ACCP, MINV, N LN) = if V < MINV

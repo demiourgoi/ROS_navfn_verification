@@ -23,7 +23,7 @@ then
 else
   echo "... ERROR. Generating potentials:"
   TEST_NAME=$(basename $DIRNAME)
-  python compare.py $ROS_OUT $MAUDE_OUT --draw
+  python compare.py $ROS_OUT $MAUDE_OUT --draw > /dev/null
   mv potentials.pdf ${DIRNAME}/${TEST_NAME}.pdf
   exit -1
 fi
