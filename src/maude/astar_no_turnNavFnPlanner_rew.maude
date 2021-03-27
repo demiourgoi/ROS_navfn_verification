@@ -11,71 +11,78 @@ mod ASTAR is
  pr COSTMAP .
 
  vars V V' T FI FI' MINV SNDV DC HF D DX DY DX' DY' DX'' DY'' DDX DDY SS FX FY FZ FX' FY' FZ' : Float .
- vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R : PoseSet .
- vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
+ vars CURR NEXT EXC NEXT' EXC' P1L P1R P2L P2R P3L P3R P4L P4R PT : Path .
+ vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I IPATH NEW N : Nat .
  vars INIT GOAL ACCP : Pose .
  vars Q Q' : Quaternion .
  vars P P' : Potential .
  var  G : Gradient .
  var  CM : CostMap .
- var  PT : Path .
 
  sort TraversalResult .
- op <_,_> : PoseSet PoseSet -> TraversalResult [ctor] .
+ op <_,_> : Path Path -> TraversalResult [ctor] .
 
- ***     Init Goal         NumRow NumCol Iterations
- op a* : Pose Pose CostMap  Nat    Nat      Nat -> Path .
- rl a*({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NR, NC, I) =>
+ ***     Init Goal         NumRow NumCol Iterations Iterations path
+ op a* : Pose Pose CostMap  Nat    Nat      Nat     Nat -> Path .
+ *** For model checking
+ op a* : Pose Pose Gradient  Nat Nat Nat Potential -> Path .
+ rl a*({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NR, NC, I, IPATH) =>
          a*({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
-            {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I) .
- crl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) => a*({X, Y}, {X', Y'}, NR, NC, I, P')
+            {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I, IPATH) .
+ crl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I, IPATH) => *** computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NR, NC)
+                                                               *** computePath(P', {X, Y}, {X', Y'}, stepSize, G, NR, NC, IPATH)
+                                                               a*({X, Y}, {X', Y'}, G, NR, NC, IPATH, P')
   if P := initialP*(NR, NC, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
      CURR := initCurrent({X', Y'}, CM, NR, NC) /\
-     a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I) => P' /\
-     (P' @ [X , Y]) < infinite .
+     a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, noPath, noPath, T, I) => P' /\
+     (P' @ [X , Y]) < infinite /\
+     G := initialGradient(NR, NC) .
+ crl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I, IPATH) => noPath
+  if P := initialP*(NR, NC, X', Y') /\
+     T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
+     CURR := initCurrent({X', Y'}, CM, NR, NC) /\
+     P' := a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, noPath, noPath, T, I) /\
+     (P' @ [X , Y]) == infinite .
+ rl a*({X, Y}, {X', Y'}, G, NR, NC, IPATH, P) => computePath(P, {X, Y}, {X', Y'}, stepSize, G, NR, NC, IPATH) .
 
- op a* : Pose Pose Nat Nat Nat Potential -> Path .
- crl a*(INIT, GOAL, NR, NC, I, P) => computePath(P, INIT, GOAL, stepSize, G, NR, NC, I)
-  if G := initialGradient(NR, NC) .
-
- op initCurrent : Pose CostMap Nat Nat -> PoseSet .
- ceq initCurrent({X, Y}, CM, NR, NC) = P1L, P2L, P3L, P4L
+ op initCurrent : Pose CostMap Nat Nat -> Path .
+ ceq initCurrent({X, Y}, CM, NR, NC) = P2L P1L P3L P4L
   if P1L := if (X > 0) and-then open?(CM, sd(X, 1), Y, NC)
             then {sd(X, 1), Y}
-            else empty
+            else noPath
             fi /\
      P2L := if (s(X) < NR) and-then open?(CM, s(X), Y, NC)
             then {s(X), Y}
-            else empty
+            else noPath
             fi /\
      P3L := if (Y > 0) and-then open?(CM, X, sd(Y, 1), NC)
             then {X, sd(Y, 1)}
-            else empty
+            else noPath
             fi /\
      P4L := if (s(Y) < NC) and-then open?(CM, X, s(Y), NC)
             then {X, s(Y)}
-            else empty
+            else noPath
             fi .
 
   op getPotential : Pose Pose CostMap Nat Nat Nat -> Potential .
   eq getPotential({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NR, NC, I) =
          getPotential({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
             {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I) .
-  ceq getPotential({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, empty, empty, T, I)
+  ceq getPotential({X, Y, Z} Q, {X', Y', Z'} Q', CM, NR, NC, I) = a*({X, Y}, {X', Y'}, CM, P, NR, NC, CURR, noPath, noPath, T, I)
    if P := initialP*(NR, NC, X', Y') /\
       T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
       CURR := initCurrent({X', Y'}, CM, NR, NC) .
 
  ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
- op a* : Pose Pose CostMap Potential  Nat     Nat   PoseSet PoseSet PoseSet   Float       Nat  ~> Potential .
- eq a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) = P .
- ceq a*({X, Y}, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, I) = P
+ op a* : Pose Pose CostMap Potential  Nat     Nat   Path Path Path   Float       Nat  ~> Potential .
+ rl a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, 0) => P .
+ crl a*({X, Y}, GOAL, CM, P, NR, NC, noPath, NEXT, EXC, T, I) => P
   if D := P @ [X , Y] /\
      D =/= infinite .
- ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) = a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, s(I))
+ crl a*(INIT, GOAL, CM, P, NR, NC, ({X, Y} CURR), NEXT, EXC, T, s(I)) => a*(INIT, GOAL, CM, P, NR, NC, CURR, NEXT, EXC, T, s(I))
   if not open?(CM, X, Y, NC) .
- ceq a*(INIT, GOAL, CM, P, NR, NC, ({X, Y}, CURR), NEXT, EXC, T, s(I)) =
+ crl a*(INIT, GOAL, CM, P, NR, NC, ({X, Y} CURR), NEXT, EXC, T, s(I)) =>
                         a*(INIT, GOAL, CM, P', NR, NC, CURR, NEXT', EXC', T, s(I))
   if open?(CM, X, Y, NC) /\
      FI := minv({X, Y}, P, NR) /\
@@ -84,38 +91,38 @@ mod ASTAR is
      SNDV := max(FI, FI') /\
      P' := updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) /\
      < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NR, NC, T, NEXT, EXC) .
- eq a*(INIT, GOAL, CM, P, NR, NC, empty, NEXT, EXC, T, s(I)) =
-         if NEXT == empty
-         then a*(INIT, GOAL, CM, P, NR, NC, EXC, empty, NEXT, T + 2.0 * mapCost, I)
-         else a*(INIT, GOAL, CM, P, NR, NC, NEXT, empty, EXC, T, I)
+ rl a*(INIT, GOAL, CM, P, NR, NC, noPath, NEXT, EXC, T, s(I)) =>
+         if NEXT == noPath
+         then a*(INIT, GOAL, CM, P, NR, NC, EXC, noPath, NEXT, T + 2.0 * mapCost, I)
+         else a*(INIT, GOAL, CM, P, NR, NC, NEXT, noPath, EXC, T, I)
          fi .
 
  ***                   Current  INIT
- op traverseNeighbors : Pose    Pose CostMap Potential Nat Nat Float PoseSet PoseSet -> TraversalResult .
- ceq traverseNeighbors({X, Y}, INIT, CM, P, NR, NC, T, NEXT, EXC) = < (NEXT, P1L, P2L, P3L, P4L), (EXC, P1R, P2R, P3R, P4R) >
-  if < P1L, P1R > := if (X > 0) and-then open?(CM, sd(X,1), Y, NC)
+ op traverseNeighbors : Pose    Pose CostMap Potential Nat Nat Float Path Path -> TraversalResult .
+ ceq traverseNeighbors({X, Y}, INIT, CM, P, NR, NC, T, NEXT, EXC) = < NEXT P2L P1L P3L P4L, EXC P2R P1R P3R P4R >
+  if < P1L, P1R > := if (X > 0) and-then open?(CM, sd(X,1), Y, NC) and-then not ({sd(X,1), Y} in NEXT) and-then not ({sd(X,1), Y} in EXC)
                      then traverseNeighbor({X, Y}, {sd(X,1), Y}, INIT, CM, P, NC, T)
-                     else < empty, empty >
+                     else < noPath, noPath >
                      fi /\
-     < P2L, P2R > := if (s(X) < NR) and-then open?(CM, s(X), Y, NC)
+     < P2L, P2R > := if (s(X) < NR) and-then open?(CM, s(X), Y, NC) and-then not ({s(X), Y} in NEXT) and-then not ({s(X), Y} in EXC)
                      then traverseNeighbor({X, Y}, {s(X), Y}, INIT, CM, P, NC, T)
-                     else < empty, empty >
+                     else < noPath, noPath >
                      fi /\
-     < P3L, P3R > := if Y > 0 and-then open?(CM, X, sd(Y,1), NC)
+     < P3L, P3R > := if Y > 0 and-then open?(CM, X, sd(Y,1), NC) and-then not ({X, sd(Y,1)} in NEXT) and-then not ({X, sd(Y,1)} in EXC)
                      then traverseNeighbor({X, Y}, {X, sd(Y,1)}, INIT, CM, P, NC, T)
-                     else < empty, empty >
+                     else < noPath, noPath >
                      fi /\
-     < P4L, P4R > := if s(Y) < NC and-then open?(CM, X, s(Y), NC)
+     < P4L, P4R > := if s(Y) < NC and-then open?(CM, X, s(Y), NC) and-then not ({X, s(Y)} in NEXT) and-then not ({X, s(Y)} in EXC)
                      then traverseNeighbor({X, Y}, {X, s(Y)}, INIT, CM, P, NC, T)
-                     else < empty, empty > fi .
+                     else < noPath, noPath > fi .
 
  op traverseNeighbor : Pose Pose Pose CostMap Potential Nat Float -> TraversalResult .
- ceq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) = < empty, empty >
+ ceq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) = < noPath, noPath >
   if (P @ [XN, YN]) <= (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) + (1.0 / sqrt(2.0)) * get(CM, XN, YN, NC) [print "No update vecino"] .
  eq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) =
                                    if (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) < T
-                                   then < {XN, YN}, empty >
-                                   else < empty, {XN, YN} >
+                                   then < {XN, YN}, noPath >
+                                   else < noPath, {XN, YN} >
                                    fi [owise] .
 
  ***                                                   MINV  SNDV
@@ -128,7 +135,7 @@ mod ASTAR is
  ceq updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) = P'
   if DC := _-_(SNDV, MINV) /\
      HF := get(CM, X, Y, NC) /\
-     DC < HF /\
+     DC <= HF /\
      D := DC / HF /\
      V := - 0.2301 * D * D + 0.5307 * D + 0.7040 /\
      V' := MINV + HF * V /\
@@ -151,7 +158,7 @@ endm
 rew a*({2, 2, 0} 90, {0, 0, 0} 90, {50, 50,  50,  50,
                                     50, 254, 254, 50,
                                     50, 50,  50,  50,
-                                    50, 50,  50,  50}, 4, 4, 30) .
+                                    50, 50,  50,  50}, 4, 4, 30, 30) .
 
 load model-checker.maude
 
@@ -161,7 +168,7 @@ mod PROPS-POT is
 
  subsort Potential < State .
 
- vars CURR NEXT EXC : PoseSet .
+ vars CURR NEXT EXC : Path .
  vars NR NC N X Y : Nat .
  vars INIT GOAL : Pose .
  var  P : Potential .
@@ -192,7 +199,7 @@ mod TEST-POT is
                 (2.55e+2 . 2.55e+2 . 2.55e+2 . 2.55e+2)
                 (2.55e+2 . 2.55e+2 . 2.55e+2 . 2.55e+2)
                 (2.55e+2 . 2.55e+2 . 2.55e+2 . 2.55e+2)),
-              4, 4, ({0,1}, {1,0}), empty, empty, 5.3684271247461902e+2, 30) .
+              4, 4, ({0,1} {1,0}), noPath, noPath, 5.3684271247461902e+2, 30, 30) .
 endm
 
 red modelCheck(initPot, [] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess)) .
@@ -203,18 +210,24 @@ mod PROPS-PATH is
 
  subsort Path < State .
 
+ vars POSE POSE' INIT GOAL : Pose .
+ var  CURR NEXT EXC PATH : Path .
  vars NR NC N X Y I : Nat .
- vars INIT GOAL : Pose .
- var  CURR : PoseSet .
  var  P : Potential .
- var  PATH : Path .
+ var  G : Gradient .
+ var  CM : CostMap .
  var  T : Float .
 
  op PathComputed : -> Prop [ctor] .
- eq (INIT PATH) |= PathComputed = true .
+ eq PATH |= PathComputed = reducedAndNotEmpty(PATH) .
+
+ op reducedAndNotEmpty : Path -> Bool .
+ eq reducedAndNotEmpty(noPath) = false .
+ eq reducedAndNotEmpty(POSE) = true .
+ eq reducedAndNotEmpty(POSE POSE' PATH) = reducedAndNotEmpty(POSE' PATH) .
 
  op NonInfinitePotAtInit : -> Prop [ctor] .
- eq a*({X, Y}, GOAL, NR, NC, I, P) |= NonInfinitePotAtInit = P @ [X, Y] < infinite .
+ eq a*({X, Y}, GOAL, G, NR, NC, I, P) |= NonInfinitePotAtInit = P @ [X, Y] < infinite .
 endm
 
 mod TEST-PATH is
@@ -227,7 +240,7 @@ mod TEST-PATH is
                                    {50, 50,  50,  50,
                                     50, 254, 254, 50,
                                     50, 50,  50,  50,
-                                    50, 50,  50,  50}, 4, 4, 30) .
+                                    50, 50,  50,  50}, 4, 4, 30, 30) .
 endm
 
 red modelCheck(initPath, [] (NonInfinitePotAtInit -> <> PathComputed)) .
