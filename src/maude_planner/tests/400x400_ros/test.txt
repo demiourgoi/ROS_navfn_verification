@@ -1,0 +1,10 @@
+400 400
+map.bin
+
+-1 Map from https://github.com/ros-planning/navigation2/
+10 10 30 30
+20 75 61 102
+20 75 62 118
+130 337 167 340
+261 339 298 323
+295 148 275 121

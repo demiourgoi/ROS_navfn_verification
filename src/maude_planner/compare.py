@@ -281,7 +281,7 @@ def main(args):
 
             # The epsilon constant is adapted to the map size
             if not epsilon:
-                side_length = len(potarr1) ** 0.5
+                side_length = len(potarr1) ** 0.5 if potarr1 is not None else 11
 
                 if side_length >= 12:
                     epsilon = 0.05

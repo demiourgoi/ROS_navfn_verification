@@ -57,9 +57,10 @@ class DirectProfiler:
 
         # Use different functions whether obtaining the potential or not
         if not obtain_navfn:
-            self.astar = self.m.findSymbol('a*', [pose_kind, pose_kind, costmap_kind,
-                                             nat_kind, nat_kind, nat_kind], 
-                                             path_kind)
+            self.astar = self.m.findSymbol('a*',
+                                           [pose_kind, pose_kind, costmap_kind]
+                                           + [nat_kind] * 4,
+                                           path_kind)
             self.get_potential = None
             self.compute_path = None
 
@@ -99,8 +100,9 @@ class DirectProfiler:
         # Build the IntList with the costmap data
         map_list = mtIL
 
-        for c in self.map_data:
-            map_list = intlist(map_list, int_terms[c])
+	# There is no need to build the map, because it will be read from the hook
+        # for c in self.map_data:
+        #    map_list = intlist(map_list, int_terms[c])
 
         cycles = str(max(int(self.w * self.h / 20), self.w + self.h))  # Same number of cycles as ROS
         path_cycles = str(4 * self.w)
