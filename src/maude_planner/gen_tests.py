@@ -11,10 +11,13 @@ Author: Enrique Martin
 from PIL import Image
 import random
 import math
+import yaml
 
 OBSTACLE = 254
 FREE_INI = 50
 FREE_END = 253
+MAX_CELL = 255
+COST_FACTOR = 0.8
 
 
 def store_test(im, testfilename, mapfilename, paths):
@@ -31,11 +34,45 @@ def store_test(im, testfilename, mapfilename, paths):
             testfile.write(f"{start[0]} {start[1]} {end[0]} {end[1]}\n")
 
 
+def test_from_yaml(path):
+    """ Create a test with random paths from a YAML+PNG describing a map """
+    with open(path, 'r') as yaml_file:
+        yaml_content = yaml.load(yaml_file, Loader=yaml.SafeLoader)
+    im = Image.open(yaml_content['image'])
+    adapt_pgm(im, yaml_content['occupied_thresh'], yaml_content['free_thresh'], yaml_content['negate'])
+    paths = random_paths_image(im, 0.0001)
+    store_test(im, 'test.txt', 'map.bin', paths)
+
+
+def adapt_pgm(im, occupied_thresh, free_thresh, negate):
+    """ Modifies the image setting pixel value in [FREE_INI, OBSTACLE] using thresholds.
+        Ideally shoudl follow the instructions in
+        https://github.com/ros-planning/navigation2/blob/30b405c58e6d53ba8c96381416bc4679d35a1483/nav2_map_server/src/map_io.cpp#L208
+        and use the negate field to check occupancy:
+           // If negate is true, we consider blacker pixels free, and whiter
+           // pixels occupied. Otherwise, it's vice versa.
+           /// on a scale from 0.0 to 1.0, how occupied is the map cell (before thresholding)?
+           double occ = (load_parameters.negate ? shade : 1.0 - shade);
+
+        ** BUT COMPLETELY IGNORES THE THRESHOLDS AND NEGATE: Just take values < FREE_INI as obstacles and
+        full white (> FREE_END) as FREE_END, leaving the rest of pixels unchanged **
+    """
+    w, h = im.size
+    for x in range(0, w):
+        for y in range(1, h):
+            pixel_value = im.getpixel((y, x))  # Blacker pixel is "more obstacle"
+            if pixel_value < FREE_INI:
+                pixel_value = OBSTACLE
+            elif pixel_value > FREE_END:
+                pixel_value = FREE_END
+            im.putpixel((y, x), pixel_value)
+
+
 def map_free_test(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):
-    """Generates a map file (binary) with num_cols x rows cells surrounded with 
-       obstacles in the border (1 pixel) and all the cells completely free.
-       Generates a random subset of the possible valid paths to test, with ratio "path_ratio".
-       Stores the map and all the possible paths in files
+    """ Generates a map file (binary) with num_cols x rows cells surrounded with
+        obstacles in the border (1 pixel) and all the cells completely free.
+        Generates a random subset of the possible valid paths to test, with ratio "path_ratio".
+        Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols+2, rows+2), OBSTACLE)
     for y in range(1, rows+1):
@@ -180,9 +217,31 @@ def all_paths_image(im, path_ratio=1.0):
         return ret
     else:
         return random.sample(ret, num_paths)
+
+
+def random_paths_image(im, path_ratio=1.0):
+    """ Returns a list with paths (start, end) that do not start or end in obstacles.
+        Generates a random subset of the valid paths in the map with ratio path_ratio wrt. the number of valid cells
+        It can generate duplicates
+    """
+    w, h = im.size
+    all_valid_cells = [(x0, y0) for x0 in range(w) for y0 in range(h) if FREE_INI <= im.getpixel((x0, y0)) <= FREE_END]
+    print(all_valid_cells)
+    num_paths = round(len(all_valid_cells) * path_ratio)
+    ret = list()
+    for _ in range(num_paths):
+        start = random.choice(all_valid_cells)
+        end = random.choice(all_valid_cells)
+        ret.append((start, end))
+    return ret
     
 
 def main():
+    # test_from_yaml('empty_room.yaml')
+    # test_from_yaml('keepout_mask.yaml')
+    # test_from_yaml('map_circular.yaml')
+    test_from_yaml('speed_mask.yaml')
+    exit()
     # 3x3 Descencing diagonal
     # cells = [(1,2), (1,3), (2,3), (2,1), (3,1), (3,2)]   
     # 3x3 Ascencing diagonal
