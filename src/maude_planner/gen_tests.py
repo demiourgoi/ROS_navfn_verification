@@ -46,26 +46,29 @@ def test_from_yaml(path):
 
 def adapt_pgm(im, occupied_thresh, free_thresh, negate):
     """ Modifies the image setting pixel value in [FREE_INI, OBSTACLE] using thresholds.
-        Ideally shoudl follow the instructions in
+        Ideally should follow the instructions in
         https://github.com/ros-planning/navigation2/blob/30b405c58e6d53ba8c96381416bc4679d35a1483/nav2_map_server/src/map_io.cpp#L208
         and use the negate field to check occupancy:
            // If negate is true, we consider blacker pixels free, and whiter
            // pixels occupied. Otherwise, it's vice versa.
            /// on a scale from 0.0 to 1.0, how occupied is the map cell (before thresholding)?
            double occ = (load_parameters.negate ? shade : 1.0 - shade);
-
-        ** BUT COMPLETELY IGNORES THE THRESHOLDS AND NEGATE: Just take values < FREE_INI as obstacles and
-        full white (> FREE_END) as FREE_END, leaving the rest of pixels unchanged **
     """
     w, h = im.size
+    free_thresh *= 255
+    occupied_thresh *= 255
     for x in range(0, w):
-        for y in range(1, h):
-            pixel_value = im.getpixel((y, x))  # Blacker pixel is "more obstacle"
-            if pixel_value < FREE_INI:
+        for y in range(0, h):
+            pixel_value = im.getpixel((y, x))  # Blacker pixel is "more obstacle" unless negate
+            if not negate:
+                pixel_value = 255 - pixel_value
+            if pixel_value < free_thresh:
+                pixel_value = FREE_INI
+            elif pixel_value >= occupied_thresh:
                 pixel_value = OBSTACLE
-            elif pixel_value > FREE_END:
-                pixel_value = FREE_END
-            im.putpixel((y, x), pixel_value)
+            else:
+                pixel_value = min(FREE_INI + COST_FACTOR * pixel_value, FREE_END)
+            im.putpixel((y, x), round(pixel_value))
 
 
 def map_free_test(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):

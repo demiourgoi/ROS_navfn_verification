@@ -1,7 +1,7 @@
 //
 // Profiler for the default C++ A* algorithm
 //
-// Built with -I/opt/ros/dashing/include/ -L/opt/ros/dashing/lib/ -lnavfn_planner_core options
+// Built with -I/opt/ros/foxy/include/ -L/opt/ros/foxy/lib/ -lnav2_navfn_planner options
 //
 
 #include <iostream>
@@ -27,6 +27,11 @@ struct CostMap {
 	COSTTYPE * data;
 	int width;
 	int height;
+};
+
+struct ProgramOptions {
+	bool outputDuration;
+	bool outputNavfn;
 };
 
 int create_nav_plan_astar2(COSTTYPE* costmap, int nx, int ny, int* goal, int* start,
@@ -84,7 +89,7 @@ double calculate_distance(fpnumber * path, size_t points) {
 	return s;
 }
 
-void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn, bool outputDuration) {
+void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn, const ProgramOptions &opts) {
 
 	auto start_time = std::chrono::high_resolution_clock::now();
 	int length = create_nav_plan_astar2(map.data, map.width, map.height, tcase + 2, tcase, path, 4 * map.width, navfn);
@@ -97,7 +102,7 @@ void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn, bool
 	cout << "{\"initial\": [" << tcase[0] << ", " << tcase[1] << "], "
 	     << "\"goal\": [" << tcase[2] << ", " << tcase[3] << "], ";
 
-	if (outputDuration)
+	if (opts.outputDuration)
 	     cout << "\"duration\": " << duration.count() << ", ";
 
 	cout << "\"length\": " << distance << ", "
@@ -106,18 +111,24 @@ void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn, bool
 	for (size_t i = 0; i < length; i++)
 		cout << "[" << path[2*i] << ", " << path[2*i+1] << ((i+1 < length) ? "], " : "]");
 
-	cout << "], \"navfn\": [";
+	cout << "]";
 
 	// Write the potential array in the JSON
-	const size_t mapSize = map.width * map.height;
+	if (opts.outputNavfn) {
+		cout << ", \"navfn\": [";
 
-	for (size_t i = 0; i < mapSize; i++)
-		cout << navfn->potarr[i] << ((i+1 < mapSize) ? ", " : "");
+		const size_t mapSize = map.width * map.height;
 
-	cout << "]}" << endl;
+		for (size_t i = 0; i < mapSize; i++)
+			cout << navfn->potarr[i] << ((i+1 < mapSize) ? ", " : "");
+
+		cout << "]";
+	}
+
+	cout << "}" << endl;
 }
 
-int readTestFile(istream &in, bool outputDuration) {
+int readTestFile(istream &in, const ProgramOptions &opts) {
 
 	// Read the configuration data from standard input
 	//
@@ -190,7 +201,7 @@ int readTestFile(istream &in, bool outputDuration) {
 		for (size_t i = 1; i < 4; i++)
 			in >> positions[i];
 
-		runTest(map, buffer, positions, navfn, outputDuration);
+		runTest(map, buffer, positions, navfn, opts);
 	}
 
 	delete [] buffer;
@@ -200,10 +211,10 @@ int readTestFile(istream &in, bool outputDuration) {
 }
 
 int main(int argc, char* argv[]) {
-	// The last argument not being -v or -d (if any) is the input file
+	// The last argument not being -v, -n or -d (if any) is the input file
 
 	char* filename = nullptr;
-	bool outputDuration = false;
+	ProgramOptions opts{false, true};
 
 	for (int i = 1; i < argc; i++) {
 		// Print the name of the floating-point type
@@ -211,7 +222,10 @@ int main(int argc, char* argv[]) {
 			cerr << (std::is_same<fpnumber, float>::value ? "float" : "double") << endl;
 		// Include the duration of the test case computation in the JSON output
 		else if (strcmp(argv[i], "-d") == 0)
-			outputDuration = true;
+			opts.outputDuration = true;
+		// Do not include the navigation function in the JSON output
+		else if (strcmp(argv[i], "-n") == 0)
+			opts.outputNavfn = false;
 		// Otherwise, it is the filename
 		else
 			filename = argv[i];
@@ -219,7 +233,7 @@ int main(int argc, char* argv[]) {
 
 	// If not file name is provided, we read from the standard input
 	if (filename == nullptr)
-		return readTestFile(cin, outputDuration);
+		return readTestFile(cin, opts);
 
 	ifstream testfile(filename);
 
@@ -233,5 +247,5 @@ int main(int argc, char* argv[]) {
 	if (chdir(dirname(filename)) == -1)
 		cerr << "Cannot change to the test directory." << endl;
 
-	return readTestFile(testfile, outputDuration);
+	return readTestFile(testfile, opts);
 }

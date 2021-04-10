@@ -7,6 +7,7 @@ Author: Enrique Martin
 
 import argparse
 import json
+import os
 import re
 
 EPSILON = 1e-5  # Epsilon to decide when two positions are the same
@@ -76,7 +77,7 @@ def equal_epsilon(cell1, cell2, epsilon):
     
 def path_equal(path1, path2, epsilon):
     """ Checks if path1 and path2 are equal, using epsilon to check if two positions are equal and removing
-        oscillatoins
+        oscillations
     """
     clean_path1 = remove_oscillations(path1, epsilon)
     clean_path2 = remove_oscillations(path2, epsilon)
@@ -94,6 +95,7 @@ class Plotter:
     def __init__(self, name, draw, width):
         self.width = width
         self.mode = draw
+        self.costmap = None
 
         # This may be a dummy plotter if draw is false. The packages are only
         # imported if drawing is required.
@@ -134,6 +136,26 @@ class Plotter:
         if self.pdf is not None:
             self.pdf.close()
 
+    def calculate_shape(self, array):
+        """Calculate the shape of an array according to the width argument"""
+
+        # It is assumed square if the width was not given
+        width = int(self.np.sqrt(len(array))) if self.width is None else self.width
+        height = len(array) // width
+
+        return width, height
+
+    def load_costmap(self, path):
+        """Load a costmap as a binary file with a byte per cell"""
+
+        if self.np is None:
+            return False
+
+        cm = self.np.fromfile(path, dtype=self.np.ubyte)
+        self.costmap = cm.reshape(self.calculate_shape(cm))
+
+        return True
+
     def draw_potential(self, potarr, path, pcolor='red'):
         """Draw the potential and path produced by a backend"""
 
@@ -157,6 +179,23 @@ class Plotter:
         # Finally, the path
         self.plt.plot(*zip(*path), color=pcolor, marker='o')
 
+    def draw_paths(self, path1, path2):
+        """Draw both paths in the plot"""
+
+        self.plt.plot(*zip(*path1), color='aqua')
+        self.plt.plot(*zip(*path2), color='blue')
+
+        # Extra points are not useful when one of the paths is empty
+        if not path1 or not path2:
+            return
+
+        # Plot the extra points of each path (epsilon should be adapted)
+        extra1 = [p for k, p in enumerate(path1) if k >= len(path2) or not equal_epsilon(p, path2[k], EPSILON)]
+        extra2 = [p for k, p in enumerate(path2) if k >= len(path1) or not equal_epsilon(p, path1[k], EPSILON)]
+
+        not extra1 or self.plt.scatter(*zip(*extra1), color='aqua')
+        not extra2 or self.plt.scatter(*zip(*extra2), color='blue')
+
     def draw_diff(self, diff, path1, path2):
         """Draw the given difference of two potentials and their paths"""
 
@@ -178,28 +217,36 @@ class Plotter:
                 color = 'blue' if value < 0.0 else 'aqua'
                 ax.add_patch(self.Rectangle([y, x], 1, 1, edgecolor=color))
 
-        # Finally, both paths
-        self.plt.plot(*zip(*path1), color='aqua')
-        self.plt.plot(*zip(*path2), color='blue')
+        self.draw_paths(path1, path2)
 
-        # Plot the extra points of each path
-        extra1 = [p for k, p in enumerate(path1) if k >= len(path2) or not equal_epsilon(p, path2[k], EPSILON)]
-        extra2 = [p for k, p in enumerate(path2) if k >= len(path1) or not equal_epsilon(p, path1[k], EPSILON)]
+    def draw_costmap(self, path1, path2):
+        """Draw the paths with the costmap as background"""
 
-        not extra1 or self.plt.scatter(*zip(*extra1), color='aqua')
-        not extra2 or self.plt.scatter(*zip(*extra2), color='blue')
+        w, h = self.costmap.shape
+
+        self.plt.imshow(self.costmap, extent=(0, w, h, 0))
+        self.plt.colorbar()
+
+        self.draw_paths(path1, path2)
 
     def draw(self, origin, dest, potarr1_raw, potarr2_raw, path1, path2, equal):
         """ Plots potentials, paths and their differences """
 
         # If we are not drawing or do not have enough information
-        if self.np is None or potarr2_raw is None:
+        if self.np is None or (potarr2_raw is None and self.costmap is None):
+            return
+
+        # If the potential is missing, we print the both paths with the costmap
+        if potarr2_raw is None:
+            self.draw_costmap(path1, path2)
+            self.plt.title(f'{origin} to {dest}')
+            self.pdf.savefig()
+            self.plt.close()
             return
 
         # Calculate the width and height of the map
         # (it should common for all cases though)
-        width = int(self.np.sqrt(len(potarr1_raw))) if self.width is None else self.width
-        height = len(potarr1_raw) // width
+        width, height = self.calculate_shape(potarr1_raw)
 
         # Convert the potentials to NumPy arrays
         potarr1 = self.np.array(potarr1_raw)
@@ -271,6 +318,10 @@ def main(args):
     num_diff = 0
     epsilon = None
 
+    # The costmap may be loaded to show paths in huge maps
+    tried_costmap = False
+    costmap_path = os.path.join(os.path.dirname(args.ros_output), 'map.bin')
+
     with Plotter('potentials.pdf', args.draw, args.width) as plotter:
         for test in tests:
             path1 = dict1[test]["path"]
@@ -279,9 +330,14 @@ def main(args):
             potarr1 = dict1[test]["navfn"]
             potarr2 = dict2[test].get("navfn")
 
+            # If both potentials are missing, try to read the map
+            if not tried_costmap and potarr1 is None and potarr2 is None and os.path.exists(costmap_path):
+                tried_costmap = True
+                plotter.load_costmap(costmap_path)
+
             # The epsilon constant is adapted to the map size
             if not epsilon:
-                side_length = len(potarr1) ** 0.5 if potarr1 is not None else 11
+                side_length = len(potarr1) ** 0.5 if potarr1 is not None else 12
 
                 if side_length >= 12:
                     epsilon = 0.05
