@@ -12,9 +12,12 @@ export SOURCE_DATE_EPOCH="0"
 
 for test in $(find tests/ -name 'test*.txt')
 do
+    # The width of the map
+    mapWidth="$(head -n 1 $test | cut -d' ' -f1)"
+
     # Navigation functions are not included in the log files if the
     # map width in greater than 100
-    if [ "$(head -n 1 $test | cut -d' ' -f1)" -gt "100" ]; then
+    if [ "$mapWidth" -gt "100" ]; then
         profm_args=--no-navfn
         profr_args=-n
     else
@@ -29,7 +32,7 @@ do
     MAUDE_OUT="$DIRNAME/maude.txt"
     ./profile_cpp $profr_args $test > $ROS_OUT
     python profile_maude.py $profm_args $test > $MAUDE_OUT
-    python compare.py $ROS_OUT $MAUDE_OUT
+    python compare.py --width="$mapWidth" $ROS_OUT $MAUDE_OUT
     if [ $? = "0" ]
     then
         echo "... OK"
@@ -38,7 +41,7 @@ do
         echo "... ERROR"
         echo "Generating potentials..."
         TEST_NAME=$(basename $DIRNAME)
-        python compare.py $ROS_OUT $MAUDE_OUT --draw > /dev/null
+        python compare.py --width="$mapWidth" $ROS_OUT $MAUDE_OUT --draw > /dev/null
         mv potentials.pdf ${DIRNAME}/${TEST_NAME}.pdf
         # exit
     fi

@@ -136,6 +136,9 @@ class Plotter:
         if self.pdf is not None:
             self.pdf.close()
 
+    def set_epsilon(self, eps):
+        self.epsilon = eps
+
     def calculate_shape(self, array):
         """Calculate the shape of an array according to the width argument"""
 
@@ -143,7 +146,7 @@ class Plotter:
         width = int(self.np.sqrt(len(array))) if self.width is None else self.width
         height = len(array) // width
 
-        return width, height
+        return height, width
 
     def load_costmap(self, path):
         """Load a costmap as a binary file with a byte per cell"""
@@ -166,7 +169,7 @@ class Plotter:
         # Draw the potential as a image omitting infinity
         # (otherwise, the other differences could not be seen)
         # (extent is used to make coordinates be in the corners)
-        self.plt.imshow(potarr, vmax=vmax, extent=(0, potarr.shape[0], potarr.shape[1], 0))
+        self.plt.imshow(potarr, vmax=vmax, extent=(0, potarr.shape[1], potarr.shape[0], 0))
         self.plt.colorbar()
 
         # Draw red squares in the infinity
@@ -189,9 +192,9 @@ class Plotter:
         if not path1 or not path2:
             return
 
-        # Plot the extra points of each path (epsilon should be adapted)
-        extra1 = [p for k, p in enumerate(path1) if k >= len(path2) or not equal_epsilon(p, path2[k], EPSILON)]
-        extra2 = [p for k, p in enumerate(path2) if k >= len(path1) or not equal_epsilon(p, path1[k], EPSILON)]
+        # Plot the extra points of each path
+        extra1 = [p for k, p in enumerate(path1) if k >= len(path2) or not equal_epsilon(p, path2[k], self.epsilon)]
+        extra2 = [p for k, p in enumerate(path2) if k >= len(path1) or not equal_epsilon(p, path1[k], self.epsilon)]
 
         not extra1 or self.plt.scatter(*zip(*extra1), color='aqua')
         not extra2 or self.plt.scatter(*zip(*extra2), color='blue')
@@ -206,7 +209,7 @@ class Plotter:
         vmax = diff[support].max()
         vmin = diff[support].min()
 
-        self.plt.imshow(diff, vmin=vmin, vmax=vmax, extent=(0, diff.shape[0], diff.shape[1], 0))
+        self.plt.imshow(diff, vmin=vmin, vmax=vmax, extent=(0, diff.shape[1], diff.shape[0], 0))
         self.plt.colorbar()
 
         # Draw red (green) squares in the infinity values of Maude (ROS)
@@ -224,7 +227,7 @@ class Plotter:
 
         w, h = self.costmap.shape
 
-        self.plt.imshow(self.costmap, extent=(0, w, h, 0))
+        self.plt.imshow(self.costmap, extent=(0, w, h, 0), cmap='gray_r')
         self.plt.colorbar()
 
         self.draw_paths(path1, path2)
@@ -246,13 +249,13 @@ class Plotter:
 
         # Calculate the width and height of the map
         # (it should common for all cases though)
-        width, height = self.calculate_shape(potarr1_raw)
+        height, width = self.calculate_shape(potarr1_raw)
 
         # Convert the potentials to NumPy arrays
         potarr1 = self.np.array(potarr1_raw)
         potarr2 = self.np.array(potarr2_raw)
-        potarr1.shape = (width, height)
-        potarr2.shape = (width, height)
+        potarr1.shape = (height, width)
+        potarr2.shape = (height, width)
 
         # Maude's potentials are transposed
         potarr2 = self.np.transpose(potarr2)
@@ -345,6 +348,8 @@ def main(args):
                     epsilon = 0.005
                 else:
                     epsilon = EPSILON
+
+                plotter.set_epsilon(epsilon)
 
             equal = path_equal(path1, path2, epsilon)
 

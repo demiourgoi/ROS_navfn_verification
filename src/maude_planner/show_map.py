@@ -16,7 +16,7 @@ def show_using_numpy(map_full_map_path, w, h):
     import numpy as np
     import matplotlib.pyplot as plt
 
-    cmap = np.fromfile(map_full_map_path, dtype=np.ubyte).reshape((w, h))
+    cmap = np.fromfile(map_full_map_path, dtype=np.ubyte).reshape((h, w))
 
     plt.imshow(cmap)
     plt.show()

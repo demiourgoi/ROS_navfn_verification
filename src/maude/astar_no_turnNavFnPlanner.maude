@@ -23,7 +23,7 @@ fmod ASTAR is
  op <_,_> : Path Path -> TraversalResult [ctor] .
 
  ***     Init Goal         NumRow NumCol Iterations Iterations path
- op a* : Pose Pose CostMap  Nat    Nat      Nat     Nat -> Path .
+ op a* : Pose Pose CostMap  Nat    Nat      Nat     Nat ~> Path .
  eq a*({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NR, NC, I, IPATH) =
          a*({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
             {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NR, NC, I, IPATH) .
