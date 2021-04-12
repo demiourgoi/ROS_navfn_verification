@@ -240,26 +240,7 @@ def random_paths_image(im, path_ratio=1.0):
     
 
 def main():
-    # test_from_yaml('empty_room.yaml')
-    # test_from_yaml('keepout_mask.yaml')
-    # test_from_yaml('map_circular.yaml')
-    test_from_yaml('speed_mask.yaml')
-    exit()
-    # 3x3 Descencing diagonal
-    # cells = [(1,2), (1,3), (2,3), (2,1), (3,1), (3,2)]   
-    # 3x3 Ascencing diagonal
-    # cells = [(1,1), (1,2), (2,1), (2,3), (3,2), (3,3)]   
-    # all_paths(cells)
-    # map_free_test(5, 5, "5x5_free.bin", "test_5x5_free.txt")
-    # map_free_random_test(3, 3, "3x3_free_random.bin", "test_3x3_free_random.txt")
-    # map_free_random_test(4, 4)
-    # map_free_test(4, 4)
-    # map_spiral(5, 5)
-
-    # map_free_test(10, 10, path_ratio=0.025)
-    # map_free_random_test(10, 10, path_ratio=0.025)
-
-    map_radial(9, 9, path_ratio=0.05, center=(5, 5), radius=5)
+    map_free_test(3, 5, 0.1)
 
 
 if __name__ == "__main__":
