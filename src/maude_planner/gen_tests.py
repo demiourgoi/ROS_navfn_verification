@@ -182,6 +182,29 @@ def map_radial(cols, rows, path_ratio=1.0, center=(1, 1), radius=25, mapfilename
     store_test(im, testfilename, mapfilename, paths)
 
 
+def map_split(cols, rows, num_vert=3, num_horiz=3, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):
+    im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
+    for x in range(1, rows + 1):
+        for y in range(1, cols + 1):
+            cell = random.choice(range(FREE_INI, FREE_END + 1))
+            im.putpixel((y, x), cell)
+
+    # Vertical walls
+    for _ in range(num_vert):
+        y = random.randint(1, cols+1)
+        for x in range(1, rows+1):
+            im.putpixel((y, x), OBSTACLE)
+
+    # Horizontal walls
+    for _ in range(num_horiz):
+        x = random.randint(1, rows+1)
+        for y in range(1, cols+1):
+            im.putpixel((y, x), OBSTACLE)
+
+    paths = all_paths_image(im, path_ratio)
+    store_test(im, testfilename, mapfilename, paths)
+
+
 def next_cell(pos, delta):
     """ Returns the next cell from pos in delta direction """
     return pos[0] + delta[0], pos[1] + delta[1]
@@ -240,7 +263,8 @@ def random_paths_image(im, path_ratio=1.0):
     
 
 def main():
-    map_free_test(3, 5, 0.1)
+    # map_radial(cols, rows, path_ratio=1.0, center=(1, 1), radius=25,
+    map_split(4, 12, 0, 4, 1.0)
 
 
 if __name__ == "__main__":
