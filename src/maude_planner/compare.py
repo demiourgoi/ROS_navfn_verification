@@ -10,7 +10,7 @@ import json
 import os
 import re
 
-EPSILON = 1e-5  # Epsilon to decide when two positions are the same
+EPSILON = 1E-2  # Epsilon to decide when two positions are the same
 POT_EPSILON = 5E-3  # Epsilon to draw or not dots in the plot
 JSON_REGEX = re.compile(r"(^\{.+\})")
 
@@ -73,20 +73,41 @@ def equal_epsilon(cell1, cell2, epsilon):
     x2, y2 = cell2
     ret = abs(x1-x2) <= epsilon and abs(y1-y2) <= epsilon
     return ret
-            
+
+
+def oscillation_to_cell(path, position, cell, epsilon):
+    """ Detect if there is an oscillation in path starting from path[position] to the place where 'cell' is.
+        Returns None if there is no such oscillation, or the position where 'cell' is
+    """
+    while position < len(path):
+        if equal_epsilon(cell, path[position], epsilon):
+            return position
+        elif equal_epsilon(path[position], path[position-2], epsilon):
+            position += 1
+        else:
+            return None
+    return None
+
     
 def path_equal(path1, path2, epsilon):
-    """ Checks if path1 and path2 are equal, using epsilon to check if two positions are equal and removing
-        oscillations
+    """ Checks if path1 and path2 are equal, using epsilon to check if two positions are equal and ignoring
+        oscillations: cells in both paths are compared position by position, and if a difference is detected checks
+        if that difference is the end of an oscillation to advance the other path
     """
-    clean_path1 = remove_oscillations(path1, epsilon)
-    clean_path2 = remove_oscillations(path2, epsilon)
-    if len(clean_path1) != len(clean_path2):
-        return False
-    pos = 0
-    while pos < len(clean_path1) and equal_epsilon(clean_path1[pos], clean_path2[pos], epsilon):
-        pos += 1
-    return pos == len(clean_path1)
+    pos1, pos2 = 0, 0
+    while pos1 < len(path1) and pos2 < len(path2):
+        if equal_epsilon(path1[pos1], path2[pos2], epsilon):
+            pos1 += 1
+            pos2 += 1
+        elif npos2 := oscillation_to_cell(path2, pos2, path1[pos1], epsilon):
+            # Oscillation ends in path1[pos1] but lasts in path2
+            pos2 = npos2
+        elif npos1 := oscillation_to_cell(path1, pos1, path2[pos2], epsilon):
+            # Oscillation ends in path2[pos2] but lasts in path1
+            pos1 = npos1
+        else:
+            break
+    return pos1 == len(path1) and pos2 == len(path2)
 
 
 class Plotter:
@@ -355,11 +376,11 @@ def main(args):
 
             if not equal:
                 num_diff += 1
-                print(f'{num_diff}) Differences in the path from {test[0]} to {test[1]}')
-                ros_osc = "(removed oscillations)" if detect_oscillation(path1, epsilon) is not None else ""
-                maude_osc = "(removed oscillations)" if detect_oscillation(path2, epsilon) is not None else ""
-                print(f'ROS {ros_osc} : {path1}')
-                print(f'Maude {maude_osc}: {path2}')
+                print(f'  {num_diff}) Differences in the path from {test[0]} to {test[1]}')
+                # ros_osc = "(removed oscillations)" if detect_oscillation(path1, epsilon) is not None else ""
+                # maude_osc = "(removed oscillations)" if detect_oscillation(path2, epsilon) is not None else ""
+                print(f'  ROS: {path1}')
+                print(f'  Maude: {path2}')
                 if len(path1) == len(path2):
                     print('Max. difference: ', max((abs(path1[i][j] - path2[i][j]) for i in range(len(path1)) for j in (0, 1))))
                 #print(f'potarr: {dict1[test]["navfn"]}\n')
