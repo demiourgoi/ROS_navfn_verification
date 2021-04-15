@@ -59,7 +59,7 @@ def adapt_pgm(im, occupied_thresh, free_thresh, negate):
     occupied_thresh *= 255
     for x in range(0, w):
         for y in range(0, h):
-            pixel_value = im.getpixel((y, x))  # Blacker pixel is "more obstacle" unless negate
+            pixel_value = im.getpixel((x, y))  # Blacker pixel is "more obstacle" unless negate
             if not negate:
                 pixel_value = 255 - pixel_value
             if pixel_value < free_thresh:
@@ -68,7 +68,7 @@ def adapt_pgm(im, occupied_thresh, free_thresh, negate):
                 pixel_value = OBSTACLE
             else:
                 pixel_value = min(FREE_INI + COST_FACTOR * pixel_value, FREE_END)
-            im.putpixel((y, x), round(pixel_value))
+            im.putpixel((x, y), round(pixel_value))
 
 
 def map_free_test(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):
@@ -78,8 +78,9 @@ def map_free_test(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilenam
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols+2, rows+2), OBSTACLE)
-    for y in range(1, rows+1):
-        for x in range(1, cols + 1):
+    for x in range(1, cols+1):
+        for y in range(1, rows + 1):
+            print((x,y))
             im.putpixel((x, y), FREE_INI)
 
     paths = all_paths_image(im, path_ratio)
@@ -93,10 +94,10 @@ def map_free_random_test(cols, rows, path_ratio=1.0, mapfilename="map.bin", test
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
-    for x in range(1, rows + 1):
-        for y in range(1, cols + 1):
+    for x in range(1, cols + 1):
+        for y in range(1, rows + 1):
             cell = random.choice(range(FREE_INI, FREE_END+1))
-            im.putpixel((y, x), cell)
+            im.putpixel((x, y), cell)
 
     paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
@@ -118,11 +119,11 @@ def map_obstacle_random_test(cols, rows, path_ratio=1.0, obstacle_ratio=0.2,
     """
     im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
     obstacles = cells(cols, rows, obstacle_ratio)
-    for x in range(1, rows + 1):
-        for y in range(1, cols + 1):
-            if (y, x) not in obstacles:
+    for x in range(1, cols + 1):
+        for y in range(1, rows + 1):
+            if (x, y) not in obstacles:
                 cell = random.choice(range(FREE_INI, FREE_END+1))
-                im.putpixel((y, x), cell)
+                im.putpixel((x, y), cell)
     paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
 
@@ -134,12 +135,12 @@ def map_spiral(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols + 2, rows + 2), FREE_INI)
-    for x in range(0, rows + 2):
-        im.putpixel((0, x), OBSTACLE)
-        im.putpixel((cols+1, x), OBSTACLE)
-    for y in range(0, cols + 2):
-        im.putpixel((y, 0), OBSTACLE)
-        im.putpixel((y, rows+1), OBSTACLE)
+    for x in range(0, cols + 2):
+        im.putpixel((x, 0), OBSTACLE)
+        im.putpixel((x, rows+1), OBSTACLE)
+    for y in range(0, rows + 2):
+        im.putpixel((0, y), OBSTACLE)
+        im.putpixel((cols+1, y), OBSTACLE)
 
     pos = (1, 1)
     delta = (1, 0)
@@ -163,20 +164,20 @@ def map_radial(cols, rows, path_ratio=1.0, center=(1, 1), radius=25, mapfilename
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols + 2, rows + 2), FREE_INI)
-    for x in range(0, rows + 2):
-        im.putpixel((0, x), OBSTACLE)
-        im.putpixel((cols+1, x), OBSTACLE)
-    for y in range(0, cols + 2):
-        im.putpixel((y, 0), OBSTACLE)
-        im.putpixel((y, rows+1), OBSTACLE)
+    for x in range(0, cols + 2):
+        im.putpixel((x, 0), OBSTACLE)
+        im.putpixel((x, rows+1), OBSTACLE)
+    for y in range(0, rows + 2):
+        im.putpixel((0, y), OBSTACLE)
+        im.putpixel((cols+1, y), OBSTACLE)
 
-    for x in range(1, rows + 1):
-        for y in range(1, cols + 1):
-            dist = math.dist(center, (y, x))
+    for x in range(1, cols + 1):
+        for y in range(1, rows + 1):
+            dist = math.dist(center, (x, y))
             cell_value = OBSTACLE
             if dist < radius:
                 cell_value = int((dist/radius) * (FREE_END - FREE_INI) + FREE_INI)
-            im.putpixel((y, x), cell_value)
+            im.putpixel((x, y), cell_value)
 
     paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
@@ -184,22 +185,22 @@ def map_radial(cols, rows, path_ratio=1.0, center=(1, 1), radius=25, mapfilename
 
 def map_split(cols, rows, num_vert=3, num_horiz=3, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):
     im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
-    for x in range(1, rows + 1):
-        for y in range(1, cols + 1):
+    for x in range(1, cols + 1):
+        for y in range(1, rows + 1):
             cell = random.choice(range(FREE_INI, FREE_END + 1))
-            im.putpixel((y, x), cell)
+            im.putpixel((x, y), cell)
 
     # Vertical walls
     for _ in range(num_vert):
-        y = random.randint(1, cols+1)
-        for x in range(1, rows+1):
-            im.putpixel((y, x), OBSTACLE)
+        x = random.randint(1, cols+1)
+        for y in range(1, rows+1):
+            im.putpixel((x, y), OBSTACLE)
 
     # Horizontal walls
     for _ in range(num_horiz):
-        x = random.randint(1, rows+1)
-        for y in range(1, cols+1):
-            im.putpixel((y, x), OBSTACLE)
+        y = random.randint(1, rows+1)
+        for x in range(1, cols+1):
+            im.putpixel((x, y), OBSTACLE)
 
     paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
@@ -263,8 +264,9 @@ def random_paths_image(im, path_ratio=1.0):
     
 
 def main():
+    map_split(50, 10, path_ratio=0.0, num_vert=20, num_horiz=1)
     # map_radial(cols, rows, path_ratio=1.0, center=(1, 1), radius=25,
-    map_split(4, 12, 0, 4, 1.0)
+    # map_split(4, 12, 0, 4, 1.0)
 
 
 if __name__ == "__main__":
