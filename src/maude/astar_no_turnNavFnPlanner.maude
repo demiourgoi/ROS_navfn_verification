@@ -43,7 +43,7 @@ fmod ASTAR is
      (P' @ [X , Y]) == infinite .
 
  op initCurrent : Pose CostMap Nat Nat -> Path .
- ceq initCurrent({X, Y}, CM, NC, NR) = P1L P2L P3L P4L
+ ceq initCurrent({X, Y}, CM, NC, NR) = P2L P1L P3L P4L
   if P1L := if (X > 0) and-then open?(CM, sd(X, 1), Y, NC)
             then {sd(X, 1), Y}
             else noPath
@@ -125,13 +125,13 @@ fmod ASTAR is
  op updatePotential : Potential Pose Pose CostMap Nat Float Float  -> Potential .
  ceq updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) = P'
   if V := get(CM, X, Y, NC) /\
-     _-_(SNDV, MINV) > V /\
+     _-_(SNDV, MINV) >= V /\
      V' := V + MINV /\
      P' := P [X ; Y \\ V'] .
  ceq updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) = P'
   if DC := _-_(SNDV, MINV) /\
      HF := get(CM, X, Y, NC) /\
-     DC <= HF /\
+     DC < HF /\
      D := DC / HF /\
      V := - 0.2301 * D * D + 0.5307 * D + 0.7040 /\
      V' := MINV + HF * V /\
