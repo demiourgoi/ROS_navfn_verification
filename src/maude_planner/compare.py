@@ -276,10 +276,7 @@ class Plotter:
         potarr1 = self.np.array(potarr1_raw)
         potarr2 = self.np.array(potarr2_raw)
         potarr1.shape = (height, width)
-        potarr2.shape = (width, height)
-
-        # Maude's potentials are transposed
-        potarr2 = self.np.transpose(potarr2)
+        potarr2.shape = (height, width)
 
         # Difference of the two potentials and its norm
         diff = potarr1 - potarr2
@@ -383,7 +380,7 @@ def main(args):
                 print(f'  Maude: {path2}')
                 if len(path1) == len(path2):
                     print('Max. difference: ', max((abs(path1[i][j] - path2[i][j]) for i in range(len(path1)) for j in (0, 1))))
-                #print(f'potarr: {dict1[test]["navfn"]}\n')
+                print(f'potarr: {dict1[test]["navfn"]}\n')
 
                 # Draw the potentials and paths only for different paths, removing any oscillation in those paths
                 plotter.draw(test[0], test[1], potarr1, potarr2, remove_oscillations(path1, epsilon),

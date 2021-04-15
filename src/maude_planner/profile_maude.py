@@ -108,8 +108,8 @@ class DirectProfiler:
         path_cycles = str(4 * self.w)
         self.static_args = [
             cmap(map_list),
-            self.m.parseTerm(str(int(self.h))),
             self.m.parseTerm(str(int(self.w))),
+            self.m.parseTerm(str(int(self.h))),
             self.m.parseTerm(cycles),
             self.m.parseTerm(path_cycles),
         ]
@@ -126,12 +126,12 @@ class DirectProfiler:
             def run(self, term, data):
                 try:
                     _, x, y, ncols = [int(arg) for arg in term.arguments()]
-                    cell_value = self.parent.map_data[x + y * ncols]
+                    cell_value = self.parent.map_data[y * ncols + x]
                     ret_term = self.cache[cell_value]
                     # print(f'FAST {term} --> {ret_term}')
                     return ret_term
                 except Exception as e:
-                    print(e)
+                    print('hook:', e)
 
         self.mapHook = MapHook(self)
         maude.connectEqHook('get', self.mapHook)
