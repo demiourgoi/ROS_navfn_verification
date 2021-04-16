@@ -136,7 +136,10 @@ class DirectProfiler:
         self.mapHook = MapHook(self)
         maude.connectEqHook('get', self.mapHook)
 
-    def run_test_suite(self):          
+    def run_test_suite(self, obtain_navf=True):
+        if obtain_navf:
+            print('Costmap:', self.map_data)
+            print()
         for origin, dest in self.test_cases:
             print(origin, dest)
             self.run_astar(origin, dest)
@@ -264,5 +267,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     dprofiler = DirectProfiler(args.test_file, args.navfn)
-    dprofiler.run_test_suite()
+    dprofiler.run_test_suite(args.navfn)
 
