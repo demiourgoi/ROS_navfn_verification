@@ -86,7 +86,10 @@ fmod ASTAR is
      MINV := min(FI, FI') /\
      SNDV := max(FI, FI') /\
      P' := updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) /\
-     < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NC, NR, T, NEXT, EXC) .
+     < NEXT', EXC' > :=  if P @ [X, Y] > P' @ [X, Y]
+                         then traverseNeighbors({X, Y}, INIT, CM, P', NC, NR, T, NEXT, EXC)
+                         else < NEXT, EXC >
+                         fi .
  eq a*(INIT, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, s(I)) =
          if NEXT == noPath
          then a*(INIT, GOAL, CM, P, NC, NR, EXC, noPath, NEXT, T + 2.0 * mapCost, I)

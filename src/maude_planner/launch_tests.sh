@@ -33,7 +33,7 @@ do
     MAUDE_OUT="$DIRNAME/maude.txt"
     ./profile_cpp $profr_args $test > $ROS_OUT
     python profile_maude.py $profm_args $test > $MAUDE_OUT
-    rm ${DIRNAME}/${TEST_NAME}.pdf
+    rm -f ${DIRNAME}/${TEST_NAME}.pdf
     python compare.py --width="$mapWidth" $ROS_OUT $MAUDE_OUT
     if [ $? = "0" ]
     then
