@@ -316,8 +316,8 @@ fmod BASIC-TRAVERSE is
  pr LIST{Nat} .
  pr PATH .
 
- vars H V V' T MINV D DX DY SS FX FY FX' FY' FX'' FY'' : Float .
- vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N : Nat .
+ vars H T D DX DY SS FX FY FX' FY' FX'' FY'' : Float .
+ vars X Y Z X' Y' Z' XI YI XC YC XN YN NR NC I NEW N V MINV : Nat .
  vars INIT GOAL ACCP NOW : Pose .
  vars Q Q' : Quaternion .
  vars P P' : Potential .
@@ -337,15 +337,15 @@ fmod BASIC-TRAVERSE is
   if ACCP := getMin({X, Y}, P, NC, NR) [owise] .
 
  op getMin : Pose Potential Nat List{Nat} -> Pose .
- eq getMin({X, Y}, P, NC, NR) = getMin({X, Y}, P, NC, NR, {X, Y}, P @ [X, Y], 135 90 45 180 0 225 270 315) .
+ eq getMin({X, Y}, P, NC, NR) = getMin({X, Y}, P, NC, NR, {X, Y}, float2nat(P @ [X, Y]), 135 90 45 180 0 225 270 315) .
 
- op getMin : Pose Potential Nat Nat Pose Float List{Nat} -> Pose .
+ op getMin : Pose Potential Nat Nat Pose Nat List{Nat} -> Pose .
  ceq getMin({X, Y}, P, NC, NR, ACCP, MINV, N LN) = if V < MINV
                                                    then getMin({X, Y}, P, NC, NR, {X', Y'}, V, LN)
                                                    else getMin({X, Y}, P, NC, NR, ACCP, MINV, LN)
                                                    fi
   if < X', Y' > := getMove({X, Y}, N, NC, NR) /\
-     V := (P @ [X', Y']) .
+     V := float2nat(P @ [X', Y']) [print "getMin {" X "," Y "} -> {" X' "," Y' "} (" N ") -- " V] .
  ceq getMin({X, Y}, P, NC, NR, ACCP, MINV, N LN) = getMin({X, Y}, P, NC, NR, ACCP, MINV, LN)
   if not (getMove({X, Y}, N, NC, NR) :: Pair) .
  eq getMin(INIT, P, NC, NR, ACCP, MINV, nil) = ACCP .
