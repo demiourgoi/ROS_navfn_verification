@@ -34,13 +34,13 @@ def store_test(im, testfilename, mapfilename, paths):
             testfile.write(f"{start[0]} {start[1]} {end[0]} {end[1]}\n")
 
 
-def test_from_yaml(path):
+def test_from_yaml(path, num_tests):
     """ Create a test with random paths from a YAML+PNG describing a map """
     with open(path, 'r') as yaml_file:
         yaml_content = yaml.load(yaml_file, Loader=yaml.SafeLoader)
     im = Image.open(yaml_content['image'])
     adapt_pgm(im, yaml_content['occupied_thresh'], yaml_content['free_thresh'], yaml_content['negate'])
-    paths = random_paths_image(im, 0.0001)
+    paths = random_paths_image_close(im, num_tests, 10)
     store_test(im, 'test.txt', 'map.bin', paths)
 
 
@@ -55,10 +55,19 @@ def adapt_pgm(im, occupied_thresh, free_thresh, negate):
            double occ = (load_parameters.negate ? shade : 1.0 - shade);
     """
     w, h = im.size
+
+    # Create 1-pixed borders
+    for x in range(0, w):
+        im.putpixel((x, 0), OBSTACLE)
+        im.putpixel((x, h-1), OBSTACLE)
+    for y in range(0, h):
+        im.putpixel((0, y), OBSTACLE)
+        im.putpixel((w-1, y), OBSTACLE)
+
     free_thresh *= 255
     occupied_thresh *= 255
-    for x in range(0, w):
-        for y in range(0, h):
+    for x in range(1, w-1):
+        for y in range(1, h-1):
             pixel_value = im.getpixel((x, y))  # Blacker pixel is "more obstacle" unless negate
             if not negate:
                 pixel_value = 255 - pixel_value
@@ -252,8 +261,8 @@ def random_paths_image(im, path_ratio=1.0):
         It can generate duplicates
     """
     w, h = im.size
-    all_valid_cells = [(x0, y0) for x0 in range(w) for y0 in range(h) if FREE_INI <= im.getpixel((x0, y0)) <= FREE_END]
-    print(all_valid_cells)
+    all_valid_cells = [(x0, y0) for x0 in range(1, w-1) for y0 in range(1, h-1)
+                       if FREE_INI <= im.getpixel((x0, y0)) <= FREE_END]
     num_paths = round(len(all_valid_cells) * path_ratio)
     ret = list()
     for _ in range(num_paths):
@@ -261,10 +270,30 @@ def random_paths_image(im, path_ratio=1.0):
         end = random.choice(all_valid_cells)
         ret.append((start, end))
     return ret
+
+
+def random_paths_image_close(im, num_paths=10, dist=10):
+    """ Returns a list with paths (start, end) that do not start or end in obstacles and are not very far
+        Generates a random subset of the valid paths in the map with ratio path_ratio wrt. the number of valid cells
+        It can generate duplicates
+    """
+    w, h = im.size
+    all_valid_cells = [(x0, y0) for x0 in range(w) for y0 in range(h) if FREE_INI <= im.getpixel((x0, y0)) <= FREE_END]
+    ret = list()
+    paths = 0
+    while paths < num_paths:
+        start = random.choice(all_valid_cells)
+        endx = start[0] + random.randint(-dist, dist)
+        endy = start[1] + random.randint(-dist, dist)
+        if (endx, endy) in all_valid_cells:
+            ret.append((start, (endx, endy)))
+            paths += 1
+    return ret
     
 
 def main():
-    map_split(50, 10, path_ratio=0.0, num_vert=20, num_horiz=1)
+    test_from_yaml('speed_mask.yaml', 30)
+    # map_split(50, 10, path_ratio=0.0, num_vert=20, num_horiz=1)
     # map_radial(cols, rows, path_ratio=1.0, center=(1, 1), radius=25,
     # map_split(4, 12, 0, 4, 1.0)
 

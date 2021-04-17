@@ -1,9 +1,10 @@
 #! /bin/bash
 
-NUM_MAPS=`ls tests/ -1 | wc -l`
+TEST_NAME=$1
+NUM_MAPS=`find tests/ -name ${TEST_NAME} | wc -l`
 NUM_PATHS=0
 
-for test in $(find tests/ -name 'test*.txt')
+for test in $(find tests/ -name ${TEST_NAME})
 do
   PATHS=`cat $test | wc -l`
   echo "$test -> $PATHS paths"
