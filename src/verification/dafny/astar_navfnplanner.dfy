@@ -138,6 +138,13 @@ method BuildInitialPotentialMap(numRows: nat, numCols: nat, initRow: nat,  initC
   ensures PotentialMapHasDimensions(p, numRows, numCols)
   ensures forall i, j | 0 <= i < numRows && 0 <= j < numCols && (i != initRow || j != initCol) :: p[i][j] == Infinity
   ensures p[initRow][initCol] == Real(0.0)
+{
+  var i := 0;
+  var j := 0;
+  
+  p := seq(numRows, i => seq(numCols, j => Infinity));
+  p := p[initRow := p[initRow][initCol := Real(0.0)]];
+}
 
 
 method InitCurrentQueue(p: Pose, ghost pot: PotentialMap, costMap: CostMap) returns (current: seq<Pose>)
@@ -199,22 +206,22 @@ method TraverseNeighbors(p: Pose, start: Pose, costMap: CostMap, pot: PotentialM
   }
 
   var p2l, p2r: seq<Pose>;
-  if (p.pos.row > 0 && open(costMap, p.pos.row - 1, p.pos.col)) {
-    p2l, p2r := TraverseNeighbor(p, Pose(Point(p.pos.row - 1, p.pos.col)), start, costMap, pot, threshold);
+  if (p.pos.row < costMap.numRows - 1 && open(costMap, p.pos.row + 1, p.pos.col)) {
+    p2l, p2r := TraverseNeighbor(p, Pose(Point(p.pos.row + 1, p.pos.col)), start, costMap, pot, threshold);
   } else {
     p2l := []; p2r := [];
   }
 
   var p3l, p3r: seq<Pose>;
-  if (p.pos.row > 0 && open(costMap, p.pos.row - 1, p.pos.col)) {
-    p3l, p3r := TraverseNeighbor(p, Pose(Point(p.pos.row - 1, p.pos.col)), start, costMap, pot, threshold);
+  if (p.pos.col > 0 && open(costMap, p.pos.row, p.pos.col - 1)) {
+    p3l, p3r := TraverseNeighbor(p, Pose(Point(p.pos.row, p.pos.col - 1)), start, costMap, pot, threshold);
   } else {
     p3l := []; p3r := [];
   }
 
   var p4l, p4r: seq<Pose>;
-  if (p.pos.row > 0 && open(costMap, p.pos.row - 1, p.pos.col)) {
-    p4l, p4r := TraverseNeighbor(p, Pose(Point(p.pos.row - 1, p.pos.col)), start, costMap, pot, threshold);
+  if (p.pos.col < costMap.numCols - 1 && open(costMap, p.pos.row, p.pos.col + 1)) {
+    p4l, p4r := TraverseNeighbor(p, Pose(Point(p.pos.row, p.pos.col + 1)), start, costMap, pot, threshold);
   } else {
     p4l := []; p4r := [];
   }
