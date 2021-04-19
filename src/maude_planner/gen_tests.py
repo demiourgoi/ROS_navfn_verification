@@ -34,13 +34,13 @@ def store_test(im, testfilename, mapfilename, paths):
             testfile.write(f"{start[0]} {start[1]} {end[0]} {end[1]}\n")
 
 
-def test_from_yaml(path):
+def test_from_yaml(path, num_tests):
     """ Create a test with random paths from a YAML+PNG describing a map """
     with open(path, 'r') as yaml_file:
         yaml_content = yaml.load(yaml_file, Loader=yaml.SafeLoader)
     im = Image.open(yaml_content['image'])
     adapt_pgm(im, yaml_content['occupied_thresh'], yaml_content['free_thresh'], yaml_content['negate'])
-    paths = random_paths_image(im, 0.0001)
+    paths = random_paths_image_close(im, num_tests, 10)
     store_test(im, 'test.txt', 'map.bin', paths)
 
 
@@ -55,11 +55,20 @@ def adapt_pgm(im, occupied_thresh, free_thresh, negate):
            double occ = (load_parameters.negate ? shade : 1.0 - shade);
     """
     w, h = im.size
+
+    # Create 1-pixed borders
+    for x in range(0, w):
+        im.putpixel((x, 0), OBSTACLE)
+        im.putpixel((x, h-1), OBSTACLE)
+    for y in range(0, h):
+        im.putpixel((0, y), OBSTACLE)
+        im.putpixel((w-1, y), OBSTACLE)
+
     free_thresh *= 255
     occupied_thresh *= 255
-    for x in range(0, w):
-        for y in range(0, h):
-            pixel_value = im.getpixel((y, x))  # Blacker pixel is "more obstacle" unless negate
+    for x in range(1, w-1):
+        for y in range(1, h-1):
+            pixel_value = im.getpixel((x, y))  # Blacker pixel is "more obstacle" unless negate
             if not negate:
                 pixel_value = 255 - pixel_value
             if pixel_value < free_thresh:
@@ -68,7 +77,7 @@ def adapt_pgm(im, occupied_thresh, free_thresh, negate):
                 pixel_value = OBSTACLE
             else:
                 pixel_value = min(FREE_INI + COST_FACTOR * pixel_value, FREE_END)
-            im.putpixel((y, x), round(pixel_value))
+            im.putpixel((x, y), round(pixel_value))
 
 
 def map_free_test(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):
@@ -78,8 +87,9 @@ def map_free_test(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilenam
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols+2, rows+2), OBSTACLE)
-    for y in range(1, rows+1):
-        for x in range(1, cols + 1):
+    for x in range(1, cols+1):
+        for y in range(1, rows + 1):
+            print((x,y))
             im.putpixel((x, y), FREE_INI)
 
     paths = all_paths_image(im, path_ratio)
@@ -93,10 +103,10 @@ def map_free_random_test(cols, rows, path_ratio=1.0, mapfilename="map.bin", test
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
-    for x in range(1, rows + 1):
-        for y in range(1, cols + 1):
+    for x in range(1, cols + 1):
+        for y in range(1, rows + 1):
             cell = random.choice(range(FREE_INI, FREE_END+1))
-            im.putpixel((y, x), cell)
+            im.putpixel((x, y), cell)
 
     paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
@@ -118,11 +128,11 @@ def map_obstacle_random_test(cols, rows, path_ratio=1.0, obstacle_ratio=0.2,
     """
     im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
     obstacles = cells(cols, rows, obstacle_ratio)
-    for x in range(1, rows + 1):
-        for y in range(1, cols + 1):
-            if (y, x) not in obstacles:
+    for x in range(1, cols + 1):
+        for y in range(1, rows + 1):
+            if (x, y) not in obstacles:
                 cell = random.choice(range(FREE_INI, FREE_END+1))
-                im.putpixel((y, x), cell)
+                im.putpixel((x, y), cell)
     paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
 
@@ -134,12 +144,12 @@ def map_spiral(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols + 2, rows + 2), FREE_INI)
-    for x in range(0, rows + 2):
-        im.putpixel((0, x), OBSTACLE)
-        im.putpixel((cols+1, x), OBSTACLE)
-    for y in range(0, cols + 2):
-        im.putpixel((y, 0), OBSTACLE)
-        im.putpixel((y, rows+1), OBSTACLE)
+    for x in range(0, cols + 2):
+        im.putpixel((x, 0), OBSTACLE)
+        im.putpixel((x, rows+1), OBSTACLE)
+    for y in range(0, rows + 2):
+        im.putpixel((0, y), OBSTACLE)
+        im.putpixel((cols+1, y), OBSTACLE)
 
     pos = (1, 1)
     delta = (1, 0)
@@ -163,20 +173,43 @@ def map_radial(cols, rows, path_ratio=1.0, center=(1, 1), radius=25, mapfilename
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols + 2, rows + 2), FREE_INI)
-    for x in range(0, rows + 2):
-        im.putpixel((0, x), OBSTACLE)
-        im.putpixel((cols+1, x), OBSTACLE)
-    for y in range(0, cols + 2):
-        im.putpixel((y, 0), OBSTACLE)
-        im.putpixel((y, rows+1), OBSTACLE)
+    for x in range(0, cols + 2):
+        im.putpixel((x, 0), OBSTACLE)
+        im.putpixel((x, rows+1), OBSTACLE)
+    for y in range(0, rows + 2):
+        im.putpixel((0, y), OBSTACLE)
+        im.putpixel((cols+1, y), OBSTACLE)
 
-    for x in range(1, rows + 1):
-        for y in range(1, cols + 1):
-            dist = math.dist(center, (y, x))
+    for x in range(1, cols + 1):
+        for y in range(1, rows + 1):
+            dist = math.dist(center, (x, y))
             cell_value = OBSTACLE
             if dist < radius:
                 cell_value = int((dist/radius) * (FREE_END - FREE_INI) + FREE_INI)
-            im.putpixel((y, x), cell_value)
+            im.putpixel((x, y), cell_value)
+
+    paths = all_paths_image(im, path_ratio)
+    store_test(im, testfilename, mapfilename, paths)
+
+
+def map_split(cols, rows, num_vert=3, num_horiz=3, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):
+    im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
+    for x in range(1, cols + 1):
+        for y in range(1, rows + 1):
+            cell = random.choice(range(FREE_INI, FREE_END + 1))
+            im.putpixel((x, y), cell)
+
+    # Vertical walls
+    for _ in range(num_vert):
+        x = random.randint(1, cols+1)
+        for y in range(1, rows+1):
+            im.putpixel((x, y), OBSTACLE)
+
+    # Horizontal walls
+    for _ in range(num_horiz):
+        y = random.randint(1, rows+1)
+        for x in range(1, cols+1):
+            im.putpixel((x, y), OBSTACLE)
 
     paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
@@ -228,8 +261,8 @@ def random_paths_image(im, path_ratio=1.0):
         It can generate duplicates
     """
     w, h = im.size
-    all_valid_cells = [(x0, y0) for x0 in range(w) for y0 in range(h) if FREE_INI <= im.getpixel((x0, y0)) <= FREE_END]
-    print(all_valid_cells)
+    all_valid_cells = [(x0, y0) for x0 in range(1, w-1) for y0 in range(1, h-1)
+                       if FREE_INI <= im.getpixel((x0, y0)) <= FREE_END]
     num_paths = round(len(all_valid_cells) * path_ratio)
     ret = list()
     for _ in range(num_paths):
@@ -237,29 +270,32 @@ def random_paths_image(im, path_ratio=1.0):
         end = random.choice(all_valid_cells)
         ret.append((start, end))
     return ret
+
+
+def random_paths_image_close(im, num_paths=10, dist=10):
+    """ Returns a list with paths (start, end) that do not start or end in obstacles and are not very far
+        Generates a random subset of the valid paths in the map with ratio path_ratio wrt. the number of valid cells
+        It can generate duplicates
+    """
+    w, h = im.size
+    all_valid_cells = [(x0, y0) for x0 in range(w) for y0 in range(h) if FREE_INI <= im.getpixel((x0, y0)) <= FREE_END]
+    ret = list()
+    paths = 0
+    while paths < num_paths:
+        start = random.choice(all_valid_cells)
+        endx = start[0] + random.randint(-dist, dist)
+        endy = start[1] + random.randint(-dist, dist)
+        if (endx, endy) in all_valid_cells:
+            ret.append((start, (endx, endy)))
+            paths += 1
+    return ret
     
 
 def main():
-    # test_from_yaml('empty_room.yaml')
-    # test_from_yaml('keepout_mask.yaml')
-    # test_from_yaml('map_circular.yaml')
-    test_from_yaml('speed_mask.yaml')
-    exit()
-    # 3x3 Descencing diagonal
-    # cells = [(1,2), (1,3), (2,3), (2,1), (3,1), (3,2)]   
-    # 3x3 Ascencing diagonal
-    # cells = [(1,1), (1,2), (2,1), (2,3), (3,2), (3,3)]   
-    # all_paths(cells)
-    # map_free_test(5, 5, "5x5_free.bin", "test_5x5_free.txt")
-    # map_free_random_test(3, 3, "3x3_free_random.bin", "test_3x3_free_random.txt")
-    # map_free_random_test(4, 4)
-    # map_free_test(4, 4)
-    # map_spiral(5, 5)
-
-    # map_free_test(10, 10, path_ratio=0.025)
-    # map_free_random_test(10, 10, path_ratio=0.025)
-
-    map_radial(9, 9, path_ratio=0.05, center=(5, 5), radius=5)
+    test_from_yaml('speed_mask.yaml', 30)
+    # map_split(50, 10, path_ratio=0.0, num_vert=20, num_horiz=1)
+    # map_radial(cols, rows, path_ratio=1.0, center=(1, 1), radius=25,
+    # map_split(4, 12, 0, 4, 1.0)
 
 
 if __name__ == "__main__":
