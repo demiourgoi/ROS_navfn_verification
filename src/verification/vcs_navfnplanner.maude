@@ -210,7 +210,7 @@ fmod POSE-QUEUE-VERIF is
   
   eq enqueue(P, Q1, Q2) =
     length(Q2) === length(Q1) + 1 
-    and queue-array(Q2) === queue-array(Q1)[length(Q2) -> P] .
+    and queue-array(Q2) === queue-array(Q1)[length(Q1) -> P] .
     
   eq dequeue(Q1, Q2) = 
     length(Q2) > 0 
@@ -282,6 +282,30 @@ fmod EUCLID-DISTANCE-VERIF is
   
   eq euclid-distance-precond(P1, P2) = true .
   eq euclid-distance-postcond(P1, P2, D) = true .
+  
+  op abs : Real Real -> Boolean .
+  
+  ops DIFFR! DIFFC! : -> Real .
+  
+  vars R R1 : Real .
+  
+  eq abs(R, R1) =
+    (R >= toReal(0) implies R1 === R)
+    and ((not R >= toReal(0)) implies R1 === toReal(0) - R) .
+  
+  op euclid-distance : Point Point Real -> Boolean .
+  
+  eq euclid-distance(P1, P2, D) =
+    forall DIFFR! . forall DIFFC! .
+      ((
+        abs(toReal(point-row(P1) - point-row(P2)), DIFFR!)
+        and abs(toReal(point-col(P1) - point-col(P2)), DIFFC!)
+      ) implies (
+        D === DIFFR! * DIFFR! + DIFFC! * DIFFC!
+      )) .
+    
+  
+  
 endfm
 
 fmod INIT-CURRENT-QUEUE-VERIF is
@@ -317,7 +341,88 @@ fmod INIT-CURRENT-QUEUE-VERIF is
     queue-axiom(PQ)
     *** ensures ValidQueue(current, pot, costMap)
     and queue-valid(PQ, PM, CM) .
-
+    
+  
+  ops Q0L! Q1L! Q2L! Q3L! Q4L! : -> PoseQueue .
+  ops PAUX1! PAUX2! PAUX3! PAUX4! : -> Pose .
+  
+  op init-current-queue-vc1 : Pose PotentialMap CostMap PoseQueue -> Boolean .
+  
+  eq init-current-queue-vc1(P, PM, CM, PQ) =
+    forall PAUX1! . forall PAUX2! . forall PAUX3! . forall PAUX4! .
+    forall Q0L! . forall Q1L! . forall Q2L! . forall Q3L! . forall Q4L! .
+    ((
+      init-current-queue-precond(P, PM, CM)
+      and empty(Q0L!)
+      and point-row(pose-position(PAUX1!)) === point-row(pose-position(P)) - 1
+      and point-col(pose-position(PAUX1!)) === point-col(pose-position(P))
+      and point-row(pose-position(PAUX2!)) === point-row(pose-position(P)) + 1
+      and point-col(pose-position(PAUX2!)) === point-col(pose-position(P))
+      and point-row(pose-position(PAUX3!)) === point-row(pose-position(P))
+      and point-col(pose-position(PAUX3!)) === point-col(pose-position(P)) - 1
+      and point-row(pose-position(PAUX4!)) === point-row(pose-position(P))
+      and point-col(pose-position(PAUX4!)) === point-col(pose-position(P)) + 1
+      and
+      ((
+        point-row(pose-position(P)) > 0
+        and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))
+      ) implies (
+        enqueue(PAUX1!, Q0L!, Q1L!)
+      ))
+      and
+      ((
+        not (point-row(pose-position(P)) > 0
+        and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P))))
+      ) implies (
+        Q1L! === Q0L!
+      ))
+      and
+      ((
+        point-row(pose-position(P)) + 1 < num-rows(CM)
+        and open(CM, point-row(pose-position(P)) + 1, point-col(pose-position(P)))
+      ) implies (
+        enqueue(PAUX2!, Q1L!, Q2L!)
+      ))      
+      and
+      (( not (
+        point-row(pose-position(P)) + 1 < num-rows(CM)
+        and open(CM, point-row(pose-position(P)) + 1, point-col(pose-position(P))))
+      ) implies (
+        Q2L! === Q1L!
+      ))      
+      and
+      ((
+        point-col(pose-position(P)) > 0
+        and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) - 1)
+      ) implies (
+        enqueue(PAUX3!, Q2L!, Q3L!)
+      ))
+      and
+      (( not (
+        point-col(pose-position(P)) > 0
+        and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) - 1))
+      ) implies (
+        Q3L! === Q2L!
+      ))
+      and
+      ((
+        point-col(pose-position(P)) + 1 < num-cols(CM)
+        and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) + 1)
+      ) implies (
+        enqueue(PAUX4!, Q3L!, Q4L!)
+      ))      
+      and
+      ((not (
+        point-col(pose-position(P)) + 1 < num-cols(CM)
+        and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) + 1))
+      ) implies (
+        Q4L! === Q3L!
+      ))
+      and
+      PQ === Q4L!      
+    ) implies (
+      init-current-queue-postcond(P, PM, CM, PQ)
+    )) .
 endfm
 
 fmod MIN-INFINITY-VERIF  is
@@ -352,6 +457,43 @@ fmod MAX-INFINITY-VERIF  is
     ((not isInfinity(X1) and not isInfinity(X2) and unwrapReal(X1) >= unwrapReal(X2)) implies MAX === X1)
     and
     ((not isInfinity(X1) and not isInfinity(X2) and not unwrapReal(X1) >= unwrapReal(X2)) implies MAX === X2) .
+endfm
+
+fmod MINUS-VERIF is
+  protecting POTENTIALMAP-VERIF .
+  
+  vars R1 R2 R : RealInf .
+  
+  op minus-precond : RealInf RealInf -> Boolean .
+ 
+  eq minus-precond(R1, R2) = not isInfinity(R2) .
+  
+  op minus : RealInf RealInf RealInf -> Boolean .
+  
+  eq minus(R1, R2, R) =
+    (isInfinity(R1) implies isInfinity(R))
+    and
+    ((not isInfinity(R1)) implies (not isInfinity(R) and unwrapReal(R) === unwrapReal(R1) - unwrapReal(R2))) .
+endfm
+
+fmod GREATER-THAN-VERIF is
+  protecting POTENTIALMAP-VERIF .
+  
+  vars R1 R2 : RealInf .
+  
+  op greater-than-precond : RealInf RealInf -> Boolean .
+
+  eq greater-than-precond(R1, R2) =
+    not isInfinity(R1) or not isInfinity(R2) .
+    
+
+
+  op greater-than : RealInf RealInf -> Boolean .
+  eq greater-than(R1, R2) =
+    isInfinity(R1) or
+    (not isInfinity(R2) and unwrapReal(R1) > unwrapReal(R2)) .
+  
+  
 endfm
 
 fmod MIN-HORIZONTAL-VERIF is
@@ -443,6 +585,8 @@ fmod UPDATE-POTENTIAL-VERIF is
   protecting POSE-VERIF .
   protecting COSTMAP-VERIF .
   protecting REAL-INTEGER .
+  protecting MINUS-VERIF .
+  protecting GREATER-THAN-VERIF .
   
   op update-potential-precond : PotentialMap Pose Pose CostMap RealInf RealInf -> Boolean .
   op update-potential-postcond : PotentialMap Pose Pose CostMap RealInf RealInf PotentialMap -> Boolean .
@@ -491,6 +635,265 @@ fmod UPDATE-POTENTIAL-VERIF is
     *** ensures pot'[p.pos.row][p.pos.col].Real?
     and not isInfinity(elem(PM', point-row(pose-position(P)), point-col(pose-position(P))))
     .
+  
+  ops HF! D! INTERPOL! : -> Real .
+  ops HFR! DIFF! : -> RealInf .
+  op POINT!  : -> Point .
+    
+
+    
+    
+  op update-potential-vc1 : PotentialMap Pose Pose CostMap RealInf RealInf PotentialMap -> Boolean .
+  
+  *** Call to minus meets precondition
+  eq update-potential-vc1(PM, P, GOAL, CM, MIN, SND, PM') =
+    forall HF! . forall POINT! . (
+      (
+        update-potential-precond(PM, P, GOAL, CM, MIN, SND)
+        and point-row(POINT!) === point-row(pose-position(P))
+        and point-col(POINT!) === point-col(pose-position(P))
+        and HF! === value(CM, POINT!)        
+      ) implies (
+        minus-precond(SND, MIN)
+      )
+    ) .
+
+  *** Call to greater-than meets precondition    
+  op update-potential-vc2 : PotentialMap Pose Pose CostMap RealInf RealInf PotentialMap -> Boolean .
+  eq update-potential-vc2(PM, P, GOAL, CM, MIN, SND, PM') =
+    forall HF! . forall HFR! . forall DIFF! . forall POINT! . (
+      (
+        update-potential-precond(PM, P, GOAL, CM, MIN, SND)
+        and point-row(POINT!) === point-row(pose-position(P))
+        and point-col(POINT!) === point-col(pose-position(P))
+        and HF! === value(CM, POINT!)
+        and minus(SND, MIN, DIFF!)
+        and not isInfinity(HFR!)
+        and unwrapReal(HFR!) === HF!
+      ) implies (
+        greater-than-precond(DIFF!, HFR!)
+      )
+    ) .
+    
+  op VREAL! : -> Real .
+  op V! : -> RealInf .
+    
+  *** Case diff > hf
+  op update-potential-vc3 : PotentialMap Pose Pose CostMap RealInf RealInf PotentialMap -> Boolean .
+  eq update-potential-vc3(PM, P, GOAL, CM, MIN, SND, PM') =
+    forall HF! . forall HFR! . forall DIFF! . forall POINT! .
+    forall VREAL! . forall V! . (
+      (
+        update-potential-precond(PM, P, GOAL, CM, MIN, SND)
+        and point-row(POINT!) === point-row(pose-position(P))
+        and point-col(POINT!) === point-col(pose-position(P))
+        and HF! === value(CM, POINT!)
+        and minus(SND, MIN, DIFF!)
+        and not isInfinity(HFR!)
+        and unwrapReal(HFR!) === HF!
+        and greater-than(DIFF!, HFR!)
+        and VREAL! === HF! + unwrapReal(MIN)
+        and not isInfinity(V!)
+        and unwrapReal(V!) === VREAL!
+        and elem(PM', point-row(pose-position(P)), point-col(pose-position(P)))
+          === V!
+        and (forall I! . forall J! . 
+          ((I! =/== point-row(pose-position(P)) or J! =/== point-col(pose-position(P)))
+          implies (elem(PM', I!, J!) === elem(PM, I!, J!))))
+      ) implies (
+        update-potential-postcond(PM, P, GOAL, CM, MIN, SND, PM')
+      )
+    ) .
+    
+  *** case diff <= h: assert diff.Real?;
+  op update-potential-vc4 : PotentialMap Pose Pose CostMap RealInf RealInf PotentialMap -> Boolean .
+  eq update-potential-vc4(PM, P, GOAL, CM, MIN, SND, PM') =
+    forall HF! . forall HFR! . forall DIFF! . forall POINT! .
+    (
+      (
+        update-potential-precond(PM, P, GOAL, CM, MIN, SND)
+        and point-row(POINT!) === point-row(pose-position(P))
+        and point-col(POINT!) === point-col(pose-position(P))
+        and HF! === value(CM, POINT!)
+        and minus(SND, MIN, DIFF!)
+        and not isInfinity(HFR!)
+        and unwrapReal(HFR!) === HF!
+        and not greater-than(DIFF!, HFR!)
+      ) implies (
+        not isInfinity(DIFF!)
+      )
+    ) .
+  
+  *** case diff <= h: postcondition
+  op update-potential-vc5 : PotentialMap Pose Pose CostMap RealInf RealInf PotentialMap -> Boolean .
+  eq update-potential-vc5(PM, P, GOAL, CM, MIN, SND, PM') =
+    forall HF! . forall HFR! . forall DIFF! . forall POINT! .
+    forall D! . forall INTERPOL! . forall VREAL! . forall V! . (
+      (
+        update-potential-precond(PM, P, GOAL, CM, MIN, SND)
+        and point-row(POINT!) === point-row(pose-position(P))
+        and point-col(POINT!) === point-col(pose-position(P))
+        and HF! === value(CM, POINT!)
+        and minus(SND, MIN, DIFF!)
+        and not isInfinity(HFR!)
+        and unwrapReal(HFR!) === HF!
+        and not greater-than(DIFF!, HFR!)
+        and not isInfinity(DIFF!)
+        and D! === unwrapReal(DIFF!) / HF!
+        *** Cannot define INTERPOL! ¿Real numbers in Maude?
+        and VREAL! === unwrapReal(MIN) + HF! * INTERPOL!
+        and not isInfinity(V!)
+        and unwrapReal(V!) === VREAL!
+        and elem(PM', point-row(pose-position(P)), point-col(pose-position(P)))
+          === V!
+        and (forall I! . forall J! . 
+          ((I! =/== point-row(pose-position(P)) or J! =/== point-col(pose-position(P)))
+          implies (elem(PM', I!, J!) === elem(PM, I!, J!))))
+      ) implies (
+        update-potential-postcond(PM, P, GOAL, CM, MIN, SND, PM')
+      )
+    ) .
+
+endfm
+
+fmod TRAVERSE-NEIGHBOUR-VERIF is
+  protecting POSE-VERIF .
+  protecting COSTMAP-VERIF .
+  protecting POTENTIALMAP-VERIF .
+  protecting REAL-INTEGER .
+  protecting POSE-QUEUE-VERIF .
+  protecting EUCLID-DISTANCE-VERIF .
+  protecting GREATER-THAN-VERIF .
+
+  op traverse-neighbour-precond : Pose Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue -> Boolean .
+
+  op traverse-neighbour-postcond : Pose Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+  
+  vars P NP START : Pose .
+  vars CM : CostMap .
+  vars PM : PotentialMap .
+  var TH : Real .
+  var NEXT EXCESS NEXT' EXCESS' : PoseQueue .
+  
+  eq traverse-neighbour-precond(P, NP, START, CM, PM, TH, NEXT, EXCESS) =
+    *** Datatype axioms
+    pose-axiom(P)
+    and pose-axiom(NP)
+    and pose-axiom(START)
+    and costmap-axiom(CM)
+    and potentialmap-axiom(PM)
+    and queue-axiom(NEXT)
+    and queue-axiom(EXCESS)
+    *** requires ValidPotentialMap(pot, costMap)
+    and potentialmap-valid(PM, CM)
+    *** requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
+    and 0 <= point-row(pose-position(P))
+    and point-row(pose-position(P)) < num-rows(CM)
+    and 0 <= point-col(pose-position(P))
+    and point-col(pose-position(P)) < num-cols(CM)
+    *** requires 0 <= newP.pos.row < costMap.numRows && 0 <= newP.pos.col < costMap.numCols    
+    and 0 <= point-row(pose-position(NP))
+    and point-row(pose-position(NP)) < num-rows(CM)
+    and 0 <= point-col(pose-position(NP))
+    and point-col(pose-position(NP)) < num-cols(CM)
+    *** requires Adjacent(p, newP, costMap)
+    and adjacent(P, NP)
+    *** requires pot[p.pos.row][p.pos.col].Real?
+    and not isInfinity(elem(PM, point-row(pose-position(P)), point-col(pose-position(P))))
+    *** requires ValidQueue(next) && ValidQueue(excess)
+    and queue-valid(NEXT, PM, CM)
+    and queue-valid(EXCESS, PM, CM) .
+
+  eq traverse-neighbour-postcond(P, NP, START, CM, PM, TH, NEXT, EXCESS, NEXT', EXCESS') =
+    queue-axiom(NEXT')
+    and queue-axiom(EXCESS')
+    and queue-valid(NEXT', PM, CM)
+    and queue-valid(EXCESS', PM, CM) .
+    
+  op traverse-neighbour-vc1 : Pose Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+    
+  ops H! SQRT2! : -> Real .
+  op RHS! : -> RealInf .
+    
+  *** Precondition of greatherThan
+  eq traverse-neighbour-vc1(P, NP, START, CM, PM, TH, NEXT, EXCESS, NEXT', EXCESS') = 
+    forall H! . forall RHS! . forall SQRT2! .
+    ((
+      traverse-neighbour-precond(P, NP, START, CM, PM, TH, NEXT, EXCESS)
+      and euclid-distance(pose-position(P), pose-position(START), H!)
+      and SQRT2! * SQRT2! === toReal(2)
+      and not isInfinity(elem(PM, point-row(pose-position(P)), point-col(pose-position(P))))
+      and not isInfinity(RHS!)
+      and unwrapReal(RHS!) === 
+        unwrapReal(elem(PM, point-row(pose-position(P)), point-col(pose-position(P)))) + H! + (toReal(1) / SQRT2!) * value(CM, pose-position(NP))
+    ) implies (
+      greater-than-precond(elem(PM, point-row(pose-position(NP)), point-col(pose-position(NP))), RHS!)
+    )) .
+
+
+  op traverse-neighbour-vc2 : Pose Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+
+  *** Case 1: !GreaterThan(PM[NEWP], ...)
+  eq traverse-neighbour-vc2(P, NP, START, CM, PM, TH, NEXT, EXCESS, NEXT', EXCESS') = 
+    forall H! . forall RHS! . forall SQRT2! .
+    ((
+      traverse-neighbour-precond(P, NP, START, CM, PM, TH, NEXT, EXCESS)
+      and euclid-distance(pose-position(P), pose-position(START), H!)
+      and SQRT2! * SQRT2! === toReal(2)
+      and not isInfinity(elem(PM, point-row(pose-position(P)), point-col(pose-position(P))))
+      and not isInfinity(RHS!)
+      and unwrapReal(RHS!) === 
+        unwrapReal(elem(PM, point-row(pose-position(P)), point-col(pose-position(P)))) + H! + (toReal(1) / SQRT2!) * value(CM, pose-position(NP))
+      and not greater-than(elem(PM, point-row(pose-position(NP)), point-col(pose-position(NP))), RHS!)
+      and NEXT' === NEXT
+      and EXCESS' === EXCESS
+    ) implies (
+      traverse-neighbour-postcond(P, NP, START, CM, PM, TH, NEXT, EXCESS, NEXT', EXCESS')
+    )) .
+  
+
+  op traverse-neighbour-vc3 : Pose Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+
+  *** Case 2: GreaterThan(PM[NEWP], ...), but PM[P] + H < Threshold
+  eq traverse-neighbour-vc3(P, NP, START, CM, PM, TH, NEXT, EXCESS, NEXT', EXCESS') = 
+    forall H! . forall RHS! . forall SQRT2! .
+    ((
+      traverse-neighbour-precond(P, NP, START, CM, PM, TH, NEXT, EXCESS)
+      and euclid-distance(pose-position(P), pose-position(START), H!)
+      and SQRT2! * SQRT2! === toReal(2)
+      and not isInfinity(elem(PM, point-row(pose-position(P)), point-col(pose-position(P))))
+      and not isInfinity(RHS!)
+      and unwrapReal(RHS!) === 
+        unwrapReal(elem(PM, point-row(pose-position(P)), point-col(pose-position(P)))) + H! + (toReal(1) / SQRT2!) * value(CM, pose-position(NP))
+      and greater-than(elem(PM, point-row(pose-position(NP)), point-col(pose-position(NP))), RHS!)
+      and unwrapReal(elem(PM, point-row(pose-position(P)), point-col(pose-position(P)))) + H! < TH
+      and enqueue(NP, NEXT, NEXT')
+      and EXCESS' === EXCESS
+    ) implies (
+      traverse-neighbour-postcond(P, NP, START, CM, PM, TH, NEXT, EXCESS, NEXT', EXCESS')
+    )) .
+
+  op traverse-neighbour-vc4 : Pose Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+
+  *** Case 3: GreaterThan(PM[NEWP], ...), but PM[P] + H >= Threshold
+  eq traverse-neighbour-vc4(P, NP, START, CM, PM, TH, NEXT, EXCESS, NEXT', EXCESS') = 
+    forall H! . forall RHS! . forall SQRT2! .
+    ((
+      traverse-neighbour-precond(P, NP, START, CM, PM, TH, NEXT, EXCESS)
+      and euclid-distance(pose-position(P), pose-position(START), H!)
+      and SQRT2! * SQRT2! === toReal(2)
+      and not isInfinity(elem(PM, point-row(pose-position(P)), point-col(pose-position(P))))
+      and not isInfinity(RHS!)
+      and unwrapReal(RHS!) === 
+        unwrapReal(elem(PM, point-row(pose-position(P)), point-col(pose-position(P)))) + H! + (toReal(1) / SQRT2!) * value(CM, pose-position(NP))
+      and greater-than(elem(PM, point-row(pose-position(NP)), point-col(pose-position(NP))), RHS!)
+      and not unwrapReal(elem(PM, point-row(pose-position(P)), point-col(pose-position(P)))) + H! < TH
+      and NEXT' === NEXT
+      and enqueue(NP, EXCESS, EXCESS')
+    ) implies (
+      traverse-neighbour-postcond(P, NP, START, CM, PM, TH, NEXT, EXCESS, NEXT', EXCESS')
+    )) .
+    
 endfm
 
 fmod TRAVERSE-NEIGHBOURS-VERIF is
@@ -499,6 +902,7 @@ fmod TRAVERSE-NEIGHBOURS-VERIF is
   protecting POTENTIALMAP-VERIF .
   protecting REAL-INTEGER .
   protecting POSE-QUEUE-VERIF .
+  protecting TRAVERSE-NEIGHBOUR-VERIF .
   
   op traverse-neighbours-precond : Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue -> Boolean .
   op traverse-neighbours-postcond : Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
@@ -536,8 +940,212 @@ fmod TRAVERSE-NEIGHBOURS-VERIF is
     queue-axiom(NEXT')
     and queue-axiom(EXCESS')
     *** ensures ValidQueue(next', pot, costMap) && ValidQueue(excess', pot, costMap)
-    and queue-valid(NEXT', PM, CM) and queue-valid(EXCESS', PM, CM)    
-    .
+    and queue-valid(NEXT', PM, CM) and queue-valid(EXCESS', PM, CM) .
+    
+  op traverse-neighbours-vc1 : Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+  op traverse-neighbours-vc2 : Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+  op traverse-neighbours-vc3 : Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+  op traverse-neighbours-vc4 : Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+  op traverse-neighbours-vc5 : Pose Pose CostMap PotentialMap Real PoseQueue PoseQueue PoseQueue PoseQueue -> Boolean .
+  
+  ops NP1! NP2! NP3! NP4! : -> Pose .
+  ops NEXT1! EXCESS1! NEXT2! EXCESS2! NEXT3! EXCESS3! : -> PoseQueue .
+  
+  *** Check call to traverse-neighbour meets precondition (North)
+  eq traverse-neighbours-vc1(P, START, CM, PM, TH, NEXT, EXCESS ,NEXT', EXCESS') =
+    forall NP1! . ((
+      traverse-neighbours-precond(P, START, CM, PM, TH, NEXT, EXCESS)
+      and point-row(pose-position(P)) > 0
+      and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))
+      and point-row(pose-position(NP1!)) === point-row(pose-position(P)) - 1
+      and point-col(pose-position(NP1!)) === point-col(pose-position(P))
+    ) implies (
+      traverse-neighbour-precond(P, NP1!, START, CM, PM, TH, NEXT, EXCESS)
+    )).
+  
+  *** Check call to traverse-neighbour meets precondition (South)
+  eq traverse-neighbours-vc2(P, START, CM, PM, TH, NEXT, EXCESS ,NEXT', EXCESS') =
+    forall NP1! . forall NEXT1! . forall EXCESS1! . 
+    forall NP2! . ((
+      traverse-neighbours-precond(P, START, CM, PM, TH, NEXT, EXCESS)
+      and 
+        ((point-row(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))
+          ) implies (
+          point-row(pose-position(NP1!)) === point-row(pose-position(P)) - 1
+          and point-col(pose-position(NP1!)) === point-col(pose-position(P))
+          and traverse-neighbour-postcond(P, NP1!, START, CM, PM, TH, NEXT, EXCESS, NEXT1!, EXCESS1!)))
+      and 
+        ((not (point-row(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))
+          )) implies (
+          NEXT1! === NEXT and EXCESS1! === EXCESS
+          ))
+      and point-row(pose-position(P)) < num-rows(CM) - 1
+      and open(CM, point-row(pose-position(P)) + 1, point-col(pose-position(P)))
+      and point-row(pose-position(NP2!)) === point-row(pose-position(P)) + 1
+      and point-col(pose-position(NP2!)) === point-col(pose-position(P))
+    ) implies (
+      traverse-neighbour-precond(P, NP2!, START, CM, PM, TH, NEXT1!, EXCESS1!)
+    )).
+  
+  *** Check call to traverse-neighbour meets precondition (West)
+  eq traverse-neighbours-vc3(P, START, CM, PM, TH, NEXT, EXCESS ,NEXT', EXCESS') =
+    forall NP1! . forall NEXT1! . forall EXCESS1! . 
+    forall NP2! . forall NEXT2! . forall EXCESS2! . 
+    forall NP3! . ((
+      traverse-neighbours-precond(P, START, CM, PM, TH, NEXT, EXCESS)
+      and 
+        ((point-row(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))
+          ) implies (
+          point-row(pose-position(NP1!)) === point-row(pose-position(P)) - 1
+          and point-col(pose-position(NP1!)) === point-col(pose-position(P))
+          and traverse-neighbour-postcond(P, NP1!, START, CM, PM, TH, NEXT, EXCESS, NEXT1!, EXCESS1!)))
+      and 
+        ((not (point-row(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))
+          )) implies (
+          NEXT1! === NEXT and EXCESS1! === EXCESS
+          ))
+      and 
+        ((point-row(pose-position(P)) < num-rows(CM) - 1
+          and open(CM, point-row(pose-position(P)) + 1, point-col(pose-position(P)))
+          ) implies (
+          point-row(pose-position(NP2!)) === point-row(pose-position(P)) + 1
+          and point-col(pose-position(NP2!)) === point-col(pose-position(P))
+          and traverse-neighbour-postcond(P, NP2!, START, CM, PM, TH, NEXT1!, EXCESS1!, NEXT2!, EXCESS2!)))
+      and 
+        ((not (point-row(pose-position(P)) < num-rows(CM) - 1
+          and open(CM, point-row(pose-position(P)) + 1, point-col(pose-position(P)))
+          )) implies (
+          NEXT2! === NEXT1! and EXCESS2! === EXCESS1!
+          ))
+      and point-col(pose-position(P)) > 0
+      and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) - 1)
+      and point-row(pose-position(NP3!)) === point-row(pose-position(P))
+      and point-col(pose-position(NP3!)) === point-col(pose-position(P)) - 1      
+    ) implies (
+      traverse-neighbour-precond(P, NP3!, START, CM, PM, TH, NEXT2!, EXCESS2!)      
+    )).
+    
+  *** Check call to traverse-neighbour meets precondition (East)
+  eq traverse-neighbours-vc4(P, START, CM, PM, TH, NEXT, EXCESS ,NEXT', EXCESS') =
+    forall NP1! . forall NEXT1! . forall EXCESS1! . 
+    forall NP2! . forall NEXT2! . forall EXCESS2! . 
+    forall NP3! . forall NEXT3! . forall EXCESS3! . 
+    forall NP4! . ((
+      traverse-neighbours-precond(P, START, CM, PM, TH, NEXT, EXCESS)
+      and 
+        ((point-row(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))
+          ) implies (
+          point-row(pose-position(NP1!)) === point-row(pose-position(P)) - 1
+          and point-col(pose-position(NP1!)) === point-col(pose-position(P))
+          and traverse-neighbour-postcond(P, NP1!, START, CM, PM, TH, NEXT, EXCESS, NEXT1!, EXCESS1!)))
+      and 
+        ((not (point-row(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))
+          )) implies (
+          NEXT1! === NEXT and EXCESS1! === EXCESS
+          ))
+      and 
+        ((point-row(pose-position(P)) < num-rows(CM) - 1
+          and open(CM, point-row(pose-position(P)) + 1, point-col(pose-position(P)))
+          ) implies (
+          point-row(pose-position(NP2!)) === point-row(pose-position(P)) + 1
+          and point-col(pose-position(NP2!)) === point-col(pose-position(P))
+          and traverse-neighbour-postcond(P, NP2!, START, CM, PM, TH, NEXT1!, EXCESS1!, NEXT2!, EXCESS2!)))
+      and 
+        ((not (point-row(pose-position(P)) < num-rows(CM) - 1
+          and open(CM, point-row(pose-position(P)) + 1, point-col(pose-position(P)))
+          )) implies (
+          NEXT2! === NEXT1! and EXCESS2! === EXCESS1!
+          ))
+      and 
+        ((point-col(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) - 1)
+          ) implies (
+          point-row(pose-position(NP3!)) === point-row(pose-position(P))
+          and point-col(pose-position(NP3!)) === point-col(pose-position(P)) - 1
+          and traverse-neighbour-postcond(P, NP3!, START, CM, PM, TH, NEXT2!, EXCESS2!, NEXT3!, EXCESS3!)))
+      and 
+        ((not (point-col(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) - 1)
+          )) implies (
+          NEXT3! === NEXT2! and EXCESS3! === EXCESS2!
+          ))
+          
+      and point-col(pose-position(P)) < num-cols(CM) - 1
+      and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) + 1)
+      and point-row(pose-position(NP4!)) === point-row(pose-position(P))
+      and point-col(pose-position(NP4!)) === point-col(pose-position(P)) + 1
+    ) implies (
+      traverse-neighbour-precond(P, NP4!, START, CM, PM, TH, NEXT3!, EXCESS3!)      
+    )).
+    
+    *** Postcondition of traverse-neighbours
+  eq traverse-neighbours-vc5(P, START, CM, PM, TH, NEXT, EXCESS ,NEXT', EXCESS') =
+    forall NP1! . forall NEXT1! . forall EXCESS1! . 
+    forall NP2! . forall NEXT2! . forall EXCESS2! . 
+    forall NP3! . forall NEXT3! . forall EXCESS3! . 
+    forall NP4! . ((
+      traverse-neighbours-precond(P, START, CM, PM, TH, NEXT, EXCESS)
+      and 
+        ((point-row(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))
+          ) implies (
+          point-row(pose-position(NP1!)) === point-row(pose-position(P)) - 1
+          and point-col(pose-position(NP1!)) === point-col(pose-position(P))
+          and traverse-neighbour-postcond(P, NP1!, START, CM, PM, TH, NEXT, EXCESS, NEXT1!, EXCESS1!)))
+      and 
+        ((not (point-row(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)) - 1, point-col(pose-position(P)))
+          )) implies (
+          NEXT1! === NEXT and EXCESS1! === EXCESS
+          ))
+      and 
+        ((point-row(pose-position(P)) < num-rows(CM) - 1
+          and open(CM, point-row(pose-position(P)) + 1, point-col(pose-position(P)))
+          ) implies (
+          point-row(pose-position(NP2!)) === point-row(pose-position(P)) + 1
+          and point-col(pose-position(NP2!)) === point-col(pose-position(P))
+          and traverse-neighbour-postcond(P, NP2!, START, CM, PM, TH, NEXT1!, EXCESS1!, NEXT2!, EXCESS2!)))
+      and 
+        ((not (point-row(pose-position(P)) < num-rows(CM) - 1
+          and open(CM, point-row(pose-position(P)) + 1, point-col(pose-position(P)))
+          )) implies (
+          NEXT2! === NEXT1! and EXCESS2! === EXCESS1!
+          ))
+      and 
+        ((point-col(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) - 1)
+          ) implies (
+          point-row(pose-position(NP3!)) === point-row(pose-position(P))
+          and point-col(pose-position(NP3!)) === point-col(pose-position(P)) - 1
+          and traverse-neighbour-postcond(P, NP3!, START, CM, PM, TH, NEXT2!, EXCESS2!, NEXT3!, EXCESS3!)))
+      and 
+        ((not (point-col(pose-position(P)) > 0
+          and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) - 1)
+          )) implies (
+          NEXT3! === NEXT2! and EXCESS3! === EXCESS2!
+          ))
+      and 
+        ((point-col(pose-position(P)) < num-cols(CM) - 1
+          and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) + 1)
+          ) implies (
+          point-row(pose-position(NP4!)) === point-row(pose-position(P))
+          and point-col(pose-position(NP4!)) === point-col(pose-position(P)) + 1
+          and traverse-neighbour-postcond(P, NP4!, START, CM, PM, TH, NEXT3!, EXCESS3!, NEXT', EXCESS')))
+      and 
+        ((not (point-col(pose-position(P)) < num-cols(CM) - 1
+          and open(CM, point-row(pose-position(P)), point-col(pose-position(P)) + 1)
+          )) implies (
+          NEXT' === NEXT3! and EXCESS' === EXCESS3!
+          ))
+    ) implies (
+      traverse-neighbours-postcond(P, START, CM, PM, TH, NEXT, EXCESS ,NEXT', EXCESS')
+    )).  
 endfm
 
 
@@ -1069,3 +1677,5 @@ fmod ASTAR-VERIF is
     ) .
   
 endfm
+
+
