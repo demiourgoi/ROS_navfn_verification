@@ -243,15 +243,15 @@ class Plotter:
 
         self.draw_paths(path1, path2)
 
-    def draw_costmap(self, path1, path2):
+    def draw_costmap(self):
         """Draw the paths with the costmap as background"""
 
         w, h = self.costmap.shape
+        
+        cm = self.plt.cm.colors.ListedColormap([(x, x, x, 1) for x in self.np.linspace(1, .25, 254 - 50)] + [(1, 0, 0, 1)])
 
-        self.plt.imshow(self.costmap, extent=(0, w, h, 0), cmap='gray_r')
+        self.plt.imshow(self.costmap, extent=(0, h, w, 0), cmap=cm)
         self.plt.colorbar()
-
-        self.draw_paths(path1, path2)
 
     def draw(self, origin, dest, potarr1_raw, potarr2_raw, path1, path2, equal):
         """ Plots potentials, paths and their differences """
@@ -261,8 +261,11 @@ class Plotter:
             return
 
         # If the potential is missing, we print the both paths with the costmap
-        if potarr2_raw is None:
-            self.draw_costmap(path1, path2)
+        if self.costmap is not None:
+            self.draw_costmap()
+            self.draw_paths(path1, path2)
+            # Draw the first path only
+            # self.plt.plot(*zip(*path1), color='blue', marker='o')
             self.plt.title(f'{origin} to {dest}')
             self.pdf.savefig()
             self.plt.close()
@@ -352,7 +355,7 @@ def main(args):
             potarr2 = dict2[test].get("navfn")
 
             # If both potentials are missing, try to read the map
-            if not tried_costmap and potarr1 is None and potarr2 is None and os.path.exists(costmap_path):
+            if not tried_costmap and (potarr1 is None and potarr2 is None or args.costmap) and os.path.exists(costmap_path):
                 tried_costmap = True
                 plotter.load_costmap(costmap_path)
 
@@ -382,9 +385,9 @@ def main(args):
                     print('Max. difference: ', max((abs(path1[i][j] - path2[i][j]) for i in range(len(path1)) for j in (0, 1))))
                 print(f'potarr: {dict1[test]["navfn"]}\n')
 
-                # Draw the potentials and paths only for different paths, removing any oscillation in those paths
-                plotter.draw(test[0], test[1], potarr1, potarr2, remove_oscillations(path1, epsilon),
-                             remove_oscillations(path2, epsilon), equal)
+            # Draw the potentials and paths for different paths or when --draw=all is used
+            if args.draw == 'all' or not equal:
+                plotter.draw(test[0], test[1], potarr1, potarr2, path1, path2, equal)
 
         plotter.draw_summary()
 
@@ -398,6 +401,7 @@ if __name__ == "__main__":
     parser.add_argument('maude_output', help='JSON test results produced by profile_maude')
     parser.add_argument('--draw', help='Draw navigation functions and paths (requires matplotlib)', nargs='?',
                         choices=['none', 'failed', 'all'], default='none', const='failed')
+    parser.add_argument('--costmap', help='Draw cost maps instead of navigation functions', action='store_true')
     parser.add_argument('--width', '-w', help='Width of the map (if not square)', type=int)
 
     args = parser.parse_args()

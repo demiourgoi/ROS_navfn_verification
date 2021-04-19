@@ -6,7 +6,7 @@ import gdb
 import sys
 
 # Stream where traces will be written
-rlog = sys.stdout
+rlog = open('ros_log.txt', 'w')
 
 
 def split_xy(n, nx):
@@ -74,5 +74,35 @@ class IterationBreak(gdb.Breakpoint):
 		return False
 
 
+class ConclusionBreak(gdb.Breakpoint):
+	"""Breakpoint when the algorithm concludes"""
+
+	def __init__(self):
+		super().__init__('navfn.cpp:731')
+
+	def stop(self):
+		print('\n--- The destination has been found', file=rlog)
+		rlog.flush()
+
+		return False
+
+
+class BadConclusionBreak(gdb.Breakpoint):
+	"""Breakpoint when the algorithm concludes badly"""
+
+	def __init__(self):
+		super().__init__('navfn.cpp:733')
+
+	def stop(self):
+		cycle = gdb.parse_and_eval('cycle')
+		cycles = gdb.parse_and_eval('cycles')
+		print(f'\n--- Finished without finding a path in', cycle, 'cycles of', cycles, file=rlog)
+		rlog.flush()
+
+		return False
+
+
 x = PositionBreak()
 y = IterationBreak()
+z = ConclusionBreak()
+t = BadConclusionBreak()

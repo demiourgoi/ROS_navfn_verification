@@ -1,5 +1,5 @@
 5 5
-3x3_free_random.bin
+map.bin
 
 1 1 1 1
 1 1 1 2

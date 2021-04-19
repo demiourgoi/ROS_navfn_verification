@@ -345,7 +345,7 @@ fmod BASIC-TRAVERSE is
                                                    else getMin({X, Y}, P, NC, NR, ACCP, MINV, LN)
                                                    fi
   if < X', Y' > := getMove({X, Y}, N, NC, NR) /\
-     V := float2nat(P @ [X', Y']) [print "getMin {" X "," Y "} -> {" X' "," Y' "} (" N ") -- " V] .
+     V := float2nat(P @ [X', Y']) .
  ceq getMin({X, Y}, P, NC, NR, ACCP, MINV, N LN) = getMin({X, Y}, P, NC, NR, ACCP, MINV, LN)
   if not (getMove({X, Y}, N, NC, NR) :: Pair) .
  eq getMin(INIT, P, NC, NR, ACCP, MINV, nil) = ACCP .
