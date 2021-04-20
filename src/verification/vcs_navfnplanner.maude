@@ -1297,7 +1297,7 @@ fmod ASTAR-ITERATION-VERIF is
     ops MINV! MINH! : -> RealInf .
 
     *** Case in which current queue is non-empty, and front position is open
-    *** Precondition of call to MinVertical holds
+    *** Precondition of call to MinHorizontal holds
     op astar-iteration-vc6 : Pose Pose CostMap PotentialMap PoseQueue PoseQueue PoseQueue Real Integer PotentialMap -> Boolean .
     
     eq astar-iteration-vc6(START, GOAL, CM, PM, CUR, NEXT, EXCESS, THRESHOLD, NIT, PM') =
@@ -1631,8 +1631,8 @@ fmod ASTAR-VERIF is
     and costmap-valid(CM) .
   
   *** Call to BuildInitialPotentialMap meets preconditions
-  op astar-vc1 : Pose Pose CostMap Integer -> Boolean .
-  eq astar-vc1(START, GOAL, CM, NI) =
+  op astar-vc1 : Pose Pose CostMap Integer PotentialMap Real Real PoseQueue PoseQueue PoseQueue -> Boolean .
+  eq astar-vc1(START, GOAL, CM, NI, PM, ITHR, ITHR', CUR, NEXT, EXCESS) =
     (
       astar-precond(START, GOAL, CM, NI)
     ) implies (
@@ -1640,8 +1640,8 @@ fmod ASTAR-VERIF is
     ) .
     
   *** Call to EuclidDistance meets preconditions
-  op astar-vc2 : Pose Pose CostMap Integer PotentialMap -> Boolean .
-  eq astar-vc2(START, GOAL, CM, NI, PM) =
+  op astar-vc2 : Pose Pose CostMap Integer PotentialMap Real Real PoseQueue PoseQueue PoseQueue -> Boolean .
+  eq astar-vc2(START, GOAL, CM, NI, PM, ITHR, ITHR', CUR, NEXT, EXCESS) =
     (
       astar-precond(START, GOAL, CM, NI)
       and build-initial-potential-map-postcond(num-rows(CM), num-cols(CM), point-row(pose-position(GOAL)), point-col(pose-position(GOAL)), PM)
@@ -1650,8 +1650,8 @@ fmod ASTAR-VERIF is
     ) .
   
   *** Call to InitCurrentQueue meets preconditions
-  op astar-vc3 : Pose Pose CostMap Integer PotentialMap Real Real -> Boolean .
-  eq astar-vc3(START, GOAL, CM, NI, PM, ITHR, ITHR') =
+  op astar-vc3 : Pose Pose CostMap Integer PotentialMap Real Real PoseQueue PoseQueue PoseQueue -> Boolean .
+  eq astar-vc3(START, GOAL, CM, NI, PM, ITHR, ITHR', CUR, NEXT, EXCESS) =
     (
       astar-precond(START, GOAL, CM, NI)
       and build-initial-potential-map-postcond(num-rows(CM), num-cols(CM), point-row(pose-position(GOAL)), point-col(pose-position(GOAL)), PM)
