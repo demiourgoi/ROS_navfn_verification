@@ -165,10 +165,10 @@ fmod ASTAR is
  ceq a*(G, CM, NR, NC, OPEN, CLOSE) = a*(G, CM, NR, NC, NEW, (CLOSE, NODE))
   if NODE | NS := min(OPEN) /\
      not goalReached(G, NODE) /\
-     NEW := generate(G, NODE, CM, NS, CLOSE, NR, NC) [print " 1 " NODE " + " NS " | " NEW "\n" ] .
+     NEW := generate(G, NODE, CM, NS, CLOSE, NR, NC) .
  ceq a*(G, CM, NR, NC, OPEN, CLOSE) = computePath(NODE, CLOSE, G)
   if NODE | NS := min(OPEN) /\
-     goalReached(G, NODE) [print " 2 " NODE] .
+     goalReached(G, NODE) .
 
  op h : Pose Pose -> Float .
  eq h({X, Y, Z} Q, {X', Y', Z'} Q') = sqrt(((X - X') ^ 2.0) + ((Y - Y') ^ 2.0)) .
