@@ -22,6 +22,13 @@ fmod ASTAR is
  sort TraversalResult .
  op <_,_> : Path Path -> TraversalResult [ctor] .
 
+ *** Simplified signature to match that of the astar.maude file
+ ***     Init Goal         NumRow NumCol
+ op a* : Pose Pose CostMap  Float  Float ~> Path .
+ ceq a*(INIT, GOAL, CM, FX, FY) = a*(INIT, GOAL, CM, NC, NR, max((NC * NR) quo 20, NC + NR), 4 * NC)
+  if NC := float2nat(FX)
+  /\ NR := float2nat(FY) .
+
  ***     Init Goal         NumRow NumCol Iterations Iterations path
  op a* : Pose Pose CostMap  Nat    Nat      Nat     Nat ~> Path .
  eq a*({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NC, NR, I, IPATH) =
@@ -150,6 +157,21 @@ fmod ASTAR is
   if FI := if Y > 0 then P @ [X, sd(Y,1)] else infinite fi /\
      FI' := if s(Y) < NR then P @ [X, s(Y)] else infinite fi .
 
+ *** Interface to the path calculation algorithm in BASIC-TRAVERSE
+ ***     Init Goal         NumRow NumCol
+ op a*basic : Pose Pose CostMap  Float  Float ~> Path .
+ ceq a*basic({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, DX, DY) = refloat(
+       computePath({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
+                   {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q',
+                   getPotential({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NC, NR, max((NC * NR) quo 20, NC + NR)),
+                   NC, NR))
+  if NC := float2nat(DX)
+  /\ NR := float2nat(DY) .
+
+ *** Convert a path of integer poses into a path of floating-point poses
+ op refloat : Path -> Path .
+ eq refloat(noPath) = noPath .
+ eq refloat(({X, Y, Z} Q) PT) = ({float(X), float(Y), float(Z)} Q) refloat(PT) .
 endfm
 
 eof

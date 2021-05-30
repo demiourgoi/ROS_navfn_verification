@@ -26,9 +26,9 @@ from rclpy.node import Node
 import math, sys
 
 from nav2_msgs.action import ComputePathToPose
-from nav2_msgs.msg import Path, Costmap
-from nav_msgs.msg import OccupancyGrid
-from geometry_msgs.msg import Pose, Quaternion, PoseWithCovarianceStamped
+from nav2_msgs.msg import Costmap
+from nav_msgs.msg import Path, OccupancyGrid
+from geometry_msgs.msg import PoseStamped, Quaternion, PoseWithCovarianceStamped
 
 # I couldn't import ROS2 tf2_ros2 module :-(
 import pyquaternion
@@ -44,7 +44,7 @@ TODO:
 """
 
 class MapProvider(maude.Hook):
-    """Handle map queries from a special Maude operator"""
+    """Handle map queries from the special Maude operator open2?"""
 
     def __init__(self, planner, module):
         super().__init__()
@@ -68,22 +68,52 @@ class MapProvider(maude.Hook):
         # Map entries are considered opened when the cost is below 50
         # return data.getTerm('trueTerm' if self.planner.occupancy_grid.data[x + y * ncols] < 50
         #                               else 'falseTerm')
-        return self.true_term if self.planner.occupancy_grid.data[x + y * ncols] < 50 \
+        return self.true_term if self.planner.occupancy_grid.data[x + y * ncols] < 254 \
           else self.false_term
 
 
-class MaudePlanner(Node):
-    ASTAR_MAUDE_PATH = '../maude/astar.maude'
+class MapProviderGet(maude.Hook):
+    """Handle map queries from the special Maude operator get"""
 
-    def __init__(self, map_in_python=True):
+    def __init__(self, planner):
+        super().__init__()
+        self.planner = planner
+        self.cache = dict()  # Dictionary int in [0..255] -> Maude term representing the corresponding Float
+        for i in range(0, 256):
+            self.cache[i] = self.planner.astar_module.parseTerm(str(float(i)))
+    
+    def run(self, term, data):
+        try:
+            _, x, y, ncols = [int(arg) for arg in term.arguments()]
+            cell_value = self.planner.occupancy_grid.data[y * ncols + x]
+            ret_term = self.cache[cell_value]
+            return ret_term
+        except Exception as e:
+            print('hook:', e)
+
+
+class MaudePlanner(Node):
+    ASTAR_MAUDE_PATH = {
+        'a*': '../maude/astar.maude',
+        'pot': '../maude/astar_no_turnNavFnPlanner.maude',
+        'ros': '../maude/astar_no_turnNavFnPlanner.maude'
+    }
+    
+    ASTAR_OPNAME = {
+        'a*': 'a*',
+        'pot': 'a*basic',
+        'ros': 'a*'
+    }
+
+    def __init__(self, implementation='a*', map_in_python=True):
         super().__init__('maude_planner_action_server') # Node name, could be changed to fit the BT
 
         maude.init()
-        maude.load(self.ASTAR_MAUDE_PATH)        
+        maude.load(self.ASTAR_MAUDE_PATH[implementation])
         self.astar_module = maude.getModule('ASTAR')
 
         if self.astar_module is None:
-            self.get_logger().fatal('Cannot find Maude ASTAR module in {}'.format(self.ASTAR_MAUDE_PATH))
+            self.get_logger().fatal('Cannot find Maude ASTAR module in {}'.format(self.ASTAR_MAUDE_PATH[implementation]))
         else:
             self.get_logger().info('Maude planner node is ready')
 
@@ -122,8 +152,12 @@ class MaudePlanner(Node):
         self.map_in_python = map_in_python
 
         if map_in_python:
-            self.map_hook = MapProvider(self, self.astar_module)
-            maude.connectEqHook('open2?', self.map_hook)
+            if implementation == 'a*':
+                self.map_hook = MapProvider(self, self.astar_module)
+                maude.connectEqHook('open2?', self.map_hook)
+            else:
+                self.map_hook = MapProviderGet(self)
+                maude.connectEqHook('get', self.map_hook)
 
         # Find sorts and operators needed to construct the a* term
         # (once for all)
@@ -134,7 +168,9 @@ class MaudePlanner(Node):
         path_kind    = m.findSort('Path').kind()
         int_kind     = m.findSort('IntList').kind()
 
-        self.astar_symb   = m.findSymbol('a*', [pose_kind, pose_kind, costmap_kind, float_kind, float_kind], path_kind)
+        #         Init Goal         NumRow NumCol
+        # op a* : Pose Pose CostMap  Float  Float -> Path .
+        self.astar_symb   = m.findSymbol(self.ASTAR_OPNAME[implementation], [pose_kind, pose_kind, costmap_kind, float_kind, float_kind], path_kind)
         self.intlist_symb = m.findSymbol('_`,_', [int_kind] * 2, int_kind)
         self.cmap_symb    = m.findSymbol('`{_`}', [int_kind], costmap_kind)
 
@@ -203,7 +239,7 @@ class MaudePlanner(Node):
         :param maude_pose Maude term representing a pose, of the form "{2.0,2.0,0.0} 90"
         :return geometry_msgs/Pose
         """
-        p = Pose()
+        p = PoseStamped()
 
         pose_parts = list(maude_pose.arguments())
         point = pose_parts[0]
@@ -211,12 +247,15 @@ class MaudePlanner(Node):
 
         resolution = self.occupancy_grid.info.resolution
         origin = self.occupancy_grid.info.origin.position
+        
+        p.header.stamp = self.get_clock().now().to_msg()
+        p.header.frame_id = self.occupancy_grid.header.frame_id
 
         point_parts = list(point.arguments())
-        p.position.x = origin.x + resolution * float(point_parts[0])
-        p.position.y = origin.y + resolution * float(point_parts[1])
-        p.position.z = origin.z + resolution * float(point_parts[2])
-        p.orientation = self.angle_to_quaternion(angle)
+        p.pose.position.x = origin.x + resolution * float(point_parts[0])
+        p.pose.position.y = origin.y + resolution * float(point_parts[1])
+        p.pose.position.z = origin.z + resolution * float(point_parts[2])
+        p.pose.orientation = self.angle_to_quaternion(angle)
 
         return p
         
@@ -306,9 +345,20 @@ class MaudePlanner(Node):
 
 
 def main(args=None):
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Maude planner action server')
+    parser.add_argument(
+        '-i', '--implementation',
+        help='Planning algorithm implementation',
+	choices=['a*', 'pot', 'ros'],
+	default='a*',
+    )
+    pargs = parser.parse_args()
+
     rclpy.init(args=args)
 
-    maude_planner = MaudePlanner()
+    maude_planner = MaudePlanner(pargs.implementation)
 
     rclpy.spin(maude_planner)
 

@@ -12,8 +12,8 @@ PARAMS_FILE="$SOURCE_ROOT/nav2_params.yaml"
 export TURTLEBOT3_MODEL=waffle
 
 # Gazebo and nav2_bringup paths
-export GAZEBO_MODEL_PATH=/opt/ros/dashing/share/turtlebot3_gazebo/models
-export BRINGUP_PATH=/opt/ros/dashing/share/nav2_bringup/launch
+export GAZEBO_MODEL_PATH=/opt/ros/foxy/share/turtlebot3_gazebo/models
+export BRINGUP_PATH=/opt/ros/foxy/share/nav2_bringup/launch
 
 # Update maude package
 python3 -m pip install -U maude

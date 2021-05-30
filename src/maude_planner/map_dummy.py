@@ -22,10 +22,10 @@ class MapDummyPublisher(Node):
         occupancy_grid.info.origin.position.y = 0.0
         occupancy_grid.info.origin.position.z = 0.0
         occupancy_grid.data = array.array('b')  # Array of unsigned integers of 1 byte
-        occupancy_grid.data.extend([0, 0,   0, 0,
-                                    0, 100, 0, 0,
-                                    0, 0,   0, 0,
-                                    0, 0,   0, 0])
+        occupancy_grid.data.extend([50,  50, 50, 50,
+                                    50, 100, 50, 50,
+                                    50,  50, 50, 50,
+                                    50,  50, 50, 50])
         occupancy_grid.info.resolution = 1.0
         occupancy_grid.info.width = 4
         occupancy_grid.info.height = 4
