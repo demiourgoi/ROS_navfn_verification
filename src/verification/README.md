@@ -10,9 +10,9 @@ Two approaches have been followed to formally prove some [properties](#Propertie
 
    * **check_navfnplanner.py** triggers the verification of the properties expressed in the Maude in the previous file. The verification conditions are passed to the SMT solver and the result is printed on the screen.
 
-   * **smtex.maude** and **maudesmt.py** extend the Maude support for SMT to the theories of uninterpreted functions, arrays and quantified formulae. The [`maude`](https://pypi.org/project/maude) and [`pysmt`](https://pypi.org/project/pysmt) libraries are used for the communication with Maude and the SMT solvers respectively.
+   * **smtex.maude** extends the Maude support for SMT to the theories of uninterpreted functions, arrays and quantified formulae.
 
-   * **smt_converter.py** is a version of `maudesmt.py` using the Python bindings of Z3 instead of `pysmt` due to limitations of the latter library.
+   * **smt_converter.py** is a version of `maudesmt.py` using the Python bindings of Z3.
 
 ## Properties
 
