@@ -225,7 +225,7 @@ class DirectProfiler:
         """ Obtain the values of a Maude pose """
         # Match the pose into the pattern (we assume there is always a single match)
         it = pose.match(self.pattern)
-        subs = next(it)
+        subs, _ = next(it)
         return float(str(subs.find('X'))), float(str(subs.find('Y'))), int(str(subs.find('O')))
 
     def calculate_length(self, mresult):
