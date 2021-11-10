@@ -1,0 +1,21 @@
+***
+*** Strategy to ensure that the A* algorithm finishes as soon as
+*** the potential of the initial cell becomes finite.
+***
+*** The model checker for strategy-controlled system is required
+*** to verify the property.
+*** 
+
+load astar_no_turnNavFnPlanner_rew.maude
+
+smod TEST-POT-STRAT is
+  pr TEST-POT .
+  pr STRATEGY-MODEL-CHECKER .
+
+  strat astar @ State .
+
+  *** Stops if the initial state has been reached or no next state is possible
+  sd astar := reached or-else ((curr | next) ? astar : idle) .
+endsm
+
+red modelCheck(initPot, [] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess), 'astar) .

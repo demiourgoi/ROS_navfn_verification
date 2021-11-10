@@ -37,7 +37,7 @@ class PositionBreak(gdb.Breakpoint):
 		# Check neighbors in every possible direction
 		for d, v in zip('lrud', (-1, 1, -nx, nx)):
 			m = n + v
-			
+
 			# Mimics the conditions in updateCellAstar and push_*
 			if gdb.parse_and_eval(f'{d} > pot + {d}e') and 0 <= m < ns and gdb.parse_and_eval(f'costarr[{m}] < 254'):
 				if gdb.parse_and_eval(f'pending[{m}]'):
@@ -48,11 +48,11 @@ class PositionBreak(gdb.Breakpoint):
 						extra = 'whose potential is {d}'
 					else:
 						extra = ''
-				
+
 					print('\tPushing', split_xy(m, nx), extra, file=rlog)
-		
+
 		return False
-		
+
 
 class IterationBreak(gdb.Breakpoint):
 	"""Breakpoint to log iterations and its queues in NavFn::propNavFnAstar"""
@@ -66,7 +66,7 @@ class IterationBreak(gdb.Breakpoint):
 		curPe = int(gdb.parse_and_eval('curPe'))
 		overPe = int(gdb.parse_and_eval('overPe'))
 		nx = int(gdb.parse_and_eval('nx'))
-		
+
 		print('\n--- Iteration', cycle, 'with threshold', curT, file=rlog)
 		print('--- Current:', [split_xy(int(gdb.parse_and_eval(f'curP[{i}]')), nx) for i in range(curPe)], file=rlog)
 		print('--- Over:', [split_xy(int(gdb.parse_and_eval(f'overP[{i}]')), nx) for i in range(overPe)], file=rlog)

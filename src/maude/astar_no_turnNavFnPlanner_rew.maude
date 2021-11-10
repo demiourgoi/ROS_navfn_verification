@@ -74,15 +74,22 @@ mod ASTAR is
       T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
       CURR := initCurrent({X', Y'}, CM, NC, NR) .
 
+ *** Initial a* term
+ op a*i : Pose Pose CostMap Nat Nat Nat ~> Potential .
+ ceq a*i({X, Y}, {X', Y'}, CM, NC, NR, I) = a*({X, Y}, {X', Y'}, CM, P, NC, NR, CURR, noPath, noPath, T,  I)
+  if P := initialP*(NC, NR, X', Y') /\
+     T := h({X, Y, 0} 0, {X', Y', 0} 0) + obstacleCost /\
+     CURR := initCurrent({X', Y'}, CM, NC, NR) .
+
  ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
  op a* : Pose Pose CostMap Potential  Nat     Nat   Path Path Path   Float       Nat  ~> Potential .
- rl a*(INIT, GOAL, CM, P, NC, NR, CURR, NEXT, EXC, T, 0) => P .
- crl a*({X, Y}, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, I) => P
+ rl [reached] : a*(INIT, GOAL, CM, P, NC, NR, CURR, NEXT, EXC, T, 0) => P .
+ crl [reached] : a*({X, Y}, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, I) => P
   if D := P @ [X , Y] /\
      D =/= infinite .
- crl a*(INIT, GOAL, CM, P, NC, NR, ({X, Y} CURR), NEXT, EXC, T, s(I)) => a*(INIT, GOAL, CM, P, NC, NR, CURR, NEXT, EXC, T, s(I))
+ crl [curr] : a*(INIT, GOAL, CM, P, NC, NR, ({X, Y} CURR), NEXT, EXC, T, s(I)) => a*(INIT, GOAL, CM, P, NC, NR, CURR, NEXT, EXC, T, s(I))
   if not open?(CM, X, Y, NC) .
- crl a*(INIT, GOAL, CM, P, NC, NR, ({X, Y} CURR), NEXT, EXC, T, s(I)) =>
+ crl [curr] :  a*(INIT, GOAL, CM, P, NC, NR, ({X, Y} CURR), NEXT, EXC, T, s(I)) =>
                         a*(INIT, GOAL, CM, P', NC, NR, CURR, NEXT', EXC', T, s(I))
   if open?(CM, X, Y, NC) /\
      FI := minv({X, Y}, P, NR) /\
@@ -91,7 +98,7 @@ mod ASTAR is
      SNDV := max(FI, FI') /\
      P' := updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) /\
      < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NC, NR, T, NEXT, EXC) .
- rl a*(INIT, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, s(I)) =>
+ rl [next] : a*(INIT, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, s(I)) =>
          if NEXT == noPath
          then a*(INIT, GOAL, CM, P, NC, NR, EXC, noPath, NEXT, T + 2.0 * mapCost, I)
          else a*(INIT, GOAL, CM, P, NC, NR, NEXT, noPath, EXC, T, I)
@@ -191,15 +198,10 @@ mod TEST-POT is
  pr PROPS-POT .
 
  op initPot : -> Potential .
- eq initPot = a*({2, 2}, {0,0}, {10, 10,  10,  10,
-                         10, 255, 255, 10,
-                         10, 10,  10,  10,
-                         10, 10,  10,  10},
-              ( (0.0 . 2.55e+2 . 2.55e+2 . 2.55e+2)
-                (2.55e+2 . 2.55e+2 . 2.55e+2 . 2.55e+2)
-                (2.55e+2 . 2.55e+2 . 2.55e+2 . 2.55e+2)
-                (2.55e+2 . 2.55e+2 . 2.55e+2 . 2.55e+2)),
-              4, 4, ({0,1} {1,0}), noPath, noPath, 5.3684271247461902e+2, 30, 30) .
+ eq initPot = a*i({2, 2}, {0,0}, {10, 10,  10,  10,
+                                  10, 255, 255, 10,
+                                  10, 10,  10,  10,
+                                  10, 10,  10,  10}, 4, 4, 30) .
 endm
 
 red modelCheck(initPot, [] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess)) .
