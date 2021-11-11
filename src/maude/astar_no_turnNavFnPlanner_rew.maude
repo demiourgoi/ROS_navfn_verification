@@ -47,7 +47,7 @@ mod ASTAR is
  rl a*({X, Y}, {X', Y'}, G, NC, NR, IPATH, P) => computePath(P, {X, Y}, {X', Y'}, stepSize, G, NC, NR, IPATH) .
 
  op initCurrent : Pose CostMap Nat Nat -> Path .
- ceq initCurrent({X, Y}, CM, NC, NR) = P1L P2L P3L P4L
+ ceq initCurrent({X, Y}, CM, NC, NR) = P2L P1L P3L P4L
   if P1L := if (X > 0) and-then open?(CM, sd(X, 1), Y, NC)
             then {sd(X, 1), Y}
             else noPath
@@ -97,7 +97,10 @@ mod ASTAR is
      MINV := min(FI, FI') /\
      SNDV := max(FI, FI') /\
      P' := updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) /\
-     < NEXT', EXC' > := traverseNeighbors({X, Y}, INIT, CM, P', NC, NR, T, NEXT, EXC) .
+     < NEXT', EXC' > :=  if P @ [X, Y] > P' @ [X, Y]
+                         then traverseNeighbors({X, Y}, INIT, CM, P', NC, NR, T, NEXT, EXC)
+                         else < NEXT, EXC >
+                         fi .
  rl [next] : a*(INIT, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, s(I)) =>
          if NEXT == noPath
          then a*(INIT, GOAL, CM, P, NC, NR, EXC, noPath, NEXT, T + 2.0 * mapCost, I)
@@ -136,13 +139,13 @@ mod ASTAR is
  op updatePotential : Potential Pose Pose CostMap Nat Float Float  -> Potential .
  ceq updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) = P'
   if V := get(CM, X, Y, NC) /\
-     _-_(SNDV, MINV) > V /\
+     _-_(SNDV, MINV) >= V /\
      V' := V + MINV /\
      P' := P [X ; Y \\ V'] .
  ceq updatePotential(P, {X,Y}, GOAL, CM, NC, MINV, SNDV) = P'
   if DC := _-_(SNDV, MINV) /\
      HF := get(CM, X, Y, NC) /\
-     DC <= HF /\
+     DC < HF /\
      D := DC / HF /\
      V := - 0.2301 * D * D + 0.5307 * D + 0.7040 /\
      V' := MINV + HF * V /\
@@ -162,10 +165,10 @@ endm
 
 *** set print attribute on .
 
-rew a*({2, 2, 0} 90, {0, 0, 0} 90, {50, 50,  50,  50,
+*** (rew a*({2, 2, 0} 90, {0, 0, 0} 90, {50, 50,  50,  50,
                                     50, 254, 254, 50,
                                     50, 50,  50,  50,
-                                    50, 50,  50,  50}, 4, 4, 30, 30) .
+                                    50, 50,  50,  50}, 4, 4, 30, 30) .)
 
 load model-checker.maude
 
@@ -204,7 +207,7 @@ mod TEST-POT is
                                   10, 10,  10,  10}, 4, 4, 30) .
 endm
 
-red modelCheck(initPot, [] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess)) .
+*** red modelCheck(initPot, [] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess)) .
 
 mod PROPS-PATH is
  pr SATISFACTION .
@@ -245,7 +248,7 @@ mod TEST-PATH is
                                     50, 50,  50,  50}, 4, 4, 30, 30) .
 endm
 
-red modelCheck(initPath, [] (NonInfinitePotAtInit -> <> PathComputed)) .
+*** red modelCheck(initPath, [] (NonInfinitePotAtInit -> <> PathComputed)) .
 
 
 

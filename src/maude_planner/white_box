@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# White-box testing of ROS NavFn planner (using the GDB and Maude APIs)
+#
+# For this to work, gdb and debug builds of libnav2_navfn_planner and
+# profile_cpp are required
+
+
+export LD_LIBRARY_PATH=ros-libs
+
+for f in $@
+do
+	export TEST_PATH="$f"
+	echo "*** $f"
+
+	gdb \ # -ex 'set substitute-path /mnt/ /source/path/if/needed/' \
+	    -x white_box.py \
+	    --args ./profile_cpp_bin_dbg "$f"
+done

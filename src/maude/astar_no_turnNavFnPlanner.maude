@@ -84,7 +84,7 @@ fmod ASTAR is
   if D := P @ [X , Y] /\
      D =/= infinite .
  ceq a*(INIT, GOAL, CM, P, NC, NR, ({X, Y} CURR), NEXT, EXC, T, s(I)) = a*(INIT, GOAL, CM, P, NC, NR, CURR, NEXT, EXC, T, s(I))
-  if not open?(CM, X, Y, NC) .
+  if not open?(CM, X, Y, NC) [owise] .
  ceq a*(INIT, GOAL, CM, P, NC, NR, ({X, Y} CURR), NEXT, EXC, T, s(I)) =
                         a*(INIT, GOAL, CM, P', NC, NR, CURR, NEXT', EXC', T, s(I))
   if open?(CM, X, Y, NC) /\
@@ -96,12 +96,12 @@ fmod ASTAR is
      < NEXT', EXC' > :=  if P @ [X, Y] > P' @ [X, Y]
                          then traverseNeighbors({X, Y}, INIT, CM, P', NC, NR, T, NEXT, EXC)
                          else < NEXT, EXC >
-                         fi .
+                         fi [owise] .
  eq a*(INIT, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, s(I)) =
          if NEXT == noPath
          then a*(INIT, GOAL, CM, P, NC, NR, EXC, noPath, NEXT, T + 2.0 * mapCost, I)
          else a*(INIT, GOAL, CM, P, NC, NR, NEXT, noPath, EXC, T, I)
-         fi .
+         fi [owise] .
 
  ***                   Current  INIT
  op traverseNeighbors : Pose    Pose CostMap Potential Nat Nat Float Path Path -> TraversalResult .
@@ -124,7 +124,7 @@ fmod ASTAR is
 
  op traverseNeighbor : Pose Pose Pose CostMap Potential Nat Float -> TraversalResult .
  ceq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) = < noPath, noPath >
-  if (P @ [XN, YN]) <= (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) + (1.0 / sqrt(2.0)) * get(CM, XN, YN, NC) [print "No update vecino"] .
+  if (P @ [XN, YN]) <= (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) + (1.0 / sqrt(2.0)) * get(CM, XN, YN, NC) . *** [print "No update vecino"] .
  eq traverseNeighbor({XC, YC}, {XN, YN}, {XI, YI}, CM, P, NC, T) =
                                    if (P @ [XC, YC]) + h({XC, YC}, {XI, YI}) < T
                                    then < {XN, YN}, noPath >
