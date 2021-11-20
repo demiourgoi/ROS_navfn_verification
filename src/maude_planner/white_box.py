@@ -88,7 +88,7 @@ class TestEngine:
 
 	ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner_rew.maude'
 
-	def __init__(self):
+	def __init__(self, use_hook=True):
 		# self.calcpath_b = CalcPathBreak()
 		self.astar_b = AStarBreak(self)
 		self.runtest_b = RunTestBreak(self)
@@ -97,6 +97,7 @@ class TestEngine:
 		self.height = None
 		self.map = None
 		self.term = None
+		self.use_hook = use_hook
 
 		self.filename = os.getenv('TEST_PATH')
 		m = maude.getModule('ASTAR')
@@ -118,6 +119,7 @@ class TestEngine:
 
 		# Symbols for constructing the map
 		self.intlist = m.findSymbol('_,_', (nat_kind, nat_kind), nat_kind)
+		self.mtIL = m.parseTerm('mtIL', nat_kind)
 		self.cmap_symb = m.findSymbol('{_}', (nat_kind, ), cmap_kind)
 		self.noPath = m.parseTerm('noPath', path_kind)
 		self.path_union = m.findSymbol('__', (path_kind, path_kind), path_kind)
@@ -127,6 +129,29 @@ class TestEngine:
 
 		self.already_missed_stack = False
 
+		# Hook for "op get : CostMap Nat Nat Nat -> Float"
+		class MapHook(maude.Hook):
+			def __init__(self, parent):
+				super().__init__()
+				self.parent = parent
+				self.cache = dict()  # Dictionary int in [0..255] -> Maude term representing the corresponding Float
+				for i in range(0, 256):
+					self.cache[i] = self.parent.module.parseTerm(str(float(i)))
+
+			def run(self, term, data):
+				try:
+					_, x, y, ncols = [int(arg) for arg in term.arguments()]
+					cell_value = self.parent.cmap[y * ncols + x]
+					ret_term = self.cache[cell_value]
+					# print(f'FAST {term} --> {ret_term}')
+					return ret_term
+				except Exception as e:
+					print('hook:', e)
+
+		if use_hook:
+			self.mapHook = MapHook(self)
+			maude.connectEqHook('get', self.mapHook)
+
 	def begin_map(self, width, cmap):
 		"""Communicate the map that NavFn has started with"""
 
@@ -134,7 +159,12 @@ class TestEngine:
 
 		self.width = self.module.parseTerm(str(width), self.nat_kind)
 		self.height = self.module.parseTerm(str(height), self.nat_kind)
-		self.map = self.cmap_symb(self.intlist(*map(self.module.parseTerm, map(str, cmap))))
+
+		if self.use_hook:
+			self.cmap = cmap
+			self.map = self.cmap_symb(self.mtIL)
+		else:
+			self.map = self.cmap_symb(self.intlist(*map(self.module.parseTerm, map(str, cmap))))
 
 		# Number of iterations
 		cycles = str(max(len(cmap) // 20, width + height))

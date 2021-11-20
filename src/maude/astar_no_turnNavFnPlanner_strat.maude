@@ -18,4 +18,4 @@ smod TEST-POT-STRAT is
   sd astar := reached or-else ((curr | next) ? astar : idle) .
 endsm
 
-red modelCheck(initPot, [] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess), 'astar) .
+*** red modelCheck(initPot, [] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess), 'astar) .

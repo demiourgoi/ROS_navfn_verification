@@ -7,6 +7,8 @@ import math
 import json
 import os.path
 
+from test_utils import load_test
+
 
 class DirectProfiler:
     """ Profile the Maude A* algorithm directly """
@@ -14,29 +16,7 @@ class DirectProfiler:
     ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner.maude'
 
     def __init__(self, test_path, obtain_navfn=True):
-        with open(test_path, 'r') as ftest:
-            lines = ftest.readlines()
-            self.w, self.h = lines[0].strip().split()
-            self.w = int(self.w)
-            self.h = int(self.h)
-            self.map_bin_file = lines[1].strip()  # Filename relative to the test case
-            self.map_data = [0] * (self.w * self.h)  # Avoid appending
-            test_full_path = os.path.abspath(ftest.name)
-            test_dir = os.path.dirname(test_full_path)
-            map_full_map_path = os.path.join(test_dir, self.map_bin_file)
-            self.map_bin_file = map_full_map_path  # Full path
-
-            with open(self.map_bin_file, 'rb') as fmap:
-                for i in range(self.w * self.h):
-                    cell = fmap.read(1)
-                    self.map_data[i] = int.from_bytes(cell, 'big')  # It's one byte, it doesn't matter big or little endian
-                
-            self.test_cases = list()
-            for test in lines[3:]:
-                if test.strip().startswith('-1'):
-                    continue
-                x0, y0, x1, y1 = [float(c) for c in test.strip().split()]
-                self.test_cases.append(((x0, y0, 0.0), (x1, y1, 0.0)))  # Orientation 0 degrees
+        self.w, self.h, self.map_data, self.test_cases, _ = load_test(test_path)
 
         maude.init()
         maude.load(self.ASTAR_MAUDE_PATH)
@@ -93,9 +73,9 @@ class DirectProfiler:
         
         # Dictionary with Maude integer terms from 0 to 255 to avoid parsing 
         # when constructing the map_list in Maude
-        int_terms = dict()
-        for i in range(0,256):
-            int_terms[i] = self.m.parseTerm(str(i))
+        # int_terms = dict()
+        # for i in range(0,256):
+        #    int_terms[i] = self.m.parseTerm(str(i))
 
         # Build the IntList with the costmap data
         map_list = mtIL
