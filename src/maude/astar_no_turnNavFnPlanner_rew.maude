@@ -37,7 +37,7 @@ mod ASTAR is
      CURR := initCurrent({X', Y'}, CM, NC, NR) /\
      a*({X, Y}, {X', Y'}, CM, P, NC, NR, CURR, noPath, noPath, T, I) => P' /\
      (P' @ [X , Y]) < infinite /\
-     G := initialGradient(NC, NR) .
+     G := initialGradient(NC, NR) [label initPath] .
  crl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NC, NR, I, IPATH) => noPath
   if P := initialP*(NC, NR, X', Y') /\
      T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\

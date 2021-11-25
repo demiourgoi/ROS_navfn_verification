@@ -8,14 +8,31 @@
 
 load astar_no_turnNavFnPlanner_rew.maude
 
-smod TEST-POT-STRAT is
-  pr TEST-POT .
-  pr STRATEGY-MODEL-CHECKER .
+smod ASTAR-STRAT is
+  pr ASTAR .
 
-  strat astar @ State .
+  strat astar @ Potential .
+  strat getPath @ Path .
 
   *** Stops if the initial state has been reached or no next state is possible
   sd astar := reached or-else ((curr | next) ? astar : idle) .
+
+  *** Get the path by applying astar to calculate the potential map
+  sd getPath := initPath{astar} ; all ! .
+endsm
+
+smod TEST-POT-STRAT is
+  pr TEST-POT .
+  pr STRATEGY-MODEL-CHECKER .
+  pr ASTAR-STRAT .
 endsm
 
 *** red modelCheck(initPot, [] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess), 'astar) .
+
+smod TEST-PATH-STRAT is
+  pr TEST-PATH .
+  pr STRATEGY-MODEL-CHECKER .
+  pr ASTAR-STRAT .
+endsm
+
+*** red modelCheck(initPath, [] (NonInfinitePotAtInit -> <> PathComputed), 'getPath) .

@@ -32,12 +32,37 @@ def simplify_test_name(name):
 	return name
 
 
+class MapHook(maude.Hook):
+	"""Hook for op get : CostMap Nat Nat Nat -> Float"""
+
+	def __init__(self):
+		super().__init__()
+		self.parent = {}
+		self.cache = {}  # Dictionary int in [0..255] -> Maude term representing the corresponding Float
+
+
+	def add_user(self, key, parent):
+		self.parent[key] = parent
+		self.cache[key] = {i: parent.module.parseTerm(str(float(i))) for i in range(256)}
+
+	def run(self, term, data):
+		try:
+			key = str(term.symbol().getModule())
+			_, x, y, ncols = [int(arg) for arg in term.arguments()]
+			cell_value = self.parent[key].cmap[y * ncols + x]
+			ret_term = self.cache[key][cell_value]
+			# print(f'FAST {term} --> {ret_term}')
+			return ret_term
+		except Exception as e:
+			print('hook:', e)
+
+
 class NavFnAstarMC:
 	"""Model checker for the NavFN-A* Maude implementation"""
 
 	ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner_strat.maude'
 
-	def __init__(self, use_hook=True, use_strategy=True):
+	def __init__(self, module_name, strat_str, formula_str, use_hook=True, use_strategy=True):
 		self.width = None
 		self.height = None
 		self.map = None
@@ -46,7 +71,7 @@ class NavFnAstarMC:
 		self.use_hook = use_hook
 		self.use_strategy = use_strategy
 
-		m = maude.getModule('TEST-POT-STRAT')
+		m = maude.getModule(module_name)
 		self.module = m
 
 		pose_kind = m.findSort('Pose').kind()
@@ -56,8 +81,7 @@ class NavFnAstarMC:
 		potential_kind = m.findSort('Potential').kind()
 
 		# Symbol of the a* algorithm
-		self.astar = m.findSymbol('a*i', (pose_kind, pose_kind, cmap_kind,
-		                                  nat_kind, nat_kind, nat_kind), potential_kind)
+		self.astar = self.get_astar_symbol(pose_kind, cmap_kind, nat_kind, potential_kind, path_kind)
 
 		# Kinds for parsing in other methods
 		self.nat_kind = nat_kind
@@ -70,35 +94,11 @@ class NavFnAstarMC:
 		self.noPath = m.parseTerm('noPath', path_kind)
 		self.path_union = m.findSymbol('__', (path_kind, path_kind), path_kind)
 
-		# Strategy to advance an iteration
-		self.astar_st = m.parseStrategy('astar')
+		# Strategy to control rewriting
+		self.astar_st = m.parseStrategy(strat_str)
 
 		# Temporal formulae
-		self.no_wall = m.parseTerm('[] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess)')
-		# self.path_computed = m.parseTerm('[] (NonInfinitePotAtInit -> <> PathComputed)')
-
-		# Hook for "op get : CostMap Nat Nat Nat -> Float"
-		class MapHook(maude.Hook):
-			def __init__(self, parent):
-				super().__init__()
-				self.parent = parent
-				self.cache = dict()  # Dictionary int in [0..255] -> Maude term representing the corresponding Float
-				for i in range(0, 256):
-					self.cache[i] = self.parent.module.parseTerm(str(float(i)))
-
-			def run(self, term, data):
-				try:
-					_, x, y, ncols = [int(arg) for arg in term.arguments()]
-					cell_value = self.parent.cmap[y * ncols + x]
-					ret_term = self.cache[cell_value]
-					# print(f'FAST {term} --> {ret_term}')
-					return ret_term
-				except Exception as e:
-					print('hook:', e)
-
-		if self.use_hook:
-			self.mapHook = MapHook(self)
-			maude.connectEqHook('get', self.mapHook)
+		self.formula = m.parseTerm(formula_str)
 
 	def set_map(self, width, cmap):
 		"""Set the map"""
@@ -124,17 +124,14 @@ class NavFnAstarMC:
 		origin = self.make_bpose(*origin)
 		dest = self.make_bpose(*dest)
 
-		# op a*i : Pose Pose CostMap Nat Nat Nat ~> Potential .
-		self.term = self.astar(origin, dest, self.map,
-		                       self.width, self.height,
-		                       self.iterations)
+		self.term = self.get_initial_term(origin, dest)
 
 		if self.use_strategy:
 			graph = maude.StrategyRewriteGraph(self.term, self.astar_st)
 		else:
 			graph = maude.RewriteGraph(self.term)
 
-		result = graph.modelCheck(self.no_wall)
+		result = graph.modelCheck(self.formula)
 
 		return result.holds
 
@@ -144,7 +141,64 @@ class NavFnAstarMC:
 		return self.module.parseTerm(f'{{{x}, {y}}}', self.pose_kind)
 
 
-def process_tests(mc, tests, args):
+class NoWallMC(NavFnAstarMC):
+	"""Model checker for the NoWallMC property"""
+
+	PROP_NAME = 'NoWall'
+
+	def __init__(self, **kwargs):
+		super().__init__('TEST-POT-STRAT',
+		                 'astar',
+		                 '[] (~ wallInCurrent /\ ~ wallInNext /\ ~ wallInExcess)',
+		                 **kwargs)
+
+	def get_astar_symbol(self, pose_kind, cmap_kind, nat_kind, potential_kind, path_kind):
+		"""Symbol for op a*i : Pose Pose CostMap Nat Nat Nat ~> Potential"""
+
+		return self.module.findSymbol('a*i', (pose_kind, pose_kind, cmap_kind,
+                                                      nat_kind, nat_kind, nat_kind), potential_kind)
+
+
+	def get_initial_term(self, origin, dest):
+		"""Get the initial term for model checking"""
+
+		return self.astar(origin, dest, self.map,
+                                  self.width, self.height,
+                                  self.iterations)
+
+
+class EventuallyPathMC(NavFnAstarMC):
+	"""Model checker for the EventuallyPath property"""
+
+	PROP_NAME = 'EventuallyPath'
+
+	def __init__(self, **kwargs):
+		super().__init__('TEST-PATH-STRAT',
+		                 'getPath',
+		                 '[] (NonInfinitePotAtInit -> <> PathComputed)',
+		                 **kwargs)
+
+	def get_astar_symbol(self, pose_kind, cmap_kind, nat_kind, potential_kind, path_kind):
+		"""Symbol for op a* : Pose Pose CostMap Nat Nat Nat Nat -> Path"""
+
+		return self.module.findSymbol('a*', (pose_kind, pose_kind, cmap_kind) +
+		                                    (nat_kind, ) * 4, path_kind)
+
+	def get_initial_term(self, origin, dest):
+		"""Get the initial term for model checking"""
+
+		return self.astar(origin, dest, self.map,
+                                  self.width, self.height,
+                                  self.iterations, self.path_cycles)
+
+	def set_map(self, width, cmap):
+		super().set_map(width, cmap)
+
+		# Number of iterations for the path calculation
+		self.path_cycles = self.module.parseTerm(str(4 * width))
+
+
+def process_tests(props, tests, args):
 	"""Process the given test with the model checker"""
 
 	for test_case in tests:
@@ -155,13 +209,16 @@ def process_tests(mc, tests, args):
 			continue
 
 		print(f'\x1b[1m{simplify_test_name(test_case)}\x1b[0m', end='', flush=True)
-		mc.set_map(w, map_data)
+
+		for prop in props:
+			prop.set_map(w, map_data)
 
 		start_time = time.perf_counter_ns()
 
 		for (x0, y0, _), (x, y, _) in test_cases:
-			if not mc.check((x0, y0), (x, y)):
-				print(f'\n\x1b[1;31mFAILURE\x1b[0m for Wall {x0},{y0} to {x},{y}', end='', flush=True)
+			for prop in props:
+				if not prop.check((x0, y0), (x, y)):
+					print(f'\n\x1b[1;31mFAILURE\x1b[0m for {prop.PROP_NAME} {x0},{y0} to {x},{y}', end='', flush=True)
 
 		end_time = time.perf_counter_ns()
 
@@ -184,6 +241,19 @@ if __name__ == '__main__':
 
 	maude.init()
 	maude.load(NavFnAstarMC.ASTAR_MAUDE_PATH)
-	mc = NavFnAstarMC(use_hook=args.use_hook, use_strategy=args.use_strategy)
 
-	process_tests(mc, args.test, args)
+	# Objects handling the LTL properties to be checked
+	props = [
+		NoWallMC(use_hook=args.use_hook, use_strategy=args.use_strategy),
+		EventuallyPathMC(use_hook=args.use_hook, use_strategy=args.use_strategy),
+	]
+
+	# Configure the hook that enables random access to the map
+	if args.use_hook:
+		mapHook = MapHook()
+		maude.connectEqHook('get', mapHook)
+
+		for prop in props:
+			mapHook.add_user(str(prop.module), prop)
+
+	process_tests(props, args.test, args)
