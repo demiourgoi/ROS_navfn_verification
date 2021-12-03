@@ -137,13 +137,20 @@ def map_obstacle_random_test(cols, rows, path_ratio=1.0, obstacle_ratio=0.2,
     store_test(im, testfilename, mapfilename, paths)
 
 
-def map_spiral(cols, rows, path_ratio=1.0, mapfilename="map.bin", testfilename="test.txt"):
+def map_spiral(cols, rows, path_ratio=1.0, random_cell=False, mapfilename="map.bin", testfilename="test.txt"):
     """ Generates a map file (binary) with num_cols x rows cells surrounded with
         obstacles in the border (1 pixel). Cells forms an clockwise spiral starting from (1, 1).
         Generates a random subset of the possible valid paths to test, with ratio "path_ratio".
         Stores the map and all the possible paths in files
     """
     im = Image.new("L", (cols + 2, rows + 2), FREE_INI)
+    
+    if random_cell:
+        for x in range(1, cols + 1):
+            for y in range(1, rows + 1):
+                cell = random.choice(range(FREE_INI, FREE_END+1))
+                im.putpixel((x, y), cell)
+    
     for x in range(0, cols + 2):
         im.putpixel((x, 0), OBSTACLE)
         im.putpixel((x, rows+1), OBSTACLE)
@@ -290,12 +297,48 @@ def random_paths_image_close(im, num_paths=10, dist=10):
             paths += 1
     return ret
     
+    
+def draw_column(im, x, y, size, color):
+    """ Draws a square column (obstacle) in (x,y) of the image """
+    for px in range(x, x+size):
+        for py in range(y, y+size):
+            if px < im.width and py < im.height:
+                im.putpixel((px, py), color)
+    
+    
+def map_column_test(cols, rows, column_size=1, column_sep=2, path_ratio=1.0,
+                    random_cell=False, mapfilename="map.bin", testfilename="test.txt"):
+    """ Generates a map file (binary) with num_cols x rows cells surrounded with
+        obstacles in the border (1 pixel). It will contain columns of a given
+        size and separations in a grid. 
+        Generates a random subset of the possible valid paths to test, with ratio "path_ratio".
+        Stores the map and all the possible paths in files
+    """
+    im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
+    for x in range(1, cols+1):
+        for y in range(1, rows + 1):
+            im.putpixel((x, y), FREE_INI)
+    
+    if random_cell:
+        for x in range(1, cols + 1):
+            for y in range(1, rows + 1):
+                cell = random.choice(range(FREE_INI, FREE_END+1))
+                im.putpixel((x, y), cell)
+    
+    column_positions = [(x,y) for x in range(column_sep+1, cols+1, column_size+column_sep)
+                              for y in range(column_sep+1, rows+1, column_size+column_sep)]
+    for (x,y) in column_positions:
+        draw_column(im, x, y, column_size, OBSTACLE)
+
+    paths = all_paths_image(im, path_ratio)
+    store_test(im, testfilename, mapfilename, paths)
+    
 
 def main():
-    test_from_yaml('speed_mask.yaml', 30)
-    # map_split(50, 10, path_ratio=0.0, num_vert=20, num_horiz=1)
-    # map_radial(cols, rows, path_ratio=1.0, center=(1, 1), radius=25,
-    # map_split(4, 12, 0, 4, 1.0)
+    map_column_test(15, 5, column_size=2, column_sep=2, path_ratio=0.5,
+                    random_cell=True, mapfilename="map.bin", testfilename="test.txt")
+    # test_from_yaml('speed_mask.yaml', 30)
+
 
 
 if __name__ == "__main__":
