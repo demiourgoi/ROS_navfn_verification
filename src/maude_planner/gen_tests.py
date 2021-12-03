@@ -298,12 +298,17 @@ def random_paths_image_close(im, num_paths=10, dist=10):
     return ret
     
     
+def draw_pixel_if_inside(im, x, y, color):
+    """ Draws a 'color' in (x,y) if inside the image """
+    if x < im.width and y < im.height:
+        im.putpixel((x, y), color)
+    
+    
 def draw_column(im, x, y, size, color):
     """ Draws a square column (obstacle) in (x,y) of the image """
     for px in range(x, x+size):
         for py in range(y, y+size):
-            if px < im.width and py < im.height:
-                im.putpixel((px, py), color)
+            draw_pixel_if_inside(im, px, py, color)
     
     
 def map_column_test(cols, rows, column_size=1, column_sep=2, path_ratio=1.0,
@@ -333,11 +338,65 @@ def map_column_test(cols, rows, column_size=1, column_sep=2, path_ratio=1.0,
     paths = all_paths_image(im, path_ratio)
     store_test(im, testfilename, mapfilename, paths)
     
+    
+def random_point(im):
+    """ Returns a random point in the image (avoiding borders) """
+    x = random.randint(1, im.width-1)
+    y = random.randint(1, im.height-1)
+    return (x,y)
+    
+    
+def draw_wall(im, p1, p2, color): 
+    # Draws a linear wall in the image from p1 to p2
+    STEP = 0.5
+    
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    norm = math.sqrt(dx**2 + dy**2)
+    dx /= norm
+    dy /= norm
+    
+    cx = p1[0]
+    cy = p1[1]
+    for _ in range(int(norm/STEP)+1):
+        cx = cx + dx*STEP
+        cy = cy + dy*STEP
+        draw_pixel_if_inside(im, int(cx), int(cy), color)
+    
+    
+    
+    
+def map_walls_test(cols, rows, num_walls=1, wall_size=1, path_ratio=1.0,
+                   random_cell=False, mapfilename="map.bin", testfilename="test.txt"):
+    """ Generates a map file (binary) with num_cols x rows cells surrounded with
+        obstacles in the border (1 pixel). It contains random walls between two
+        points of the map. 
+        Generates a random subset of the possible valid paths to test, with ratio "path_ratio".
+        Stores the map and all the possible paths in files
+    """
+    im = Image.new("L", (cols + 2, rows + 2), OBSTACLE)
+    for x in range(1, cols+1):
+        for y in range(1, rows + 1):
+            im.putpixel((x, y), FREE_INI)
+    
+    if random_cell:
+        for x in range(1, cols + 1):
+            for y in range(1, rows + 1):
+                cell = random.choice(range(FREE_INI, FREE_END+1))
+                im.putpixel((x, y), cell)
+    
+    for _ in range(num_walls):
+        p1 = random_point(im)
+        p2 = random_point(im)
+        draw_wall(im, p1, p2, OBSTACLE)
+
+    paths = all_paths_image(im, path_ratio)
+    store_test(im, testfilename, mapfilename, paths)    
+    
 
 def main():
-    map_column_test(15, 5, column_size=2, column_sep=2, path_ratio=0.5,
-                    random_cell=True, mapfilename="map.bin", testfilename="test.txt")
-    # test_from_yaml('speed_mask.yaml', 30)
+    map_obstacle_random_test(10, 10, path_ratio=0.2, obstacle_ratio=0.0,
+                             mapfilename="map.bin", testfilename="test.txt")
 
 
 
