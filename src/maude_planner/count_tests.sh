@@ -1,10 +1,11 @@
 #! /bin/bash
 
-TEST_NAME=$1
-NUM_MAPS=`find tests/ -name ${TEST_NAME} | wc -l`
+#TEST_NAME=$1
+TEST_DIR=$1
+NUM_MAPS=`find ${TEST_DIR} -name test.txt | wc -l`
 NUM_PATHS=0
 
-for test in $(find tests/ -name ${TEST_NAME})
+for test in $(find ${TEST_DIR} -name test.txt)
 do
   PATHS=`cat $test | wc -l`
   echo "$test -> $PATHS paths"
