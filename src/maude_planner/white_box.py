@@ -200,8 +200,8 @@ class TestEngine:
 
 			for k, name in enumerate(('CURR', 'NEXT', 'OVER')):
 				if stacks[k] != stacks_maude[k]:
-					log_diff(name, cycle, stacks[k], stacks_maude[k],
-					         set(stacks[k]) == set(stacks_maude[k]))
+					self.log_diff(name, cycle, stacks[k], stacks_maude[k],
+					              set(stacks[k]) == set(stacks_maude[k]))
 
 			self.term, _ = next(self.term.srewrite(self.iter_st), (None, None))
 
