@@ -7,13 +7,32 @@ Author: Enrique Martin
 
 import ast
 import argparse
+import math
 import os
 import sys
 
 OBSTACLE = 254
 
 
-def show_using_numpy(map_full_map_path, w, h, args):
+def midpoint(x, y):
+    """Middle point between other two"""
+
+    return [(a + b) / 2 for a, b in zip(x, y)]
+
+
+def calculate_cost(costmap, path):
+    """Calculate the cost of a path"""
+    
+    cost = 0.0
+
+    for k in range(len(path)-1):
+        i, j = map(math.floor, midpoint(path[k], path[k+1]))
+        cost += math.dist(path[k], path[k+1]) * costmap[j, i]
+        
+    return cost
+
+
+def show_using_numpy(map_full_map_path, w, h, args, lines):
     import numpy as np
     import matplotlib.pyplot as plt
 
@@ -31,6 +50,17 @@ def show_using_numpy(map_full_map_path, w, h, args):
     if args.path:
         path = ast.literal_eval(args.path)
         plt.plot(*zip(*path), color='blue', marker='o')
+        
+        print('Path cost:', calculate_cost(costmap, path))
+
+    # Overlay the test cases if enabled
+    if args.cases:
+        # Read the test cases from the txt file
+        cases = [map(int, line.strip().split(' ')) for line in lines[4:]]
+
+        for x0, y0, x, y in cases:
+            plt.arrow(x0, y0, x - x0, y - y0, color='blue',
+                      length_includes_head=True, head_width=0.002 * w)
     
     # Show or write the result
     if args.o:
@@ -39,7 +69,7 @@ def show_using_numpy(map_full_map_path, w, h, args):
         plt.show()
 
 
-def show_using_pil(map_full_map_path, w, h, args):
+def show_using_pil(map_full_map_path, w, h, args, lines):
     from PIL import Image
 
     with open(map_full_map_path, "rb") as mapfile:
@@ -76,9 +106,9 @@ def show_map(args):
         print(map_full_map_path)
 
     # Show the map using NumPy or PIL depending on the argument
-    show_fn = show_using_numpy if args.numpy or args.path else show_using_pil
+    show_fn = show_using_numpy if args.numpy or args.path or args.cases else show_using_pil
 
-    show_fn(map_full_map_path, w, h, args)
+    show_fn(map_full_map_path, w, h, args, lines)
 
 
 if __name__ == "__main__":
@@ -86,7 +116,8 @@ if __name__ == "__main__":
     parser.add_argument('test_file', help='Test specification file')
     parser.add_argument('--numpy', help='Use NumPy-Matplotlib instead of PIL to show the map',
                         action='store_true')
-    parser.add_argument('--path', help='Print a path the map, given a Python list of pairs over (implies --numpy)')
+    parser.add_argument('--path', help='Print a path on the map, given a Python list of pairs over (implies --numpy)')
+    parser.add_argument('--cases', help='Print the test cases (initial and final pose) on the map (implies --numpy)', action='store_true')
     parser.add_argument('-o', help='Output the drawing to a file')
 
     show_map(parser.parse_args())
