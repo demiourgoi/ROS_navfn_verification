@@ -86,7 +86,7 @@ predicate ValidQueue(queue: seq<Pose>, pot: PotentialMap, costMap: CostMap)
     && HasSomeAdjacentReal(p, pot, costMap.numRows, costMap.numCols)
 }
 
-method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat) returns (error: bool, path: Path)
+method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numPathIterations: nat) returns (error: bool, path: Path)
   requires 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
   requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
   requires Open(costMap, goal.pos.row, goal.pos.col)
@@ -106,7 +106,7 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat) retu
   var pot': PotentialMap := AStarIteration(start, goal, costMap, pot, current, [], [], initialThreshold, numIterations);
   ghost var closestPath: seq<Point>;
   if (pot'[start.pos.row][start.pos.col].Real?) {
-    error, path, closestPath := ComputePath(start.pos, goal.pos, pot', numIterations, costMap.numRows, costMap.numCols);
+    error, path, closestPath := ComputePath(start.pos, goal.pos, pot', numPathIterations, costMap.numRows, costMap.numCols);
     assert !error ==> forall p | p in path :: pot'[ClosestPoint(p).row][ClosestPoint(p).col].Real?;
     assert !error ==> forall p | p in path :: Open(costMap, ClosestPoint(p).row, ClosestPoint(p).col);
   } else {
@@ -390,7 +390,7 @@ method ComputePath(start: Point, goal: Point, potentialMap: PotentialMap, numSte
   closest := [cl];
   error := false;
   while (i > 0 && !error && ClosestPoint(p) != goal)
-    decreases !error, i
+    decreases i
     invariant !error ==> 0 <= cl.row < numRows && 0 <= cl.col < numCols
     invariant !error ==> cl == ClosestPoint(p)
     invariant !error ==> potentialMap[cl.row][cl.col].Real?
@@ -402,11 +402,11 @@ method ComputePath(start: Point, goal: Point, potentialMap: PotentialMap, numSte
         potentialMap[closest[i].row][closest[i].col].Real?
   {
     error, p, cl := NextMove(p, cl, potentialMap, numRows, numCols);
-    if (!error) {
+    if (!error && ClosestPoint(p) != goal) {
       path := path + [p];
       closest := closest + [cl];
-      i := i - 1;
     }
+    i := i - 1;
   }
 
   if (error || i == 0) {
