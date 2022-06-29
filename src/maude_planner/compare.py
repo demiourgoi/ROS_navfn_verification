@@ -113,10 +113,11 @@ def path_equal(path1, path2, epsilon):
 class Plotter:
     """Plotter of potentials and paths using matplotlib"""
 
-    def __init__(self, name, draw, width):
+    def __init__(self, name, draw, width, other_name):
         self.width = width
         self.mode = draw
         self.costmap = None
+        self.other_name = other_name
 
         # This may be a dummy plotter if draw is false. The packages are only
         # imported if drawing is required.
@@ -296,9 +297,10 @@ class Plotter:
         self.pdf.savefig()
         self.plt.close()
 
-        # Maude potential and path
+        # Maude/Dafny potential and path
         self.draw_potential(potarr2, path2, pcolor='blue')
-        self.plt.title(f'{origin} to {dest} — Maude')
+        print(self.other_name)
+        self.plt.title(f'{origin} to {dest} — {self.other_name}')
         self.pdf.savefig()
         self.plt.close()
 
@@ -346,7 +348,7 @@ def main(args):
     tried_costmap = False
     costmap_path = os.path.join(os.path.dirname(args.ros_output), 'map.bin')
 
-    with Plotter('potentials.pdf', args.draw, args.width) as plotter:
+    with Plotter('potentials.pdf', args.draw, args.width, args.name) as plotter:
         for test in tests:
             path1 = dict1[test]["path"]
             path2 = dict2[test]["path"]
@@ -380,7 +382,7 @@ def main(args):
                 # ros_osc = "(removed oscillations)" if detect_oscillation(path1, epsilon) is not None else ""
                 # maude_osc = "(removed oscillations)" if detect_oscillation(path2, epsilon) is not None else ""
                 print(f'  ROS: {path1}')
-                print(f'  Maude: {path2}')
+                print(f'  {args.name}: {path2}')
                 if len(path1) == len(path2):
                     print('Max. difference: ', max((abs(path1[i][j] - path2[i][j]) for i in range(len(path1)) for j in (0, 1))))
                 print(f'potarr: {dict1[test]["navfn"]}\n')
@@ -403,6 +405,7 @@ if __name__ == "__main__":
                         choices=['none', 'failed', 'all'], default='none', const='failed')
     parser.add_argument('--costmap', help='Draw cost maps instead of navigation functions', action='store_true')
     parser.add_argument('--width', '-w', help='Width of the map (if not square)', type=int)
+    parser.add_argument('--name', help='Name of the high-level backend', choices=['Maude', 'Dafny'], default='Maude')
 
     args = parser.parse_args()
     main(args)
