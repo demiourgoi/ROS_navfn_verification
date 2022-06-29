@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Check navigation results from ROS2 and Maude implementation
+Check navigation results from ROS2, Maude, and Dafny implementation
 Author: Enrique Martin
 """
 

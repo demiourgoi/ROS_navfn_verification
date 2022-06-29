@@ -1,0 +1,48 @@
+--- a/astar_navfnplanner-go/src/astar_navfnplanner.go
++++ b/astar_navfnplanner-go/src/astar_navfnplanner.go
+@@ -1,6 +1,12 @@
+ // Dafny program astar_navfnplanner.dfy compiled into Go
+ package main
+ 
++// #cgo CFLAGS: -g
++// void notify_tuple(int a, int b) { };
++// void end_queue() { };
++// int oldIterations = - 1;
++import "C"
++
+ import (
+   "math"
+   _dafny "astar_navfnplanner/dafny"
+@@ -611,6 +617,7 @@ func (_static *CompanionStruct_Default__
+ }
+ func (_static *CompanionStruct_Default___) AStar(start Pose, goal Pose, costMap CostMap, numIterations _dafny.Int, numPathIterations _dafny.Int) (bool, _dafny.Seq, _dafny.Seq) {
+   var error_ bool = false
++  C.oldIterations = C.int(-1)
+   _ = error_
+   var path _dafny.Seq = _dafny.EmptySeq
+   _ = path
+@@ -655,9 +662,24 @@ func (_static *CompanionStruct_Default__
+   }
+   return error_, path, navfn
+ }
++func NotifyQueue(queue _dafny.Seq) {
++  it := queue.Iterator()
++  elem, has := it()
++  for has {
++    C.notify_tuple(C.int(elem.(Pose).Dtor_pos().Dtor_col().Int()), C.int(elem.(Pose).Dtor_pos().Dtor_row().Int()))
++    elem, has = it()
++  }
++  C.end_queue()
++}
+ func (_static *CompanionStruct_Default___) AStarIteration(start Pose, goal Pose, costMap CostMap, pot _dafny.Seq, current _dafny.Seq, next _dafny.Seq, excess _dafny.Seq, threshold _dafny.Real, numIterations _dafny.Int) _dafny.Seq {
+   goto TAIL_CALL_START
+   TAIL_CALL_START:
++  if C.oldIterations == -1 || numIterations.Int() < int(C.oldIterations) {
++    C.oldIterations = C.int(numIterations.Int())
++    NotifyQueue(current)
++    NotifyQueue(next)
++    NotifyQueue(excess)
++  }
+   var pot_k _dafny.Seq = _dafny.EmptySeq
+   _ = pot_k
+   if ((numIterations).Sign() == 0) {

@@ -1,0 +1,201 @@
+--- a/astar_navfnplanner-go/src/dafny/dafny.go
++++ b/astar_navfnplanner-go/src/dafny/dafny.go
+@@ -5,6 +5,7 @@ package dafny
+ 
+ import (
+   "fmt"
++  "math"
+   big "math/big"
+   refl "reflect"
+   "runtime"
+@@ -2119,25 +2120,17 @@ func (Ord) IsNatOrd() bool {
+  ******************************************************************************/
+ 
+ // A Real is an arbitrary-precision real number, represented as a ratio of
+-// arbitrary-precision integers.
+-type Real struct {
+-  impl *big.Rat
+-  // debug string
+-}
++// arbitrary-precision integers
++type Real float32
+ 
+ func realOf(r *big.Rat) Real {
+-  return Real{
+-    impl: r,
+-    // debug: r.String()
+-  }
++  f32, _ := r.Float32()
++  return Real(f32)
+ }
+ 
+ // RealOf converts a float64 into a Real.  Common values are cached.
+ func RealOf(f float64) Real {
+-  if f == 0.0 {
+-    return ZeroReal
+-  }
+-  return realOf(new(big.Rat).SetFloat64(f))
++  return Real(float32(f))
+ }
+ 
+ // RealOfFrac makes a Real of the ratio of two Ints.
+@@ -2149,14 +2142,14 @@ func RealOfFrac(num, denom Int) Real {
+ }
+ 
+ // ZeroReal is the Real value zero.
+-var ZeroReal = realOf(new(big.Rat))
++var ZeroReal = Real(0.0)
+ 
+ // NilReal is a missing Real value.
+-var NilReal = realOf(nil)
++var NilReal = Real(0.0)
+ 
+ // IsNilReal returns whether this is actually a missing value.
+ func (x Real) IsNilReal() bool {
+-  return x.impl == nil
++  return false
+ }
+ 
+ // RealOfString parses the given string in base 10 and panics if this is not
+@@ -2166,113 +2159,61 @@ func RealOfString(s string) Real {
+   if !ok {
+     panic("Can't parse generated string as ratio: \"" + s + "\"")
+   }
+-  if x.Cmp(ZeroReal.impl) == 0 {
+-    return ZeroReal
+-  }
+   return realOf(x)
+ }
+ 
+ // Int converts the given real to an integer, rounding toward negative numbers.
+ // (That is, returns floor(x).)
+ func (x Real) Int() Int {
+-  if x.Cmp(ZeroReal) == 0 || x.Denom().Cmp(One) == 0 {
+-    return x.Num()
+-  } else if x.Num().Cmp(Zero) > 0 {
+-    return intOf(new(big.Int).Div(x.impl.Num(), x.impl.Denom()))
+-  } else {
+-    a := new(big.Int).Sub(x.impl.Num(), x.impl.Denom())
+-    a.Add(a, One.impl)
+-    return intOf(a.Quo(a, x.impl.Denom())) // note: *truncated* division
+-  }
+-}
+-
+-// Num returns the given Real's numerator as an Int
+-func (x Real) Num() Int {
+-  return intOf(x.impl.Num())
+-}
+-
+-// Denom returns the given Real's denominator as an Int
+-func (x Real) Denom() Int {
+-  return intOf(x.impl.Denom())
++  return IntOf(int(math.Floor(float64(x))))
+ }
+ 
+ func (x Real) String() string {
+-  if x.Num().Cmp(Zero) == 0 || x.Denom().Cmp(One) == 0 {
+-    return x.Num().String() + ".0"
+-  }
+-  divsPow10, fact, log10 := x.Denom().dividesAPowerOf10()
+-  if divsPow10 {
+-    num := x.Num().Times(fact)
+-    var sign, digits string
+-    if x.Cmp(ZeroReal) < 0 {
+-      sign, digits = "-", num.Negated().String()
+-    } else {
+-      sign, digits = "", num.String()
+-    }
+-    if log10 < len(digits) {
+-      n := len(digits) - log10
+-      return sign + digits[0:n] + "." + digits[n:]
+-    } else {
+-      s := sign + "0."
+-      for i := 0; i < log10-len(digits); i++ {
+-        s = s + "0"
+-      }
+-      return s + digits
+-    }
+-  } else {
+-    return "(" + x.Num().String() + ".0 / " + x.Denom().String() + ".0)"
+-  }
+-}
+-
+-func (x Real) isPowerOf10() (bool, int) {
+-  if x.Num().Cmp(Zero) != 1 {
+-    return false, -1
+-  } else if x.Num().Cmp(One) == 1 {
+-    b, i := x.Denom().isPowerOf10()
+-    return b, -i
+-  } else if x.Denom().Cmp(One) != 1 {
+-    return false, -1
+-  } else {
+-    return x.Num().isPowerOf10()
+-  }
+-}
+-
+-// binOp lifts a binary operation on *big.Rat to one on Reals.  The second
+-// argument is intended to be of the form (*big.Rat).Op.
+-func (x Real) binOp(y Real, f func(*big.Rat, *big.Rat, *big.Rat) *big.Rat) Real {
+-  return realOf(f(new(big.Rat), x.impl, y.impl))
++  return fmt.Sprintf("%g", x)
+ }
+ 
+ // Plus adds two Reals.
+ func (x Real) Plus(y Real) Real {
+-  return x.binOp(y, (*big.Rat).Add)
++  return x + y
+ }
+ 
+ // Minus subtracts one Real from another.
+ func (x Real) Minus(y Real) Real {
+-  return x.binOp(y, (*big.Rat).Sub)
++  return x - y
+ }
+ 
+ // Times multiplies two Reals.
+ func (x Real) Times(y Real) Real {
+-  return x.binOp(y, (*big.Rat).Mul)
++  return x * y
+ }
+ 
+ // DivBy divides one Real by another.
+ func (x Real) DivBy(y Real) Real {
+-  return x.binOp(y, (*big.Rat).Quo)
++  return x / y
+ }
+ 
+ // Cmp compares one Real to another, returning -1 for less, 0 for equal, or 1
+ // for greater.
+ func (x Real) Cmp(y Real) int {
+-  return x.impl.Cmp(y.impl)
++  if x < y {
++    return -1
++  } else if x > y {
++    return 1
++  } else {
++    return 0
++  }
+ }
+ 
+ // Sign returns the sign of a Real, returning -1 for negative, 0 for zero, or
+ // 1 for positive.
+ func (x Real) Sign() int {
+-  return x.impl.Sign()
++  if x < 0.0 {
++    return -1
++  } else if x > 0.0 {
++    return 1
++  } else {
++    return 0
++  }
+ }
+ 
+ // EqualsGeneric compares an int to another value.
+@@ -2601,6 +2542,5 @@ func CatchHalt() {
+   }
+ }
+ func (x Real) Float64() float64 {
+-  fp, _ := x.impl.Float64()
+-  return fp
++  return float64(x)
+ }

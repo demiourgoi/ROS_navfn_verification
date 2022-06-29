@@ -1,6 +1,5 @@
 datatype Point = Point(row: int, col: int)
 datatype RealPoint = RealPoint(row: real, col: real)
-datatype OffsetPoint = OffsetPoint(base: Point, offset: RealPoint)
 datatype Pose = Pose(pos: Point)
 datatype CostMap = CostMap(value: Point -> real, numRows: nat, numCols: nat)
 datatype RealInf = Real(r: real) | Infinity
@@ -11,7 +10,7 @@ type PotentialMap = seq<seq<RealInf>>
 
 const obstacleCost: real := 254.0
 const mapCost: real := 50.0
-const stepSize: real := 0.5
+
 
 predicate method Open(costMap: CostMap, row: int, col: int)
 {
@@ -97,6 +96,7 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
     |path| >= 1
     && path[0] == RealPoint(start.pos.row as real, start.pos.col as real)
     && path[|path| - 1] == RealPoint(goal.pos.row as real, goal.pos.col as real)
+    && forall p | p in path :: Open(costMap, ClosestPoint(p).row, ClosestPoint(p).col)
 
 {
   var pot := BuildInitialPotentialMap(costMap.numRows, costMap.numCols, goal.pos.row, goal.pos.col);
@@ -108,6 +108,8 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
   ghost var closestPath: seq<Point>;
   if (pot'[start.pos.row][start.pos.col].Real?) {
     error, path, closestPath := ComputePath(start.pos, goal.pos, pot', numPathIterations, costMap.numRows, costMap.numCols);
+    assert !error ==> forall p | p in path :: pot'[ClosestPoint(p).row][ClosestPoint(p).col].Real?;
+    assert !error ==> forall p | p in path :: Open(costMap, ClosestPoint(p).row, ClosestPoint(p).col);
     navfn := pot';
   } else {
     error := true;
@@ -311,22 +313,16 @@ function method SignReal(x: real): real {
   else 0.0
 }
 
-function method Round(x: real): int {
-	if x - x.Floor as real > 0.5 || (x - x.Floor as real == 0.5 && x > 0.0) then x.Floor + 1 else x.Floor
+function method ClosestPoint(p: RealPoint): Point {
+  Point((p.row + 0.5).Floor, (p.col + 0.5).Floor)
 }
 
-function method ClosestPoint(p: OffsetPoint): Point {
-  Point(p.base.row + Round(p.offset.row), p.base.col + Round(p.offset.col))
-}
 
-function method ToRealPoint(p: OffsetPoint): RealPoint {
-  RealPoint(p.base.row as real + p.offset.row, p.base.col as real + p.offset.col)
-}
 
 method EuclidDistance(p1: Point, p2: Point) returns (d: real) {
   var diffRows := AbsInt(p1.row - p2.row);
   var diffCols := AbsInt(p1.col - p2.col);
-  d := Sqrt((diffRows * diffRows + diffCols * diffCols) as real) * mapCost;
+  d := (diffRows * diffRows + diffCols * diffCols) as real; // TODO: sqrt?
 }
 
 function method MinHorizontal(p: Pose, pot: PotentialMap, numCols: nat): RealInf
@@ -377,65 +373,6 @@ function method Minus(x1: RealInf, x2: RealInf): RealInf
   if (x1.Infinity?) then Infinity else Real(x1.r - x2.r)
 }
 
-function method {:extern} Sqrt(x: real): real
-  requires x >= 0.0
-  ensures Sqrt(x) >= 0.0
-  ensures Sqrt(x) * Sqrt(x) == x
-
-lemma SqrtZero(x: real)
-  requires x > 0.0
-  ensures Sqrt(x) > 0.0
-{
-  if (Sqrt(x) == 0.0) {
-    assert x == 0.0;
-  }
-}
-
-lemma NormPositive(x: real, y: real)
-  requires x != 0.0 || y != 0.0
-  ensures Sqrt(x * x + y * y) > 0.0
-{
-  var sumsq := x * x + y * y;
-
-  if (x != 0.0) {
-    calc {
-      sumsq;
-      ==
-      x * x + y * y;
-      >=
-      x * x;
-      >
-      0.0;
-    }
-  }
-  else {
-    assert y != 0.0;
-    calc {
-      sumsq;
-      ==
-      x * x + y * y;
-      >=
-      y * y;
-      >
-      0.0;
-    }
-  }
-  SqrtZero(sumsq);
-}
-
-lemma {:axiom} NormBound(x: real, y: real)
-  requires x != 0.0 || y != 0.0
-  ensures Sqrt(x * x + y * y) > 0.0
-  ensures -1.0 < x * stepSize / Sqrt(x * x + y * y) < 1.0
-// Assumed for the moment, but can be proved
-
-lemma ClosestToInteger(p: OffsetPoint)
-  requires p.offset == RealPoint(0.0, 0.0)
-  ensures ClosestPoint(p) == p.base
-{
-  // Proved automatically
-}
-
 predicate method AllFree(p: Point, potentialMap: PotentialMap, ghost numRows: nat, ghost numCols: nat)
   requires |potentialMap| == numRows
   requires forall x | x in potentialMap :: |x| == numCols
@@ -458,196 +395,97 @@ method ComputePath(start: Point, goal: Point, potentialMap: PotentialMap, numSte
             && |path| >= 1
             && path[0] == RealPoint(start.row as real, start.col as real)
             && path[|path| - 1] == RealPoint(goal.row as real, goal.col as real)
+            && forall i | 0 <= i < |path| :: ClosestPoint(path[i]) == closest[i]
+            && forall i | 0 <= i < |closest| :: 0 <= closest[i].row < numRows && 0 <= closest[i].col < numCols && potentialMap[closest[i].row][closest[i].col].Real?
 {
   var i := numSteps;
-  var p: OffsetPoint := OffsetPoint(start, RealPoint(0.0, 0.0));
-  ghost var cl := p.base;
+  var p: RealPoint := RealPoint(start.row as real, start.col as real);
+  ghost var cl := ClosestPoint(p);
   assert cl == start;
-  path := [];
-  closest := [];
+  path := [p];
+  closest := [cl];
   error := false;
-  while (i > 0 && !error)
+  while (i > 0 && !error && ClosestPoint(p) != goal)
     decreases i
     invariant !error ==> 0 <= cl.row < numRows && 0 <= cl.col < numCols
-    invariant !error ==> -1.0 <= p.offset.row <= 1.0 && -1.0 <= p.offset.col <= 1.0
-    invariant !error ==> cl == p.base
-    invariant !error ==> potentialMap[p.base.row][p.base.col].Real?
+    invariant !error ==> cl == ClosestPoint(p)
+    invariant !error ==> potentialMap[cl.row][cl.col].Real?
     invariant |path| == |closest|
-    invariant path == [] ==> p.base == start && p.offset == RealPoint(0.0, 0.0)
-    invariant (if path == [] then ToRealPoint(p) else path[0]) == RealPoint(start.row as real, start.col as real)
+    invariant |path| > 0
+    invariant path[0] == RealPoint(start.row as real, start.col as real)
+    invariant forall i | 0 <= i < |path| :: ClosestPoint(path[i]) == closest[i]
     invariant forall i | 0 <= i < |closest| :: 0 <= closest[i].row < numRows && 0 <= closest[i].col < numCols &&
         potentialMap[closest[i].row][closest[i].col].Real?
   {
-    var clpoint := ClosestPoint(p);
-    assert path == [] ==> (ClosestToInteger(p); clpoint == start);
-    if (clpoint == goal) {
-      path := path + [RealPoint(goal.row as real, goal.col as real)];
-      closest := closest + [goal];
-      error := false;
-      return;
+    error, p, cl := NextMove(p, cl, potentialMap, numRows, numCols);
+    if (!error && ClosestPoint(p) != goal) {
+      path := path + [p];
+      closest := closest + [cl];
     }
-
-    path := path + [ToRealPoint(p)];
-    closest := closest + [cl];
     i := i - 1;
-
-    var oscillation := |path| > 2 && path[|path| - 1] == path[|path| - 3];
-
-    error, p, cl := NextMove(p, potentialMap, numRows, numCols, oscillation);
   }
 
-  if (i == 0) {
+  if (error || i == 0) {
     error := true;
+  } else {
+    error := false;
+    path := path + [RealPoint(goal.row as real, goal.col as real)];
+    closest := closest + [goal];
   }
 }
 
-method GetGradient(pos: Point, potentialMap: PotentialMap, numRows: nat, numCols: nat)
-  returns (grad : RealPoint)
+method NextMove(p: RealPoint, ghost closest: Point, potentialMap: PotentialMap, numRows: nat, numCols: nat)
+  returns (error: bool, p': RealPoint, ghost closest': Point)
   requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
-  requires 0 <= pos.row < numRows && 0 <= pos.col < numCols
-{
-  var gx: real := 0.0;
-  var gy: real := 0.0;
-  grad := RealPoint(0.0, 0.0);
-
-  // Outside bounds
-  if (!(1 <= pos.row < numRows - 1 && 1 <= pos.col < numCols - 1)) {
-    return;
-  }
-
-  // Potential at neighbor positions
-  var center := potentialMap[pos.row][pos.col];
-  var north := potentialMap[pos.row - 1][pos.col];
-  var south := potentialMap[pos.row + 1][pos.col];
-  var west := potentialMap[pos.row][pos.col - 1];
-  var east := potentialMap[pos.row][pos.col + 1];
-
-  if (!center.Real?) {
-    if (west.Real?) {
-      gx := - obstacleCost;
-    }
-    else if (east.Real?) {
-      gx := obstacleCost;
-    }
-    else {
-      gx := 0.0;
-    }
-
-    if (north.Real?) {
-      gy := - obstacleCost;
-    }
-    else if (south.Real?) {
-      gy := obstacleCost;
-    }
-    else {
-      gy := 0.0;
-    }
-  }
-  else {
-    if (west.Real?) {
-      gx := gx + west.r - center.r;
-    }
-    if (east.Real?) {
-      gx := gx + center.r - east.r;
-    }
-    if (north.Real?) {
-      gy := gy + north.r - center.r;
-    }
-    if (south.Real?) {
-      gy := gy + center.r - south.r;
-    }
-  }
-
-  var norm := Sqrt(gx * gx + gy * gy);
-
-  if (norm > 0.0) {
-    gx := gx / norm;
-    gy := gy / norm;
-  }
-
-  grad := RealPoint(gy, gx);
-}
-
-method NextMove(p: OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCols: nat, oscillation: bool)
-  returns (error: bool, p': OffsetPoint, ghost closest': Point)
-  requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
-  requires 0 <= p.base.row < numRows && 0 <= p.base.col < numCols
-  requires -1.0 <= p.offset.row <= 1.0 && -1.0 <= p.offset.col <= 1.0
-//  requires closest == ClosestPoint(p)
-  requires potentialMap[p.base.row][p.base.col].Real?
-  ensures !error ==> closest' == p'.base
+  requires 0 <= closest.row < numRows && 0 <= closest.col < numCols
+  requires closest == ClosestPoint(p)
+  requires potentialMap[closest.row][closest.col].Real?
+  ensures !error ==> closest' == ClosestPoint(p')
   ensures !error ==> 0 <= closest'.row < numRows && 0 <= closest'.col < numCols
-  ensures !error ==> -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0
   ensures !error ==> potentialMap[closest'.row][closest'.col].Real?
 {
-  if (AllFree(p.base, potentialMap, numRows, numCols) && !oscillation) {
-    // Gradient of the neighbor positions
-    var gcenter := GetGradient(p.base, potentialMap, numRows, numCols);
-    var geast := GetGradient(Point(p.base.row, p.base.col + 1), potentialMap, numRows, numCols);
-    var gsouth := GetGradient(Point(p.base.row + 1, p.base.col), potentialMap, numRows, numCols);
-    var gse := GetGradient(Point(p.base.row + 1, p.base.col + 1), potentialMap, numRows, numCols);
+  var cp := ClosestPoint(p);
+  assert cp == closest;
+  if (AllFree(cp, potentialMap, numRows, numCols)) {
+    var drow: real := *;
+    var dcol: real := *;
 
-    // Extrapolated gradient
-    var x := (1.0 - p.offset.row) * ((1.0 - p.offset.col) * gcenter.col + p.offset.col * geast.col)
-                 + p.offset.row * ((1.0 - p.offset.col) * gsouth.col + p.offset.col * gse.col);
-    var y := (1.0 - p.offset.row) * ((1.0 - p.offset.col) * gcenter.row + p.offset.col * geast.row)
-                 + p.offset.row * ((1.0 - p.offset.col) * gsouth.row + p.offset.col * gse.row);
-
-    // There is no path
-    if (x == 0.0 && y == 0.0) {
-      error := true;
-      return;
+    if (AbsReal(drow) > 1.0) {
+      drow := SignReal(drow);
     }
-
-    var nx := p.base.col;
-    var ny := p.base.row;
-    var dx := p.offset.col;
-    var dy := p.offset.row;
-
-    // (x, y) is not zero
-    NormPositive(x, y);
-
-    dx := dx + x * stepSize / Sqrt(x * x + y * y);
-    dy := dy + y * stepSize / Sqrt(x * x + y * y);
-
-    NormBound(x, y);
-    NormBound(y, x);
-    assert -2.0 < dx < 2.0;
-    assert -2.0 < dy < 2.0;
-
-    if (AbsReal(dx) > 1.0) {
-      nx := nx + SignReal(dx) as int;
-      dx := dx - SignReal(dx);
+    if (AbsReal(dcol) > 1.0) {
+      dcol := SignReal(dcol);
     }
-    if (AbsReal(dy) > 1.0) {
-      ny := ny + SignReal(dy) as int;
-      dy := dy - SignReal(dy);
-    }
-    assert -1.0 <= dx <= 1.0;
-    assert -1.0 <= dy <= 1.0;
+    assert -1.0 <= drow <= 1.0;
+    assert -1.0 <= dcol <= 1.0;
 
-    p' := OffsetPoint(Point(ny, nx), RealPoint(dy, dx));
-    closest' := p'.base;
+    p' := RealPoint(p.row + drow, p.col + dcol);
+    closest' := ClosestPoint(p');
     error := false;
 
-    assert potentialMap[p'.base.row][p'.base.col].Real?;
+    assert 0 <= closest'.row < numRows;
+    assert 0 <= closest'.col < numCols;
+
+    assert potentialMap[closest'.row][closest'.col].Real?;
   } else {
     p' := p;
-    closest' := p'.base;
+    closest' := ClosestPoint(p');
 
-    var adjs := AdjacentOf(p.base);
+    var adjs := AdjacentOf(cp);
     var i := 0;
     var min_idx := 0;
 
     while (i < |adjs|)
       invariant 0 <= i <= |adjs|
       invariant 0 <= min_idx < |adjs|
+      invariant forall j | 0 <= j < i ::
+        (adjs[j].row < 0 || adjs[j].row >= numRows || adjs[j].col < 0 || adjs[j].col >= numCols ||
+         adjs[min_idx].row < 0 || adjs[min_idx].row >= numRows || adjs[min_idx].col < 0 || adjs[min_idx].col >= numCols ||
+        GreaterThanOrEqual(potentialMap[adjs[j].row][adjs[j].col], potentialMap[adjs[min_idx].row][adjs[min_idx].col]))
     {
       if (0 <= adjs[i].row < numRows && 0 <= adjs[i].col < numCols &&
           0 <= adjs[min_idx].row < numRows && 0 <= adjs[min_idx].col < numCols &&
-          !potentialMap[adjs[i].row][adjs[i].col].Infinity? && (
-             potentialMap[adjs[min_idx].row][adjs[min_idx].col].Infinity? ||
-             potentialMap[adjs[i].row][adjs[i].col].r.Floor < potentialMap[adjs[min_idx].row][adjs[min_idx].col].r.Floor)) {
+          !GreaterThanOrEqual(potentialMap[adjs[i].row][adjs[i].col], potentialMap[adjs[min_idx].row][adjs[min_idx].col])) {
         min_idx := i;
       }
       i := i + 1;
@@ -658,9 +496,9 @@ method NextMove(p: OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCol
       error :=  true;
     } else {
       error := false;
-      p' := OffsetPoint(Point(adjs[min_idx].row, adjs[min_idx].col), RealPoint(0.0, 0.0));
-      closest' := p'.base;
-      assert potentialMap[p'.base.row][p'.base.col].Real?;
+      p' := RealPoint(adjs[min_idx].row as real, adjs[min_idx].col as real);
+      closest' := ClosestPoint(p');
+      assert potentialMap[closest'.row][closest'.col].Real?;
     }
   }
 }
