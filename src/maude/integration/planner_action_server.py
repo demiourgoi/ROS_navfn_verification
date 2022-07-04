@@ -94,9 +94,9 @@ class MapProviderGet(maude.Hook):
 
 class MaudePlanner(Node):
     ASTAR_MAUDE_PATH = {
-        'a*': '../maude/astar.maude',
-        'pot': '../maude/astar_no_turnNavFnPlanner.maude',
-        'ros': '../maude/astar_no_turnNavFnPlanner.maude'
+        'a*': '../astar.maude',
+        'pot': '../astar_no_turnNavFnPlanner.maude',
+        'ros': '../astar_no_turnNavFnPlanner.maude'
     }
     
     ASTAR_OPNAME = {

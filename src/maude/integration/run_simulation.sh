@@ -5,7 +5,7 @@
 
 SOURCE_ROOT="$(dirname "$BASH_SOURCE")"
 
-PLANNER_FILE="$SOURCE_ROOT/maude_planner/planner_action_server.py"
+PLANNER_FILE="$SOURCE_ROOT/planner_action_server.py"
 PARAMS_FILE="$SOURCE_ROOT/nav2_params.yaml"
 
 # Select the map: waffle, burger, waffle_pi, world
