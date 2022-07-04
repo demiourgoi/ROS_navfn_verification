@@ -14,6 +14,7 @@ do
 	echo "*** $f"
 
 	gdb \ # -ex 'set substitute-path /mnt/ /source/path/if/needed/' \
+	    -ex 'set debuginfod enabled off' \
 	    -x white_box.py \
 	    --args ./profile_cpp_bin_dbg "$f"
 done

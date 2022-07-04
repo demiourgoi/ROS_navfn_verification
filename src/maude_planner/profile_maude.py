@@ -6,6 +6,7 @@ import maude
 import math
 import json
 import os.path
+import sys
 
 from test_utils import load_test
 
@@ -13,7 +14,7 @@ from test_utils import load_test
 class DirectProfiler:
     """ Profile the Maude A* algorithm directly """
 
-    ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner.maude'
+    ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner_rew.maude'
 
     def __init__(self, test_path, obtain_navfn=True):
         self.w, self.h, self.map_data, self.test_cases, _ = load_test(test_path)
@@ -41,21 +42,21 @@ class DirectProfiler:
                                            [pose_kind, pose_kind, costmap_kind]
                                            + [nat_kind] * 4,
                                            path_kind)
-            self.get_potential = None
-            self.compute_path = None
+            self.initialPotState = None
+            self.initialPathState = None
 
         else:
             self.astar = None
 
-            # op getPotential : Pose Pose CostMap Nat Nat Nat -> Potential .
-            self.get_potential = self.m.findSymbol('getPotential',
-                                                   [pose_kind, pose_kind, costmap_kind, nat_kind, nat_kind, nat_kind],
-                                                   potential_kind)
+            # op initialPotState : Pose Pose CostMap Nat Nat Nat -> Path .
+            self.initialPotState = self.m.findSymbol('initialPotState',
+                                                     (pose_kind, pose_kind, costmap_kind, nat_kind, nat_kind, nat_kind),
+                                                     potential_kind)
 
-            # op computePath : CostMap Potential Pose Pose Float Gradient Nat Nat Nat -> Path .
-            self.compute_path = self.m.findSymbol('computePath',
-                                                  [potential_kind, pose_kind, pose_kind, float_kind, gradient_kind, nat_kind, nat_kind, nat_kind],
-                                                  path_kind)
+            # op initialPathState : Pose Pose Nat Nat Nat Potential -> Path .
+            self.initialPathState = self.m.findSymbol('initialPathState',
+                                                      (pose_kind, pose_kind, nat_kind, nat_kind, nat_kind, potential_kind),
+                                                      path_kind)
 
         intlist      = self.m.findSymbol('_`,_', [int_kind] * 2, int_kind) 
         cmap         = self.m.findSymbol('`{_`}', [int_kind], costmap_kind)
@@ -138,23 +139,24 @@ class DirectProfiler:
             poses = []
         elif term.getSort() == self.m.findSort('Pose'):
             poses = [term] 
-        else: 
+        else:
             poses = term.arguments()
-            
+
         for pose in poses:
             x, y, t = self.destruct_pose(pose)
             path.append([self.int_float(x), self.int_float(y)])
         line['path'] = path
-        if potarr is not None:
+        if potarr:
             line['navfn'] = [float(entry) for row in potarr.arguments() for entry in row.arguments()]
-        print(json.dumps(line))
+        json.dump(line, sys.stdout)
+        print()
 
     def run_astar(self, origin, dest):
         x0, y0, t0 = origin
         x,  y,  t  = dest
 
         # Build the a* or computePath term with makeTerm
-        if self.astar is not None:
+        if self.astar:
             # The a* function is directly call because we are not interested in the potential
             term = self.astar(
                     self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x0), float(y0), int(t0))),
@@ -164,29 +166,31 @@ class DirectProfiler:
 
             potarr = None
         else:
-            # The calculation is decomposed in getPotential and computePath, so that we can obtain
-            # the potential calculated by Maude
-            potarr = self.get_potential(
+            # The potential is calculated first by rewriting initialPotState
+            term = self.initialPotState(
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x0), float(y0), int(t0))),
                 self.mod.parseTerm('{{{}, {}, 0.0}} {}'.format(float(x), float(y), int(t))),
                 *self.static_args[:-1]
             )
 
-            # Only the computePath term will be reduced, but the subterm potarr
-            # will get reduced by the way
-            term = self.compute_path(
-                potarr,
+        start_time = time.perf_counter()
+
+        call = term.copy()
+        term.rewrite()
+
+        if self.astar is None:
+            # term is the potential array except in case of failure
+            potarr = term
+            # Rewrting should continue to find the path
+            term = self.initialPathState(
                 self.mod.parseTerm(f'{{{int(x0)}, {int(y0)}}}', self.pose_kind),
                 self.mod.parseTerm(f'{{{int(x)}, {int(y)}}}', self.pose_kind),
-                self.mod.parseTerm('stepSize'),
-                self.mod.parseTerm(f'initialGradient({self.h}, {self.w})'),
                 *self.static_args[-4:-2],
                 self.static_args[-1],
+                potarr
             )
+            term.rewrite()
 
-        start_time = time.perf_counter()
-        call = term.copy()
-        term.reduce()
         end_time = time.perf_counter()
 
         if not term.getSort() <= self.m.findSort('Path'):

@@ -29,21 +29,30 @@ mod ASTAR is
  rl a*({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NC, NR, I, IPATH) =>
          a*({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
             {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NC, NR, I, IPATH) .
+ *** Initial state for calculating the potential
+ op initialPotState : Pose Pose CostMap Nat Nat Nat -> Potential .
+ eq initialPotState({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NC, NR, I) =
+          initialPotState({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
+            {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NC, NR, I) .
+ ceq initialPotState({X, Y, Z} Q, {X', Y', Z'} Q', CM, NC, NR, I) =
+                                         a*({X, Y}, {X', Y'}, CM, P, NC, NR, CURR, noPath, noPath, T, I)
+  if P := initialP*(NC, NR, X', Y') /\
+     T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
+     CURR := initCurrent({X', Y'}, CM, NC, NR) .
+ *** Initial state for calculating the path
+ op initialPathState : Pose Pose Nat Nat Nat Potential -> Path .
+ eq initialPathState({X, Y}, GOAL, NC, NR, IPATH, P) =
+      if (P @ [X, Y]) == infinite then
+        noPath
+      else
+        a*({X, Y}, GOAL, initialGradient(NC, NR), NC, NR, IPATH, P)
+      fi .
+
  crl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NC, NR, I, IPATH) => *** computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NC, NR)
                                                                *** computePath(P', {X, Y}, {X', Y'}, stepSize, G, NC, NR, IPATH)
-                                                               a*({X, Y}, {X', Y'}, G, NC, NR, IPATH, P')
-  if P := initialP*(NC, NR, X', Y') /\
-     T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
-     CURR := initCurrent({X', Y'}, CM, NC, NR) /\
-     a*({X, Y}, {X', Y'}, CM, P, NC, NR, CURR, noPath, noPath, T, I) => P' /\
-     (P' @ [X , Y]) < infinite /\
-     G := initialGradient(NC, NR) [label initPath] .
- crl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NC, NR, I, IPATH) => noPath
-  if P := initialP*(NC, NR, X', Y') /\
-     T := h({X, Y, Z} Q, {X', Y', Z'} Q') + obstacleCost /\
-     CURR := initCurrent({X', Y'}, CM, NC, NR) /\
-     P' := a*({X, Y}, {X', Y'}, CM, P, NC, NR, CURR, noPath, noPath, T, I) /\
-     (P' @ [X , Y]) == infinite .
+                                                               initialPathState({X, Y}, {X', Y'}, NC, NR, IPATH, P')
+  if initialPotState({X, Y, Z} Q, {X', Y', Z'} Q', CM, NC, NR, I) => P' [label initPath] .
+
  rl a*({X, Y}, {X', Y'}, G, NC, NR, IPATH, P) => computePath(P, {X, Y}, {X', Y'}, stepSize, G, NC, NR, IPATH) .
 
  op initCurrent : Pose CostMap Nat Nat -> Path .
@@ -84,7 +93,7 @@ mod ASTAR is
  ***     Init                        NumRow NumCol  Current  Next   Excess  Threshold  Iterations
  op a* : Pose Pose CostMap Potential  Nat     Nat   Path Path Path   Float       Nat  ~> Potential .
  rl [reached] : a*(INIT, GOAL, CM, P, NC, NR, CURR, NEXT, EXC, T, 0) => P .
- crl [reached] : a*({X, Y}, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, I) => P
+ crl [reached] : a*({X, Y}, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, s I) => P
   if D := P @ [X , Y] /\
      D =/= infinite .
  crl [curr] : a*(INIT, GOAL, CM, P, NC, NR, ({X, Y} CURR), NEXT, EXC, T, s(I)) => a*(INIT, GOAL, CM, P, NC, NR, CURR, NEXT, EXC, T, s(I))
@@ -101,11 +110,12 @@ mod ASTAR is
                          then traverseNeighbors({X, Y}, INIT, CM, P', NC, NR, T, NEXT, EXC)
                          else < NEXT, EXC >
                          fi .
- rl [next] : a*(INIT, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, s(I)) =>
+ crl [next] : a*({X, Y}, GOAL, CM, P, NC, NR, noPath, NEXT, EXC, T, s(I)) =>
          if NEXT == noPath
-         then a*(INIT, GOAL, CM, P, NC, NR, EXC, noPath, NEXT, T + 2.0 * mapCost, I)
-         else a*(INIT, GOAL, CM, P, NC, NR, NEXT, noPath, EXC, T, I)
-         fi .
+         then a*({X, Y}, GOAL, CM, P, NC, NR, EXC, noPath, NEXT, T + 2.0 * mapCost, I)
+         else a*({X, Y}, GOAL, CM, P, NC, NR, NEXT, noPath, EXC, T, I)
+         fi
+  if P @ [X, Y] == infinite .
 
  ***                   Current  INIT
  op traverseNeighbors : Pose    Pose CostMap Potential Nat Nat Float Path Path -> TraversalResult .
@@ -249,20 +259,3 @@ mod TEST-PATH is
 endm
 
 *** red modelCheck(initPath, [] (NonInfinitePotAtInit -> <> PathComputed)) .
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

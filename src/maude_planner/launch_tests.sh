@@ -115,7 +115,10 @@ class TestRunner:
 				subprocess.run([sys.executable, 'compare.py', f'--width={mapWidth}',
 					        f'--name={impl.NAME}', ros_out, impls_out[k], '--draw=failed'],
 					        stdout=subprocess.DEVNULL)
-				shutil.move('potentials.pdf', os.path.join(dirname, f'{test_name}_{impl.ID}.pdf'))
+
+				if os.path.exists('potentials.pdf'):
+					shutil.move('potentials.pdf',
+					            os.path.join(dirname, f'{test_name}_{impl.ID}.pdf'))
 
 	def run_tests(self, tests):
 		"""Run all the test given as argument"""
