@@ -86,7 +86,7 @@ class AStarBreak(gdb.Breakpoint):
 class TestEngine:
 	"""White-box testing for ROS and Maude"""
 
-	ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner_rew.maude'
+	ASTAR_MAUDE_PATH = '../maude/astar_navfnplanner.maude'
 
 	def __init__(self, use_hook=True):
 		# self.calcpath_b = CalcPathBreak()

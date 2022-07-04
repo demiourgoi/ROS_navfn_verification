@@ -1,4 +1,4 @@
-load common.maude
+load ../common.maude
 
 ***(
    The algorithm assumes the number of iterations and the "inflated" map (including limits) are given by the user.
@@ -22,7 +22,7 @@ fmod ASTAR is
  sort TraversalResult .
  op <_,_> : Path Path -> TraversalResult [ctor] .
 
- *** Simplified signature to match that of the astar.maude file
+ *** Simplified signature to match that of the astar_textbook.maude file
  ***     Init Goal         NumRow NumCol
  op a* : Pose Pose CostMap  Float  Float ~> Path .
  ceq a*(INIT, GOAL, CM, FX, FY) = a*(INIT, GOAL, CM, NC, NR, max((NC * NR) quo 20, NC + NR), 4 * NC)

@@ -2,7 +2,7 @@
 ***	Performance evaluation of the A* algorithm
 ***
 
-sload astar
+sload ../astar_textbook
 
 fmod ASTAR-PERF is
 	protecting ASTAR .

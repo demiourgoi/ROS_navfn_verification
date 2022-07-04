@@ -2,9 +2,9 @@
 
 The Maude implementations of the NavFn algorithm are in the `src/maude` directory. There are various versions:
 
-* NavFn<sub>A*</sub> is a textbook implementation of the A* algorithm. It can be executed with the [`a*`](src/maude/astar.maude#L158) operator of the `ASTAR` module in `astar.maude`.
+* NavFn<sub>A*</sub> is a textbook implementation of the A* algorithm. It can be executed with the [`a*`](src/maude/astar_textbook.maude#L158) operator of the `ASTAR` module in `astar_textbook.maude`.
 * NavFn<sub>pot</sub> calculates a potential function imitating the [`NavFn` planner](https://github.com/ros-planning/navigation2/tree/main/nav2_navfn_planner) of Navigation 2, and then computes the path from the origin to the goal by always taking the neighbor with the lowest potential as the next position. This is the [`computePath`](src/maude/common.maude#L329) function of the `BASIC-TRAVERSE` module in `common.maude`.
-* NavFn<sub>ROS</sub> imitates the complete `NavFN` implementation, also in the second phase where the path is computed. It is available in the [`a*`](src/maude/astar_no_turnNavFnPlanner.maude#L33) function of the `ASTAR` module in `astar_no_turnNavFnPlanner.maude`.
+* NavFn<sub>ROS</sub> imitates the complete `NavFN` implementation, also in the second phase where the path is computed. It is available in the [`a*`](src/maude/astar_navfnplanner.maude#L26) function of the `ASTAR` module in `astar_navfnplanner.maude`.
 
 The Dafny implementation of the NavFn planner are in the `src/dafny` directory.
 

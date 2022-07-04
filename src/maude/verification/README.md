@@ -2,7 +2,7 @@
 
 Two approaches have been followed to formally prove some [properties](#Properties) of the Maude specification of the ROS's `NavFn` planner:
 
-1. Translating it into the [Dafny](https://github.com/dafny-lang/dafny), a programming language and verifier based on Hoare logic. These files are included in the **dafny** folder.
+1. Translating it into the [Dafny](https://github.com/dafny-lang/dafny), a programming language and verifier based on Hoare logic. These files are included in the [**dafny**](../../dafny) folder.
 
 2. Manually expressing verification conditions in Maude and having them checked by SMT solvers. Several files are involved:
 

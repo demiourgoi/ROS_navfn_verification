@@ -14,7 +14,7 @@ from test_utils import load_test
 class DirectProfiler:
     """ Profile the Maude A* algorithm directly """
 
-    ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner_rew.maude'
+    ASTAR_MAUDE_PATH = '../maude/astar_navfnplanner.maude'
 
     def __init__(self, test_path, obtain_navfn=True):
         self.w, self.h, self.map_data, self.test_cases, _ = load_test(test_path)
@@ -81,7 +81,7 @@ class DirectProfiler:
         # Build the IntList with the costmap data
         map_list = mtIL
 
-	# There is no need to build the map, because it will be read from the hook
+        # There is no need to build the map, because it will be read from the hook
         # for c in self.map_data:
         #    map_list = intlist(map_list, int_terms[c])
 

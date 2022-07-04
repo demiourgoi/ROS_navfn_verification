@@ -60,7 +60,7 @@ class MapHook(maude.Hook):
 class NavFnAstarMC:
 	"""Model checker for the NavFN-A* Maude implementation"""
 
-	ASTAR_MAUDE_PATH = '../maude/astar_no_turnNavFnPlanner_strat.maude'
+	ASTAR_MAUDE_PATH = '../maude/variations/astar_navfnplanner_strat.maude'
 
 	def __init__(self, module_name, strat_str, formula_str, use_hook=True, use_strategy=True):
 		self.width = None

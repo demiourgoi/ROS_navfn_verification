@@ -6,7 +6,7 @@
 *** to verify the property.
 *** 
 
-load astar_no_turnNavFnPlanner_rew.maude
+load ../astar_navfnplanner.maude
 
 smod ASTAR-STRAT is
   pr ASTAR .
