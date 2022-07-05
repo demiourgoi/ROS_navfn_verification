@@ -30,7 +30,7 @@ mod ASTAR is
          a*({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
             {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NC, NR, I, IPATH) .
  *** Initial state for calculating the potential
- op initialPotState : Pose Pose CostMap Nat Nat Nat -> Potential .
+ op initialPotState : Pose Pose CostMap Nat Nat Nat ~> Potential .
  eq initialPotState({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NC, NR, I) =
           initialPotState({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
             {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NC, NR, I) .
@@ -48,10 +48,10 @@ mod ASTAR is
         a*({X, Y}, GOAL, initialGradient(NC, NR), NC, NR, IPATH, P)
       fi .
 
- crl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NC, NR, I, IPATH) => *** computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NC, NR)
+ rl a*({X, Y, Z} Q, {X', Y', Z'} Q', CM, NC, NR, I, IPATH) => *** computePath({X, Y, Z} Q, {X', Y', Z'} Q', P', NC, NR)
                                                                *** computePath(P', {X, Y}, {X', Y'}, stepSize, G, NC, NR, IPATH)
-                                                               initialPathState({X, Y}, {X', Y'}, NC, NR, IPATH, P')
-  if initialPotState({X, Y, Z} Q, {X', Y', Z'} Q', CM, NC, NR, I) => P' [label initPath] .
+       initialPathState({X, Y}, {X', Y'}, NC, NR, IPATH,
+                        initialPotState({X, Y, Z} Q, {X', Y', Z'} Q', CM, NC, NR, I)) [label initPath] .
 
  rl a*({X, Y}, {X', Y'}, G, NC, NR, IPATH, P) => computePath(P, {X, Y}, {X', Y'}, stepSize, G, NC, NR, IPATH) .
 
