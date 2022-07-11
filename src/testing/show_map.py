@@ -45,25 +45,30 @@ def show_using_numpy(map_full_map_path, w, h, args, lines):
     
     w, h = costmap.shape
     plt.imshow(costmap, cmap=cm, extent=(0, h, w, 0))
-    
+
     # Overlay the path if given
     if args.path:
         path = ast.literal_eval(args.path)
         plt.plot(*zip(*path), color='blue', marker='o')
-        
+
         print('Path cost:', calculate_cost(costmap, path))
 
     # Overlay the test cases if enabled
     if args.cases:
         # Read the test cases from the txt file
-        cases = [map(int, line.strip().split(' ')) for line in lines[4:]]
+        cases = [map(int, line.strip().split(' ')) for line in lines[3:]]
 
         for x0, y0, x, y in cases:
             plt.arrow(x0, y0, x - x0, y - y0, color='blue',
                       length_includes_head=True, head_width=0.002 * w)
-    
+
+    # Add a title to the map if given
+    if args.title:
+        plt.title(args.title)
+
     # Show or write the result
     if args.o:
+        plt.tight_layout()
         plt.savefig(args.o)
     else:
         plt.show()
@@ -118,6 +123,7 @@ if __name__ == "__main__":
                         action='store_true')
     parser.add_argument('--path', help='Print a path on the map, given a Python list of pairs over (implies --numpy)')
     parser.add_argument('--cases', help='Print the test cases (initial and final pose) on the map (implies --numpy)', action='store_true')
+    parser.add_argument('--title', help='Print a title on top of the map')
     parser.add_argument('-o', help='Output the drawing to a file')
 
     show_map(parser.parse_args())

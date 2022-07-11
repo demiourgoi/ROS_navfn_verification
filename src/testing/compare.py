@@ -299,7 +299,6 @@ class Plotter:
 
         # Maude/Dafny potential and path
         self.draw_potential(potarr2, path2, pcolor='blue')
-        print(self.other_name)
         self.plt.title(f'{origin} to {dest} — {self.other_name}')
         self.pdf.savefig()
         self.plt.close()

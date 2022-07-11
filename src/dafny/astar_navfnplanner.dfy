@@ -104,11 +104,10 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
   initialThreshold := initialThreshold + obstacleCost;
   var current := InitCurrentQueue(goal, pot, costMap);
 
-  var pot': PotentialMap := AStarIteration(start, goal, costMap, pot, current, [], [], initialThreshold, numIterations);
+  navfn := AStarIteration(start, goal, costMap, pot, current, [], [], initialThreshold, numIterations);
   ghost var closestPath: seq<Point>;
-  if (pot'[start.pos.row][start.pos.col].Real?) {
-    error, path, closestPath := ComputePath(start.pos, goal.pos, pot', numPathIterations, costMap.numRows, costMap.numCols);
-    navfn := pot';
+  if (navfn[start.pos.row][start.pos.col].Real?) {
+    error, path, closestPath := ComputePath(start.pos, goal.pos, navfn, numPathIterations, costMap.numRows, costMap.numCols);
   } else {
     error := true;
   }
