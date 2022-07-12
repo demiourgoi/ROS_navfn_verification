@@ -390,6 +390,21 @@ lemma SqrtZero(x: real)
   }
 }
 
+lemma MultPositive(x: real, y: real)
+  requires x > 0.0 && y > 0.0
+  ensures x * y > 0.0
+{ }
+
+lemma MultNegative(x: real, y: real)
+  requires x < 0.0 && y < 0.0
+  ensures x * y > 0.0
+{ }
+
+lemma MultSameSign(x: real, y: real)
+  requires (x < 0.0 && y < 0.0) || (x > 0.0 && y > 0.0)
+  ensures x * y > 0.0
+{ }
+
 lemma NormPositive(x: real, y: real)
   requires x != 0.0 || y != 0.0
   ensures Sqrt(x * x + y * y) > 0.0
@@ -403,7 +418,7 @@ lemma NormPositive(x: real, y: real)
       x * x + y * y;
       >=
       x * x;
-      >
+      > { MultSameSign(x, x); }
       0.0;
     }
   }
@@ -415,7 +430,7 @@ lemma NormPositive(x: real, y: real)
       x * x + y * y;
       >=
       y * y;
-      >
+      > { MultSameSign(y, y); }
       0.0;
     }
   }
