@@ -1,28 +1,71 @@
-datatype Point = Point(row: int, col: int)
-datatype RealPoint = RealPoint(row: real, col: real)
-datatype OffsetPoint = OffsetPoint(base: Point, offset: RealPoint)
+/*
+ * Implementation and verification of NavFn planner in Dafny
+ */
+
+/*
+ * ----------
+ * Data types
+ * ----------
+ */
+datatype Point = Point(row: int, col: int)                                        // Tile location in a discrete map
+datatype RealPoint = RealPoint(row: real, col: real)                              // Continuous location
+datatype OffsetPoint = OffsetPoint(base: Point, offset: RealPoint)                // Base tile + offset
 datatype Pose = Pose(pos: Point)
-datatype CostMap = CostMap(value: Point -> real, numRows: nat, numCols: nat)
-datatype RealInf = Real(r: real) | Infinity
+datatype CostMap = CostMap(value: Point -> real, numRows: nat, numCols: nat)      // CostMap assigns a cost to each tile
+datatype RealInf = Real(r: real) | Infinity                                       // Set R ∪ {+\infty}
 
 
 type Path = seq<RealPoint>
+
+// Matrix with potentials. A finite potential implies no obstacles
+// The lower the potential, the closer to the goal
 type PotentialMap = seq<seq<RealInf>>
 
 const obstacleCost: real := 254.0
 const mapCost: real := 50.0
 const stepSize: real := 0.5
 
+/* 
+ * ------------------------------------------------------------------------------------
+ *                     Cost map-related functions and predicates
+ * ------------------------------------------------------------------------------------
+ */
+
+/*
+ * It tells whether a given position in the cost map is free of obstacle
+ */
 predicate method Open(costMap: CostMap, row: int, col: int)
 {
-  costMap.value(Point(row, col))  < obstacleCost
+  costMap.value(Point(row, col)) < obstacleCost
 }
 
+/*
+ * A cost map is valid iff every position has a positive cost
+ */
+predicate ValidCostMap(costMap: CostMap)
+{
+  forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols :: costMap.value(Point(i, j)) > 0.0
+}
+
+
+/* 
+ * ------------------------------------------------------------------------------------
+ *                  Potential map-related functions and predicates
+ * ------------------------------------------------------------------------------------
+ */
+
+/*
+ * It is satisfied iff the given potential map is a matrix with the given dimensions
+ */
 predicate PotentialMapHasDimensions(p: PotentialMap, numRows: nat, numCols: nat) {
   |p| == numRows
   && forall r: seq<RealInf> | r in p :: |r| == numCols
 }
 
+/*
+ * A potential map is valid w.r.t. a cost map iff every tile with finite potential
+ * is free of obstacles.
+ */
 predicate ValidPotentialMap(pot: PotentialMap, costMap: CostMap)
 {
   PotentialMapHasDimensions(pot, costMap.numRows, costMap.numCols)
@@ -30,28 +73,42 @@ predicate ValidPotentialMap(pot: PotentialMap, costMap: CostMap)
     pot[i][j].Real? ==> Open(costMap, i, j)
 }
 
-predicate ValidCostMap(costMap: CostMap)
-{
-  forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols :: costMap.value(Point(i, j)) > 0.0
-}
+/* 
+ * ------------------------------------------------------------------------------------
+ *                       Pose-related functions and properties
+ * ------------------------------------------------------------------------------------
+ */
 
+
+/*
+ * Tells us whether two poses are adjacent and lie in the same row
+ */
 predicate AdjacentHorizontal(p1: Pose, p2: Pose)
 {
   (p1.pos.row == p2.pos.row && p1.pos.col == p2.pos.col + 1)
   || (p1.pos.row == p2.pos.row && p1.pos.col == p2.pos.col - 1)
 }
 
+/*
+ * Tells us whether two poses are adjacent and lie in the same column
+ */
 predicate AdjacentVertical(p1: Pose, p2: Pose)
 {
   (p1.pos.col == p2.pos.col && p1.pos.row == p2.pos.row - 1)
   || (p1.pos.col == p2.pos.col && p1.pos.row == p2.pos.row + 1)
 }
 
+/*
+ * Tells us whether two poses are adjacent considering rows and columns, but not diagonals
+ */
 predicate Adjacent(p1: Pose, p2: Pose, costMap: CostMap)
 {
   AdjacentHorizontal(p1, p2) || AdjacentVertical(p1, p2)
 }
 
+/*
+ * Returns a list with positions adjacent to p (including p itself)
+ */
 function method AdjacentOf(p: Point): seq<Point>
 {
   [Point(p.row, p.col),
@@ -66,8 +123,10 @@ function method AdjacentOf(p: Point): seq<Point>
   ]
 }
 
-
-
+/*
+ * Given a position p in a potential map of (numRows x numCols) tiles, it tells
+ * whether p has a (non-diagonal) adjacent position with finite potential
+ */
 predicate HasSomeAdjacentReal(p: Pose, pot: PotentialMap, numRows: nat, numCols: nat)
   requires PotentialMapHasDimensions(pot, numRows, numCols)
   requires 0 <= p.pos.row < numRows && 0 <= p.pos.col < numCols
@@ -79,6 +138,16 @@ predicate HasSomeAdjacentReal(p: Pose, pot: PotentialMap, numRows: nat, numCols:
 }
 
 
+/* 
+ * ------------------------------------------------------------------------------------
+ *                                    Pose queue
+ * ------------------------------------------------------------------------------------
+ */
+
+/*
+ * A queue is valid w.r.t. a potential map and a cost map iff all its positions
+ * lie within the costmap and every position has an adjacent one with finite potential
+ */
 predicate ValidQueue(queue: seq<Pose>, pot: PotentialMap, costMap: CostMap)
   requires PotentialMapHasDimensions(pot, costMap.numRows, costMap.numCols)
 {
@@ -88,6 +157,11 @@ predicate ValidQueue(queue: seq<Pose>, pot: PotentialMap, costMap: CostMap)
     && HasSomeAdjacentReal(p, pot, costMap.numRows, costMap.numCols)
 }
 
+/* 
+ * ------------------------------------------------------------------------------------
+ *                                   NavFn algorithm
+ * ------------------------------------------------------------------------------------
+ */
 method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numPathIterations: nat) returns (error: bool, path: Path, navfn: PotentialMap)
   requires 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
   requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
@@ -112,6 +186,13 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
     error := true;
   }
 }
+
+/* 
+ * ------------------------------------------------------------------------------------
+ *                        Computation of NavFn function
+ * ------------------------------------------------------------------------------------
+ */
+
 
 method AStarIteration(start: Pose, goal: Pose,
                       costMap: CostMap, pot: PotentialMap,
@@ -295,6 +376,12 @@ method TraverseNeighbor(p: Pose, newP: Pose, start: Pose, costMap: CostMap, pot:
   }
 }
 
+/* 
+ * ------------------------------------------------------------------------------------
+ *                   Computation of path from potential map
+ * ------------------------------------------------------------------------------------
+ */
+
 
 function method AbsInt(x: int): int {
   if (x >= 0) then x else -x
@@ -389,16 +476,6 @@ lemma SqrtZero(x: real)
     assert x == 0.0;
   }
 }
-
-lemma MultPositive(x: real, y: real)
-  requires x > 0.0 && y > 0.0
-  ensures x * y > 0.0
-{ }
-
-lemma MultNegative(x: real, y: real)
-  requires x < 0.0 && y < 0.0
-  ensures x * y > 0.0
-{ }
 
 lemma MultSameSign(x: real, y: real)
   requires (x < 0.0 && y < 0.0) || (x > 0.0 && y > 0.0)
