@@ -63,10 +63,10 @@ predicate PotentialMapHasDimensions(p: PotentialMap, numRows: nat, numCols: nat)
 }
 
 /*
- * A potential map is valid w.r.t. a cost map iff every tile with finite potential
+ * A potential map satisfies position safety w.r.t. a cost map iff every tile with finite potential
  * is free of obstacles.
  */
-predicate ValidPotentialMap(pot: PotentialMap, costMap: CostMap)
+predicate PositionSafe(pot: PotentialMap, costMap: CostMap)
 {
   PotentialMapHasDimensions(pot, costMap.numRows, costMap.numCols)
   && forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols ::
@@ -174,11 +174,12 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
 
 {
   var pot := BuildInitialPotentialMap(costMap.numRows, costMap.numCols, goal.pos.row, goal.pos.col);
+  assert PositionSafe(pot, costMap);
   var initialThreshold := EuclidDistance(start.pos, goal.pos);
   initialThreshold := initialThreshold + obstacleCost;
   var current := InitCurrentQueue(goal, pot, costMap);
 
-  navfn := AStarIteration(start, goal, costMap, pot, current, [], [], initialThreshold, numIterations);
+  navfn := ComputeNavFn(start, goal, costMap, pot, current, [], [], initialThreshold, numIterations);
   ghost var closestPath: seq<Point>;
   if (navfn[start.pos.row][start.pos.col].Real?) {
     error, path, closestPath := ComputePath(start.pos, goal.pos, navfn, numPathIterations, costMap.numRows, costMap.numCols);
@@ -194,16 +195,16 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
  */
 
 
-method AStarIteration(start: Pose, goal: Pose,
+method ComputeNavFn(start: Pose, goal: Pose,
                       costMap: CostMap, pot: PotentialMap,
                       current: seq<Pose>, next: seq<Pose>, excess: seq<Pose>,
                       threshold: real, numIterations: nat) returns (pot': PotentialMap)
-  requires ValidPotentialMap(pot, costMap)
+  requires PositionSafe(pot, costMap)
   requires ValidQueue(current, pot, costMap) && ValidQueue(next, pot, costMap) && ValidQueue(excess, pot, costMap)
   requires ValidCostMap(costMap)
   requires 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
   requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
-  ensures ValidPotentialMap(pot', costMap)
+  ensures PositionSafe(pot', costMap)
   decreases numIterations, |current|
 {
   if (numIterations == 0) {
@@ -212,7 +213,7 @@ method AStarIteration(start: Pose, goal: Pose,
 
   if (|current| > 0) {
     if (!Open(costMap, current[0].pos.row, current[0].pos.col)) {
-      pot' := AStarIteration(start, goal, costMap, pot, current[1..], next, excess, threshold, numIterations);
+      pot' := ComputeNavFn(start, goal, costMap, pot, current[1..], next, excess, threshold, numIterations);
       return;
     } else {
       var minV := MinVertical(current[0], pot, costMap.numRows);
@@ -230,20 +231,24 @@ method AStarIteration(start: Pose, goal: Pose,
         assert ValidQueue(next', potAux, costMap);
         assert ValidQueue(excess', potAux, costMap);
       }
-      pot' := AStarIteration(start, goal, costMap, potAux, current[1..], next', excess', threshold, numIterations);
+      pot' := ComputeNavFn(start, goal, costMap, potAux, current[1..], next', excess', threshold, numIterations);
     }
   } else {
     if (pot[start.pos.row][start.pos.col] != Infinity) {
       return pot;
     }
     if (next == []) {
-      pot' := AStarIteration(start, goal, costMap, pot, excess, [], next, threshold + 2.0 * mapCost, numIterations - 1);
+      pot' := ComputeNavFn(start, goal, costMap, pot, excess, [], next, threshold + 2.0 * mapCost, numIterations - 1);
     } else {
-      pot' := AStarIteration(start, goal, costMap, pot, next, [], excess, threshold, numIterations - 1);
+      pot' := ComputeNavFn(start, goal, costMap, pot, next, [], excess, threshold, numIterations - 1);
     }
   }
 }
 
+/*
+ * It returns a potential map of (numRows x numCols) size with all positions set to +\infty, except the position
+ * (initRow, initCol), which has zero potential.
+ */
 method BuildInitialPotentialMap(numRows: nat, numCols: nat, initRow: nat,  initCol: nat) returns (p: PotentialMap)
   requires 0 <= initRow < numRows && 0 <= initCol < numCols
   ensures PotentialMapHasDimensions(p, numRows, numCols)
@@ -258,6 +263,10 @@ method BuildInitialPotentialMap(numRows: nat, numCols: nat, initRow: nat,  initC
 }
 
 
+/*
+ * It returns a queue with the open positions that are (non-diagonally) adjacent to p, provided that these
+ * positions are within the bounds of the cost map.
+ */
 method InitCurrentQueue(p: Pose, ghost pot: PotentialMap, costMap: CostMap) returns (current: seq<Pose>)
   requires PotentialMapHasDimensions(pot, costMap.numRows, costMap.numCols)
   requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
@@ -277,12 +286,12 @@ method InitCurrentQueue(p: Pose, ghost pot: PotentialMap, costMap: CostMap) retu
 }
 
 method UpdatePotential(pot: PotentialMap, p: Pose, goal: Pose, costMap: CostMap, min: RealInf, snd: RealInf) returns (pot': PotentialMap, updated: bool)
-  requires ValidPotentialMap(pot, costMap)
+  requires PositionSafe(pot, costMap)
   requires ValidCostMap(costMap)
   requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
   requires min.Real?
   requires Open(costMap, p.pos.row, p.pos.col)
-  ensures ValidPotentialMap(pot', costMap)
+  ensures PositionSafe(pot', costMap)
   ensures forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols ::
     pot[i][j].Real? ==> pot'[i][j].Real?
   ensures pot'[p.pos.row][p.pos.col].Real?
@@ -309,7 +318,7 @@ method UpdatePotential(pot: PotentialMap, p: Pose, goal: Pose, costMap: CostMap,
 
 method TraverseNeighbors(p: Pose, start: Pose, costMap: CostMap, pot: PotentialMap, threshold: real, next: seq<Pose>, excess: seq<Pose>)
     returns (next': seq<Pose>, excess': seq<Pose>)
-  requires ValidPotentialMap(pot, costMap)
+  requires PositionSafe(pot, costMap)
   requires ValidQueue(next, pot, costMap) && ValidQueue(excess, pot, costMap)
   requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
   requires pot[p.pos.row][p.pos.col].Real?
@@ -354,7 +363,7 @@ method TraverseNeighbors(p: Pose, start: Pose, costMap: CostMap, pot: PotentialM
 }
 
 method TraverseNeighbor(p: Pose, newP: Pose, start: Pose, costMap: CostMap, pot: PotentialMap, threshold: real) returns (next': seq<Pose>, excess': seq<Pose>)
-  requires ValidPotentialMap(pot, costMap)
+  requires PositionSafe(pot, costMap)
   requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
   requires 0 <= newP.pos.row < costMap.numRows && 0 <= newP.pos.col < costMap.numCols
   requires Adjacent(p, newP, costMap)
