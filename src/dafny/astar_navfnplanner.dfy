@@ -394,6 +394,7 @@ method ComputeNavFnRec(start: Pose, goal: Pose,
               && 0 <= pMin.pos.row < costMap.numRows
               && 0 <= pMin.pos.col < costMap.numCols
               && pot[pMin.pos.row][pMin.pos.col] == min;
+        assert GreaterThanOrEqual(snd, min);
       } else {
         ghost var minHPose :| AdjacentHorizontal(minHPose, front) 
             && 0 <= minHPose.pos.row < costMap.numRows
@@ -404,6 +405,7 @@ method ComputeNavFnRec(start: Pose, goal: Pose,
               && 0 <= pMin.pos.row < costMap.numRows
               && 0 <= pMin.pos.col < costMap.numCols
               && pot[pMin.pos.row][pMin.pos.col] == min;
+        assert GreaterThanOrEqual(snd, min);
       }
       assert Adjacent(pMin, front, costMap);
       assert 0 <= pMin.pos.row < costMap.numRows && 0 <= pMin.pos.col < costMap.numCols;
@@ -486,6 +488,7 @@ method UpdatePotential(pot: PotentialMap, p: Pose, costMap: CostMap, min: RealIn
   requires pot[posMin.pos.row][posMin.pos.col] == min
   requires Adjacent(p, posMin, costMap)
   requires min.Real?
+  requires GreaterThanOrEqual(snd, min)
   requires Open(costMap, p.pos.row, p.pos.col)
   ensures PositionSafe(pot', costMap)
   ensures forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols ::
@@ -493,7 +496,6 @@ method UpdatePotential(pot: PotentialMap, p: Pose, costMap: CostMap, min: RealIn
   ensures pot'[p.pos.row][p.pos.col].Real?
   ensures Progress(pot', goal, costMap.numRows, costMap.numCols)
 {
-  assume GreaterThanOrEqual(snd, min);
   var hf := costMap.value(Point(p.pos.row, p.pos.col));
   var diff := Minus(snd, min);
   var v';
