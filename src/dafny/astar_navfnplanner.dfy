@@ -493,6 +493,7 @@ method UpdatePotential(pot: PotentialMap, p: Pose, costMap: CostMap, min: RealIn
   ensures pot'[p.pos.row][p.pos.col].Real?
   ensures Progress(pot', goal, costMap.numRows, costMap.numCols)
 {
+  assume GreaterThanOrEqual(snd, min);
   var hf := costMap.value(Point(p.pos.row, p.pos.col));
   var diff := Minus(snd, min);
   var v';
@@ -500,10 +501,17 @@ method UpdatePotential(pot: PotentialMap, p: Pose, costMap: CostMap, min: RealIn
     v' := hf + min.r;
   } else {
     assert diff.Real?;
+    assert 0.0 <= diff.r < hf;    
     var d := diff.r / hf;
+    assert 0.0 <= d <= 1.0;
+    assert 0.0 <= d * d <= 1.0;
+    // Not necessary, but just for documentation purposes
+    // assert 0.0 <= 0.5307 * d <= 0.5307;
+    // assert -0.2301 <= -0.2301 * d * d <= 0.0;
+    // assert -0.2301 <= -0.2301 * d * d + 0.5307 * d <= 0.5307;
+    // assert 0.4739 == -0.2301 + 0.7040 <= -0.2301 * d * d + 0.5307 * d + 0.7040 <= 0.5307 + 0.7040 == 1.2347;
     var interpol := -0.2301 * d * d + 0.5307 * d + 0.7040;
-    assume interpol > 0.0;
-    // if (interpol < 0.00001) { interpol := 0.00001; }      // WARNING: Same behaviour?
+    assert interpol > 0.0;
     v' := min.r + hf * interpol;
   }
   assert v' > min.r;
