@@ -35,7 +35,9 @@ const stepSize: real := 0.5
 /*
  * Returns the smallest of two elements
  */
-function method MinInfinity(x1: RealInf, x2: RealInf): RealInf {
+function method MinInfinity(x1: RealInf, x2: RealInf): RealInf
+  ensures MinInfinity(x1, x2) == x1 || MinInfinity(x1, x2) == x2
+{
   if (x1.Infinity?) then x2
   else if (x2.Infinity?) then x1
   else if (x1.r <= x2.r) then x1 else x2
@@ -128,6 +130,34 @@ function method AdjacentOf(p: Point): seq<Point>
   ]
 }
 
+method EuclidDistance(p1: Point, p2: Point) returns (d: real) {
+  var diffRows := AbsInt(p1.row - p2.row);
+  var diffCols := AbsInt(p1.col - p2.col);
+  d := Sqrt((diffRows * diffRows + diffCols * diffCols) as real) * mapCost;
+}
+
+function method AbsInt(x: int): int {
+  if (x >= 0) then x else -x
+}
+
+function method AbsReal(x: real): real {
+  if (x >= 0.0) then x else -x
+}
+
+function method {:extern} Sqrt(x: real): real
+  requires x >= 0.0
+  ensures Sqrt(x) >= 0.0
+  ensures Sqrt(x) * Sqrt(x) == x
+
+lemma SqrtZero(x: real)
+  requires x > 0.0
+  ensures Sqrt(x) > 0.0
+{
+  if (Sqrt(x) == 0.0) {
+    assert x == 0.0;
+  }
+}
+
 
 /* 
  * ------------------------------------------------------------------------------------
@@ -166,6 +196,35 @@ predicate PotentialMapHasDimensions(p: PotentialMap, numRows: nat, numCols: nat)
   && forall r: seq<RealInf> | r in p :: |r| == numCols
 }
 
+function method MinHorizontal(p: Pose, pot: PotentialMap, numRows: nat, numCols: nat): RealInf
+  requires PotentialMapHasDimensions(pot, numRows, numCols)
+  requires 0 <= p.pos.row < numRows && 0 <= p.pos.col < numCols
+  ensures MinHorizontal(p, pot, numRows, numCols).Real? ==> 
+    exists p': Pose :: AdjacentHorizontal(p', p) && 0 <= p'.pos.row < numRows && 0 <= p'.pos.col < numCols 
+                    && pot[p'.pos.row][p'.pos.col] == MinHorizontal(p, pot, numRows, numCols)
+{
+  var left := if p.pos.col > 0 then pot[p.pos.row][p.pos.col - 1] else Infinity;
+  var right := if p.pos.col + 1 < numCols then pot[p.pos.row][p.pos.col + 1] else Infinity;
+  assert AdjacentHorizontal(Pose(Point(p.pos.row, p.pos.col - 1)), p);
+  assert AdjacentHorizontal(Pose(Point(p.pos.row, p.pos.col + 1)), p);
+  MinInfinity(left, right)
+}
+
+function method MinVertical(p: Pose, pot: PotentialMap, numRows: nat, numCols: nat): RealInf
+  requires PotentialMapHasDimensions(pot, numRows, numCols)
+  requires 0 <= p.pos.row < numRows && 0 <= p.pos.col < numCols
+  ensures MinVertical(p, pot, numRows, numCols).Real? ==> 
+    exists p': Pose :: AdjacentVertical(p', p) && 0 <= p'.pos.row < numRows && 0 <= p'.pos.col < numCols 
+                    && pot[p'.pos.row][p'.pos.col] == MinVertical(p, pot, numRows, numCols)
+{
+  var up := if p.pos.row > 0 then pot[p.pos.row - 1][p.pos.col] else Infinity;
+  var down := if p.pos.row + 1 < numRows then pot[p.pos.row + 1][p.pos.col] else Infinity;
+  assert AdjacentVertical(Pose(Point(p.pos.row - 1, p.pos.col)), p);
+  assert AdjacentVertical(Pose(Point(p.pos.row + 1, p.pos.col)), p);
+  MinInfinity(up, down)
+}
+
+
 /*
  * A potential map satisfies position safety w.r.t. a cost map iff every tile with finite potential
  * is free of obstacles.
@@ -190,6 +249,21 @@ predicate HasSomeAdjacentReal(p: Pose, pot: PotentialMap, numRows: nat, numCols:
       || (p.pos.row + 1 < numRows && pot[p.pos.row + 1][p.pos.col].Real?)
       || (p.pos.col > 0 && pot[p.pos.row][p.pos.col - 1].Real?)
       || (p.pos.col + 1 < numCols && pot[p.pos.row][p.pos.col + 1].Real?)
+}
+
+/*
+ * A potential map satisfies progress iff every tile with finite potential (excluding the goal)
+ * has another adjacent tile with lower potential.
+ */
+predicate Progress(pot: PotentialMap, goal: Pose, numRows: nat, numCols: nat)
+{
+  PotentialMapHasDimensions(pot, numRows, numCols)
+  && forall i, j | 0 <= i < numRows && 0 <= j < numCols ::
+        i != goal.pos.row && j != goal.pos.col && pot[i][j].Real? ==> 
+          exists i', j' :: Adjacent(Pose(Point(i, j)), Pose(Point(i', j')), CostMap((p => 0.0), 0, 0))    // TODO: remove costmap
+                && 0 <= i' < numRows && 0 <= j' < numCols
+                && pot[i'][j'].Real?
+                && GreaterThan(pot[i][j], pot[i'][j'])
 }
 
 
@@ -273,11 +347,13 @@ method ComputeNavFnRec(start: Pose, goal: Pose,
                       current: seq<Pose>, next: seq<Pose>, excess: seq<Pose>,
                       threshold: real, numIterations: nat) returns (pot': PotentialMap)
   requires PositionSafe(pot, costMap)
+  requires Progress(pot, goal, costMap.numRows, costMap.numCols)
   requires ValidQueue(current, pot, costMap) && ValidQueue(next, pot, costMap) && ValidQueue(excess, pot, costMap)
   requires ValidCostMap(costMap)
   requires 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
   requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
   ensures PositionSafe(pot', costMap)
+  ensures Progress(pot', goal, costMap.numRows, costMap.numCols)
   decreases numIterations, |current|
 {
   if (numIterations == 0) {
@@ -289,18 +365,56 @@ method ComputeNavFnRec(start: Pose, goal: Pose,
       pot' := ComputeNavFnRec(start, goal, costMap, pot, current[1..], next, excess, threshold, numIterations);
       return;
     } else {
-      var minV := MinVertical(current[0], pot, costMap.numRows);
-      var minH := MinHorizontal(current[0], pot, costMap.numCols);
-      assert minV != Infinity || minH != Infinity;  // Because current queue is valid
+      var front := current[0];
+      var minV := MinVertical(front, pot, costMap.numRows, costMap.numCols);
+      var minH := MinHorizontal(front, pot, costMap.numRows, costMap.numCols);
+
+      assert minV != Infinity || minH != Infinity by {
+        assert HasSomeAdjacentReal(front, pot, costMap.numRows, costMap.numCols);
+        if ((front.pos.row > 0 && pot[front.pos.row - 1][front.pos.col].Real?) 
+            || (front.pos.row + 1 < costMap.numRows && pot[front.pos.row + 1][front.pos.col].Real?)) {
+          assert minV.Real?;
+        } else {
+          assert  (front.pos.col > 0 && pot[front.pos.row][front.pos.col - 1].Real?) 
+                    || (front.pos.col + 1 < costMap.numCols && pot[front.pos.row][front.pos.col + 1].Real?);
+          assert minH.Real?;
+        }
+      } // Because current queue is valid
       var min := MinInfinity(minV, minH);
       var snd := MaxInfinity(minV, minH);
-      var potAux, updated := UpdatePotential(pot, current[0], costMap, min, snd);
+      assert min == minV || min == minH;
+      ghost var pMin: Pose;
+      if (minV == min) {
+        ghost var minVPose :| AdjacentVertical(minVPose, front) 
+            && 0 <= minVPose.pos.row < costMap.numRows
+            && 0 <= minVPose.pos.col < costMap.numCols 
+            && pot[minVPose.pos.row][minVPose.pos.col] == minV;
+        pMin := minVPose;
+        assert Adjacent(pMin, front, costMap) 
+              && 0 <= pMin.pos.row < costMap.numRows
+              && 0 <= pMin.pos.col < costMap.numCols
+              && pot[pMin.pos.row][pMin.pos.col] == min;
+      } else {
+        ghost var minHPose :| AdjacentHorizontal(minHPose, front) 
+            && 0 <= minHPose.pos.row < costMap.numRows
+            && 0 <= minHPose.pos.col < costMap.numCols 
+            && pot[minHPose.pos.row][minHPose.pos.col] == minH;
+        pMin := minHPose;
+        assert Adjacent(pMin, front, costMap) 
+              && 0 <= pMin.pos.row < costMap.numRows
+              && 0 <= pMin.pos.col < costMap.numCols
+              && pot[pMin.pos.row][pMin.pos.col] == min;
+      }
+      assert Adjacent(pMin, front, costMap);
+      assert 0 <= pMin.pos.row < costMap.numRows && 0 <= pMin.pos.col < costMap.numCols;
+      assert pot[pMin.pos.row][pMin.pos.col] == min;
+      var potAux, updated := UpdatePotential(pot, front, costMap, min, snd, pMin, goal);
       var next', excess' := next, excess;
       if (updated) {
         assert ValidQueue(current, potAux, costMap);
         assert ValidQueue(next, potAux, costMap);
         assert ValidQueue(excess, potAux, costMap);
-        next', excess' := TraverseNeighbors(current[0], start, costMap, potAux, threshold, next, excess);
+        next', excess' := TraverseNeighbors(front, start, costMap, potAux, threshold, next, excess);
         assert ValidQueue(next', potAux, costMap);
         assert ValidQueue(excess', potAux, costMap);
       }
@@ -327,6 +441,7 @@ method BuildInitialPotentialMap(numRows: nat, numCols: nat, initRow: nat,  initC
   ensures PotentialMapHasDimensions(p, numRows, numCols)
   ensures forall i, j | 0 <= i < numRows && 0 <= j < numCols && (i != initRow || j != initCol) :: p[i][j] == Infinity
   ensures p[initRow][initCol] == Real(0.0)
+  ensures Progress(p, Pose(Point(initRow, initCol)), numRows, numCols); 
 {
   var i := 0;
   var j := 0;
@@ -362,35 +477,68 @@ method InitCurrentQueue(p: Pose, ghost pot: PotentialMap, costMap: CostMap) retu
  * Assuming that the position p in the costMap is open, it updates the potential map at position p with
  * the information gathered from the adjacent positions.
  */
-method UpdatePotential(pot: PotentialMap, p: Pose, costMap: CostMap, min: RealInf, snd: RealInf) returns (pot': PotentialMap, updated: bool)
+method UpdatePotential(pot: PotentialMap, p: Pose, costMap: CostMap, min: RealInf, snd: RealInf, ghost posMin: Pose, ghost goal: Pose) returns (pot': PotentialMap, updated: bool)
   requires PositionSafe(pot, costMap)
+  requires Progress(pot, goal, costMap.numRows, costMap.numCols)
   requires ValidCostMap(costMap)
   requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
+  requires 0 <= posMin.pos.row < costMap.numRows && 0 <= posMin.pos.col < costMap.numCols
+  requires pot[posMin.pos.row][posMin.pos.col] == min
+  requires Adjacent(p, posMin, costMap)
   requires min.Real?
   requires Open(costMap, p.pos.row, p.pos.col)
   ensures PositionSafe(pot', costMap)
   ensures forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols ::
     pot[i][j].Real? ==> pot'[i][j].Real?
   ensures pot'[p.pos.row][p.pos.col].Real?
+  ensures Progress(pot', goal, costMap.numRows, costMap.numCols)
 {
   var hf := costMap.value(Point(p.pos.row, p.pos.col));
   var diff := Minus(snd, min);
   var v';
   if (GreaterThanOrEqual(diff, Real(hf))) {
     v' := hf + min.r;
-    pot' := pot[p.pos.row := pot[p.pos.row][p.pos.col := Real(v')]];
   } else {
     assert diff.Real?;
     var d := diff.r / hf;
     var interpol := -0.2301 * d * d + 0.5307 * d + 0.7040;
+    assume interpol > 0.0;
+    // if (interpol < 0.00001) { interpol := 0.00001; }      // WARNING: Same behaviour?
     v' := min.r + hf * interpol;
-    pot' := pot[p.pos.row := pot[p.pos.row][p.pos.col := Real(v')]];
   }
-  updated := false;
+  assert v' > min.r;
   if (GreaterThan(pot[p.pos.row][p.pos.col], Real(v'))) {
     pot' := pot[p.pos.row := pot[p.pos.row][p.pos.col := Real(v')]];
     updated := true;
-  }
+    assert Progress(pot', goal, costMap.numRows, costMap.numCols) by {
+      forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols
+      ensures i != goal.pos.row && j != goal.pos.col && pot'[i][j].Real? ==> 
+            exists i', j' :: Adjacent(Pose(Point(i, j)), Pose(Point(i', j')), CostMap((p => 0.0), 0, 0))    // TODO: remove costmap
+                  && 0 <= i' < costMap.numRows && 0 <= j' < costMap.numCols
+                  && pot'[i'][j'].Real?
+                  && GreaterThan(pot'[i][j], pot'[i'][j']);
+      { 
+        if (i != goal.pos.row && j != goal.pos.col && pot'[i][j].Real?) {
+          if (i == p.pos.row && j == p.pos.col) {
+            var i' := posMin.pos.row;
+            var j' := posMin.pos.col;
+            assert Adjacent(Pose(Point(i, j)), Pose(Point(i', j')), CostMap((p => 0.0), 0, 0));
+            assert 0 <= i' < costMap.numRows && 0 <= j' < costMap.numCols;
+            assert pot'[i'][j'] == pot[i'][j'] == min;
+            assert pot'[i'][j'].Real?;
+            assert pot'[i][j].Real?;
+            assert pot'[i][j].r == v';
+            assert GreaterThan(pot'[i][j], pot'[i'][j']);
+          } else {
+            assert pot'[i][j] == pot[i][j];
+          }
+        }
+      }  
+    }
+  } else {
+    pot' := pot;
+    updated := false;
+  }  
 }
 
 /*
@@ -476,14 +624,6 @@ method TraverseNeighbors(p: Pose, start: Pose, costMap: CostMap, pot: PotentialM
  */
 
 
-function method AbsInt(x: int): int {
-  if (x >= 0) then x else -x
-}
-
-function method AbsReal(x: real): real {
-  if (x >= 0.0) then x else -x
-}
-
 function method SignReal(x: real): real {
   if (x > 0.0) then 1.0
   else if (x < 0.0) then -1.0
@@ -502,44 +642,7 @@ function method ToRealPoint(p: OffsetPoint): RealPoint {
   RealPoint(p.base.row as real + p.offset.row, p.base.col as real + p.offset.col)
 }
 
-method EuclidDistance(p1: Point, p2: Point) returns (d: real) {
-  var diffRows := AbsInt(p1.row - p2.row);
-  var diffCols := AbsInt(p1.col - p2.col);
-  d := Sqrt((diffRows * diffRows + diffCols * diffCols) as real) * mapCost;
-}
 
-function method MinHorizontal(p: Pose, pot: PotentialMap, numCols: nat): RealInf
-  requires exists numRows :: PotentialMapHasDimensions(pot, numRows, numCols) && 0 <= p.pos.row < numRows
-  requires 0 <= p.pos.col < numCols
-{
-  var left := if p.pos.col > 0 then pot[p.pos.row][p.pos.col - 1] else Infinity;
-  var right := if p.pos.col + 1 < numCols then pot[p.pos.row][p.pos.col + 1] else Infinity;
-  MinInfinity(left, right)
-}
-
-function method MinVertical(p: Pose, pot: PotentialMap, numRows: nat): RealInf
-  requires exists numCols :: PotentialMapHasDimensions(pot, numRows, numCols) && 0 <= p.pos.col < numCols
-  requires 0 <= p.pos.row < numRows
-{
-  var up := if p.pos.row > 0 then pot[p.pos.row - 1][p.pos.col] else Infinity;
-  var down := if p.pos.row + 1 < numRows then pot[p.pos.row + 1][p.pos.col] else Infinity;
-  MinInfinity(up, down)
-}
-
-
-function method {:extern} Sqrt(x: real): real
-  requires x >= 0.0
-  ensures Sqrt(x) >= 0.0
-  ensures Sqrt(x) * Sqrt(x) == x
-
-lemma SqrtZero(x: real)
-  requires x > 0.0
-  ensures Sqrt(x) > 0.0
-{
-  if (Sqrt(x) == 0.0) {
-    assert x == 0.0;
-  }
-}
 
 lemma MultSameSign(x: real, y: real)
   requires (x < 0.0 && y < 0.0) || (x > 0.0 && y > 0.0)
@@ -601,7 +704,6 @@ predicate method AllFree(p: Point, potentialMap: PotentialMap, ghost numRows: na
     0 < p.row < |potentialMap| - 1 && 0 < p.col < |potentialMap[0]| - 1
     && forall adj | adj in AdjacentOf(p) :: potentialMap[adj.row][adj.col].Real?
 }
-
 
 method ComputePath(start: Point, goal: Point, potentialMap: PotentialMap, numSteps: nat, numRows: nat, numCols: nat)
   returns (error: bool, path: seq<RealPoint>, ghost closest: seq<Point>)
@@ -819,4 +921,3 @@ method NextMove(p: OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCol
     }
   }
 }
-
