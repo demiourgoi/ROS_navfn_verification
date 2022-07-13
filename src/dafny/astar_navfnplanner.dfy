@@ -27,6 +27,58 @@ const stepSize: real := 0.5
 
 /* 
  * ------------------------------------------------------------------------------------
+ *                           Operations on R ∪ {+\infty}
+ * ------------------------------------------------------------------------------------
+ */
+
+
+/*
+ * Returns the smallest of two elements
+ */
+function method MinInfinity(x1: RealInf, x2: RealInf): RealInf {
+  if (x1.Infinity?) then x2
+  else if (x2.Infinity?) then x1
+  else if (x1.r <= x2.r) then x1 else x2
+}
+
+/*
+ * Returns the greatest of two elements
+ */
+function method MaxInfinity(x1: RealInf, x2: RealInf): RealInf {
+  if (x1.Infinity?) then x1
+  else if (x2.Infinity?) then x2
+  else if (x1.r >= x2.r) then x1 else x2
+}
+
+/*
+ * Returns true iff x1 < x2
+ */
+predicate method GreaterThan(x1: RealInf, x2: RealInf)
+  requires x1.Real? || x2.Real?
+{
+  x1.Infinity? || (x2.Real? && x1.r > x2.r)
+}
+
+/*
+ * Returns true iff x1 <= x2
+ */
+predicate method GreaterThanOrEqual(x1: RealInf, x2: RealInf)
+{
+  x1.Infinity? || (x1.Real? && x2.Real? && x1.r >= x2.r)
+}
+
+/*
+ * Substraction operator: x1 - x2
+ * It requires x2 to be finite to avoid indetermination or -\infty
+ */
+function method Minus(x1: RealInf, x2: RealInf): RealInf
+  requires x2.Real?
+{
+  if (x1.Infinity?) then Infinity else Real(x1.r - x2.r)
+}
+
+/* 
+ * ------------------------------------------------------------------------------------
  *                     Cost map-related functions and predicates
  * ------------------------------------------------------------------------------------
  */
@@ -173,13 +225,7 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
     && path[|path| - 1] == RealPoint(goal.pos.row as real, goal.pos.col as real)
 
 {
-  var pot := BuildInitialPotentialMap(costMap.numRows, costMap.numCols, goal.pos.row, goal.pos.col);
-  assert PositionSafe(pot, costMap);
-  var initialThreshold := EuclidDistance(start.pos, goal.pos);
-  initialThreshold := initialThreshold + obstacleCost;
-  var current := InitCurrentQueue(goal, pot, costMap);
-
-  navfn := ComputeNavFn(start, goal, costMap, pot, current, [], [], initialThreshold, numIterations);
+  navfn := ComputeNavFn(start, goal, costMap, numIterations);
   ghost var closestPath: seq<Point>;
   if (navfn[start.pos.row][start.pos.col].Real?) {
     error, path, closestPath := ComputePath(start.pos, goal.pos, navfn, numPathIterations, costMap.numRows, costMap.numCols);
@@ -195,7 +241,31 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
  */
 
 
-method ComputeNavFn(start: Pose, goal: Pose,
+/*
+ * It computes the navigation function given the start and goal positions and a costMap.
+ * The numIterations parameters specifies an upper bound on how many times the contents of
+ * the excess queue are transferred to the next queue.
+ */
+method ComputeNavFn(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat) returns (navfn: PotentialMap)
+  requires ValidCostMap(costMap)
+  requires 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
+  requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
+  requires Open(costMap, goal.pos.row, goal.pos.col)
+  ensures PositionSafe(navfn, costMap)
+{
+  var pot := BuildInitialPotentialMap(costMap.numRows, costMap.numCols, goal.pos.row, goal.pos.col);
+  var initialThreshold := EuclidDistance(start.pos, goal.pos);
+  initialThreshold := initialThreshold + obstacleCost;
+  var current := InitCurrentQueue(goal, pot, costMap);
+  navfn := ComputeNavFnRec(start, goal, costMap, pot, current, [], [], initialThreshold, numIterations);
+}
+
+
+/*
+ * Compute the navigation function (i.e. potential map) given a start and goal positions, a cost map, an
+ *
+ */
+method ComputeNavFnRec(start: Pose, goal: Pose,
                       costMap: CostMap, pot: PotentialMap,
                       current: seq<Pose>, next: seq<Pose>, excess: seq<Pose>,
                       threshold: real, numIterations: nat) returns (pot': PotentialMap)
@@ -213,15 +283,15 @@ method ComputeNavFn(start: Pose, goal: Pose,
 
   if (|current| > 0) {
     if (!Open(costMap, current[0].pos.row, current[0].pos.col)) {
-      pot' := ComputeNavFn(start, goal, costMap, pot, current[1..], next, excess, threshold, numIterations);
+      pot' := ComputeNavFnRec(start, goal, costMap, pot, current[1..], next, excess, threshold, numIterations);
       return;
     } else {
       var minV := MinVertical(current[0], pot, costMap.numRows);
       var minH := MinHorizontal(current[0], pot, costMap.numCols);
-      assert minV != Infinity || minH != Infinity;
+      assert minV != Infinity || minH != Infinity;  // Because current queue is valid
       var min := MinInfinity(minV, minH);
       var snd := MaxInfinity(minV, minH);
-      var potAux, updated := UpdatePotential(pot, current[0], goal, costMap, min, snd);
+      var potAux, updated := UpdatePotential(pot, current[0], costMap, min, snd);
       var next', excess' := next, excess;
       if (updated) {
         assert ValidQueue(current, potAux, costMap);
@@ -231,16 +301,16 @@ method ComputeNavFn(start: Pose, goal: Pose,
         assert ValidQueue(next', potAux, costMap);
         assert ValidQueue(excess', potAux, costMap);
       }
-      pot' := ComputeNavFn(start, goal, costMap, potAux, current[1..], next', excess', threshold, numIterations);
+      pot' := ComputeNavFnRec(start, goal, costMap, potAux, current[1..], next', excess', threshold, numIterations);
     }
   } else {
     if (pot[start.pos.row][start.pos.col] != Infinity) {
       return pot;
     }
     if (next == []) {
-      pot' := ComputeNavFn(start, goal, costMap, pot, excess, [], next, threshold + 2.0 * mapCost, numIterations - 1);
+      pot' := ComputeNavFnRec(start, goal, costMap, pot, excess, [], next, threshold + 2.0 * mapCost, numIterations - 1);
     } else {
-      pot' := ComputeNavFn(start, goal, costMap, pot, next, [], excess, threshold, numIterations - 1);
+      pot' := ComputeNavFnRec(start, goal, costMap, pot, next, [], excess, threshold, numIterations - 1);
     }
   }
 }
@@ -285,7 +355,11 @@ method InitCurrentQueue(p: Pose, ghost pot: PotentialMap, costMap: CostMap) retu
   current := p1l + p2l + p3l + p4l;
 }
 
-method UpdatePotential(pot: PotentialMap, p: Pose, goal: Pose, costMap: CostMap, min: RealInf, snd: RealInf) returns (pot': PotentialMap, updated: bool)
+/*
+ * Assuming that the position p in the costMap is open, it updates the potential map at position p with
+ * the information gathered from the adjacent positions.
+ */
+method UpdatePotential(pot: PotentialMap, p: Pose, costMap: CostMap, min: RealInf, snd: RealInf) returns (pot': PotentialMap, updated: bool)
   requires PositionSafe(pot, costMap)
   requires ValidCostMap(costMap)
   requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
@@ -316,6 +390,9 @@ method UpdatePotential(pot: PotentialMap, p: Pose, goal: Pose, costMap: CostMap,
   }
 }
 
+/*
+ * It traverses all the positions adjacent to p and add them to the next and excess queues
+ */
 method TraverseNeighbors(p: Pose, start: Pose, costMap: CostMap, pot: PotentialMap, threshold: real, next: seq<Pose>, excess: seq<Pose>)
     returns (next': seq<Pose>, excess': seq<Pose>)
   requires PositionSafe(pot, costMap)
@@ -362,7 +439,11 @@ method TraverseNeighbors(p: Pose, start: Pose, costMap: CostMap, pot: PotentialM
   excess' := excess + p1r + p2r + p3r + p4r;
 }
 
-method TraverseNeighbor(p: Pose, newP: Pose, start: Pose, costMap: CostMap, pot: PotentialMap, threshold: real) returns (next': seq<Pose>, excess': seq<Pose>)
+/*
+ * It determines whether newP (which is non-diagonally adjacent to p) should be stored in the next queue or
+ * in the excess queue.
+ */
+ method TraverseNeighbor(p: Pose, newP: Pose, start: Pose, costMap: CostMap, pot: PotentialMap, threshold: real) returns (next': seq<Pose>, excess': seq<Pose>)
   requires PositionSafe(pot, costMap)
   requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
   requires 0 <= newP.pos.row < costMap.numRows && 0 <= newP.pos.col < costMap.numCols
@@ -442,35 +523,6 @@ function method MinVertical(p: Pose, pot: PotentialMap, numRows: nat): RealInf
   MinInfinity(up, down)
 }
 
-function method MinInfinity(x1: RealInf, x2: RealInf): RealInf {
-  if (x1.Infinity?) then x2
-  else if (x2.Infinity?) then x1
-  else if (x1.r <= x2.r) then x1 else x2
-}
-
-function method MaxInfinity(x1: RealInf, x2: RealInf): RealInf {
-  if (x1.Infinity?) then x1
-  else if (x2.Infinity?) then x2
-  else if (x1.r >= x2.r) then x1 else x2
-}
-
-predicate method GreaterThan(x1: RealInf, x2: RealInf)
-  requires x1.Real? || x2.Real?
-{
-  x1.Infinity? || (x2.Real? && x1.r > x2.r)
-}
-
-predicate method GreaterThanOrEqual(x1: RealInf, x2: RealInf)
-{
-  x1.Infinity? || (x1.Real? && x2.Real? && x1.r >= x2.r)
-}
-
-
-function method Minus(x1: RealInf, x2: RealInf): RealInf
-  requires x2.Real?
-{
-  if (x1.Infinity?) then Infinity else Real(x1.r - x2.r)
-}
 
 function method {:extern} Sqrt(x: real): real
   requires x >= 0.0
