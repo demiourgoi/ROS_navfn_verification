@@ -244,7 +244,7 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
 /*
  * It computes the navigation function given the start and goal positions and a costMap.
  * The numIterations parameters specifies an upper bound on how many times the contents of
- * the excess queue are transferred to the next queue.
+ * the next/excess queues are transferred to the current queue.
  */
 method ComputeNavFn(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat) returns (navfn: PotentialMap)
   requires ValidCostMap(costMap)
@@ -253,67 +253,60 @@ method ComputeNavFn(start: Pose, goal: Pose, costMap: CostMap, numIterations: na
   requires Open(costMap, goal.pos.row, goal.pos.col)
   ensures PositionSafe(navfn, costMap)
 {
-  var pot := BuildInitialPotentialMap(costMap.numRows, costMap.numCols, goal.pos.row, goal.pos.col);
+  navfn := BuildInitialPotentialMap(costMap.numRows, costMap.numCols, goal.pos.row, goal.pos.col);
   var initialThreshold := EuclidDistance(start.pos, goal.pos);
   initialThreshold := initialThreshold + obstacleCost;
-  var current := InitCurrentQueue(goal, pot, costMap);
-  navfn := ComputeNavFnRec(start, goal, costMap, pot, current, [], [], initialThreshold, numIterations);
-}
+  var current := InitCurrentQueue(goal, navfn, costMap);
+  var next := [];
+  var excess := [];
 
-
-/*
- * Compute the navigation function (i.e. potential map) given a start and goal positions, a cost map, an
- *
- */
-method ComputeNavFnRec(start: Pose, goal: Pose,
-                      costMap: CostMap, pot: PotentialMap,
-                      current: seq<Pose>, next: seq<Pose>, excess: seq<Pose>,
-                      threshold: real, numIterations: nat) returns (pot': PotentialMap)
-  requires PositionSafe(pot, costMap)
-  requires ValidQueue(current, pot, costMap) && ValidQueue(next, pot, costMap) && ValidQueue(excess, pot, costMap)
-  requires ValidCostMap(costMap)
-  requires 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
-  requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
-  ensures PositionSafe(pot', costMap)
-  decreases numIterations, |current|
-{
-  if (numIterations == 0) {
-    return pot;
-  }
-
-  if (|current| > 0) {
-    if (!Open(costMap, current[0].pos.row, current[0].pos.col)) {
-      pot' := ComputeNavFnRec(start, goal, costMap, pot, current[1..], next, excess, threshold, numIterations);
-      return;
-    } else {
-      var minV := MinVertical(current[0], pot, costMap.numRows);
-      var minH := MinHorizontal(current[0], pot, costMap.numCols);
-      assert minV != Infinity || minH != Infinity;  // Because current queue is valid
-      var min := MinInfinity(minV, minH);
-      var snd := MaxInfinity(minV, minH);
-      var potAux, updated := UpdatePotential(pot, current[0], costMap, min, snd);
-      var next', excess' := next, excess;
-      if (updated) {
-        assert ValidQueue(current, potAux, costMap);
-        assert ValidQueue(next, potAux, costMap);
-        assert ValidQueue(excess, potAux, costMap);
-        next', excess' := TraverseNeighbors(current[0], start, costMap, potAux, threshold, next, excess);
-        assert ValidQueue(next', potAux, costMap);
-        assert ValidQueue(excess', potAux, costMap);
+  var threshold := initialThreshold + obstacleCost;
+  var iterationCounter := numIterations;
+  while (iterationCounter > 0 && navfn[start.pos.row][start.pos.col] != Infinity)
+    invariant PositionSafe(navfn, costMap)
+    invariant PotentialMapHasDimensions(navfn, costMap.numRows, costMap.numCols)
+    invariant ValidQueue(current, navfn, costMap) && ValidQueue(next, navfn, costMap) && ValidQueue(excess, navfn, costMap)
+    invariant ValidCostMap(costMap)
+    invariant 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
+    invariant 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
+    decreases iterationCounter, |current|
+  {
+    if (|current| > 0) {
+      if (!Open(costMap, current[0].pos.row, current[0].pos.col)) {
+        current := current[1..];
+      } else {
+        var minV := MinVertical(current[0], navfn, costMap.numRows);
+        var minH := MinHorizontal(current[0], navfn, costMap.numCols);
+        assert minV != Infinity || minH != Infinity;  // Because current queue is valid
+        var min := MinInfinity(minV, minH);
+        var snd := MaxInfinity(minV, minH);
+        var newNavFn, updated := UpdatePotential(navfn, current[0], costMap, min, snd);
+        if (updated) {
+          assert ValidQueue(current, newNavFn, costMap);
+          assert ValidQueue(next, newNavFn, costMap);
+          assert ValidQueue(excess, newNavFn, costMap);
+          next, excess := TraverseNeighbors(current[0], start, costMap, newNavFn, threshold, next, excess);
+          assert ValidQueue(next, newNavFn, costMap);
+          assert ValidQueue(excess, newNavFn, costMap);
+        }
+        current := current[1..];
+        navfn := newNavFn;
       }
-      pot' := ComputeNavFnRec(start, goal, costMap, potAux, current[1..], next', excess', threshold, numIterations);
-    }
-  } else {
-    if (pot[start.pos.row][start.pos.col] != Infinity) {
-      return pot;
-    }
-    if (next == []) {
-      pot' := ComputeNavFnRec(start, goal, costMap, pot, excess, [], next, threshold + 2.0 * mapCost, numIterations - 1);
     } else {
-      pot' := ComputeNavFnRec(start, goal, costMap, pot, next, [], excess, threshold, numIterations - 1);
+      if (next == []) {
+        current := excess;
+        excess := [];
+        threshold := threshold + 2.0 * mapCost;
+        iterationCounter := iterationCounter - 1;
+      } else {
+        current := next;
+        next := [];
+        iterationCounter := iterationCounter - 1;
+      }
     }
   }
 }
+
 
 /*
  * It returns a potential map of (numRows x numCols) size with all positions set to +\infty, except the position
