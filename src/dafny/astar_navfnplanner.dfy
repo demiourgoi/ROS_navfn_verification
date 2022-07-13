@@ -108,7 +108,7 @@ predicate AdjacentVertical(p1: Pose, p2: Pose)
 /*
  * Tells us whether two poses are adjacent considering rows and columns, but not diagonals
  */
-predicate Adjacent(p1: Pose, p2: Pose, costMap: CostMap)
+predicate Adjacent(p1: Pose, p2: Pose)
 {
   AdjacentHorizontal(p1, p2) || AdjacentVertical(p1, p2)
 }
@@ -260,7 +260,7 @@ predicate Progress(pot: PotentialMap, goal: Pose, numRows: nat, numCols: nat)
   PotentialMapHasDimensions(pot, numRows, numCols)
   && forall i, j | 0 <= i < numRows && 0 <= j < numCols ::
         i != goal.pos.row && j != goal.pos.col && pot[i][j].Real? ==> 
-          exists i', j' :: Adjacent(Pose(Point(i, j)), Pose(Point(i', j')), CostMap((p => 0.0), 0, 0))    // TODO: remove costmap
+          exists i', j' :: Adjacent(Pose(Point(i, j)), Pose(Point(i', j')))
                 && 0 <= i' < numRows && 0 <= j' < numCols
                 && pot[i'][j'].Real?
                 && GreaterThan(pot[i][j], pot[i'][j'])
@@ -390,7 +390,7 @@ method ComputeNavFnRec(start: Pose, goal: Pose,
             && 0 <= minVPose.pos.col < costMap.numCols 
             && pot[minVPose.pos.row][minVPose.pos.col] == minV;
         pMin := minVPose;
-        assert Adjacent(pMin, front, costMap) 
+        assert Adjacent(pMin, front) 
               && 0 <= pMin.pos.row < costMap.numRows
               && 0 <= pMin.pos.col < costMap.numCols
               && pot[pMin.pos.row][pMin.pos.col] == min;
@@ -401,13 +401,13 @@ method ComputeNavFnRec(start: Pose, goal: Pose,
             && 0 <= minHPose.pos.col < costMap.numCols 
             && pot[minHPose.pos.row][minHPose.pos.col] == minH;
         pMin := minHPose;
-        assert Adjacent(pMin, front, costMap) 
+        assert Adjacent(pMin, front) 
               && 0 <= pMin.pos.row < costMap.numRows
               && 0 <= pMin.pos.col < costMap.numCols
               && pot[pMin.pos.row][pMin.pos.col] == min;
         assert GreaterThanOrEqual(snd, min);
       }
-      assert Adjacent(pMin, front, costMap);
+      assert Adjacent(pMin, front);
       assert 0 <= pMin.pos.row < costMap.numRows && 0 <= pMin.pos.col < costMap.numCols;
       assert pot[pMin.pos.row][pMin.pos.col] == min;
       var potAux, updated := UpdatePotential(pot, front, costMap, min, snd, pMin, goal);
@@ -486,7 +486,7 @@ method UpdatePotential(pot: PotentialMap, p: Pose, costMap: CostMap, min: RealIn
   requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
   requires 0 <= posMin.pos.row < costMap.numRows && 0 <= posMin.pos.col < costMap.numCols
   requires pot[posMin.pos.row][posMin.pos.col] == min
-  requires Adjacent(p, posMin, costMap)
+  requires Adjacent(p, posMin)
   requires min.Real?
   requires GreaterThanOrEqual(snd, min)
   requires Open(costMap, p.pos.row, p.pos.col)
@@ -523,7 +523,7 @@ method UpdatePotential(pot: PotentialMap, p: Pose, costMap: CostMap, min: RealIn
     assert Progress(pot', goal, costMap.numRows, costMap.numCols) by {
       forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols
       ensures i != goal.pos.row && j != goal.pos.col && pot'[i][j].Real? ==> 
-            exists i', j' :: Adjacent(Pose(Point(i, j)), Pose(Point(i', j')), CostMap((p => 0.0), 0, 0))    // TODO: remove costmap
+            exists i', j' :: Adjacent(Pose(Point(i, j)), Pose(Point(i', j')))
                   && 0 <= i' < costMap.numRows && 0 <= j' < costMap.numCols
                   && pot'[i'][j'].Real?
                   && GreaterThan(pot'[i][j], pot'[i'][j']);
@@ -532,7 +532,7 @@ method UpdatePotential(pot: PotentialMap, p: Pose, costMap: CostMap, min: RealIn
           if (i == p.pos.row && j == p.pos.col) {
             var i' := posMin.pos.row;
             var j' := posMin.pos.col;
-            assert Adjacent(Pose(Point(i, j)), Pose(Point(i', j')), CostMap((p => 0.0), 0, 0));
+            assert Adjacent(Pose(Point(i, j)), Pose(Point(i', j')));
             assert 0 <= i' < costMap.numRows && 0 <= j' < costMap.numCols;
             assert pot'[i'][j'] == pot[i'][j'] == min;
             assert pot'[i'][j'].Real?;
@@ -608,7 +608,7 @@ method TraverseNeighbors(p: Pose, start: Pose, costMap: CostMap, pot: PotentialM
   requires PositionSafe(pot, costMap)
   requires 0 <= p.pos.row < costMap.numRows && 0 <= p.pos.col < costMap.numCols
   requires 0 <= newP.pos.row < costMap.numRows && 0 <= newP.pos.col < costMap.numCols
-  requires Adjacent(p, newP, costMap)
+  requires Adjacent(p, newP)
   requires pot[p.pos.row][p.pos.col].Real?
   ensures ValidQueue(next', pot, costMap) && ValidQueue(excess', pot, costMap)
 {
