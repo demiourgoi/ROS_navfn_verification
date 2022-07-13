@@ -77,53 +77,6 @@ function method Minus(x1: RealInf, x2: RealInf): RealInf
   if (x1.Infinity?) then Infinity else Real(x1.r - x2.r)
 }
 
-/* 
- * ------------------------------------------------------------------------------------
- *                     Cost map-related functions and predicates
- * ------------------------------------------------------------------------------------
- */
-
-/*
- * It tells whether a given position in the cost map is free of obstacle
- */
-predicate method Open(costMap: CostMap, row: int, col: int)
-{
-  costMap.value(Point(row, col)) < obstacleCost
-}
-
-/*
- * A cost map is valid iff every position has a positive cost
- */
-predicate ValidCostMap(costMap: CostMap)
-{
-  forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols :: costMap.value(Point(i, j)) > 0.0
-}
-
-
-/* 
- * ------------------------------------------------------------------------------------
- *                  Potential map-related functions and predicates
- * ------------------------------------------------------------------------------------
- */
-
-/*
- * It is satisfied iff the given potential map is a matrix with the given dimensions
- */
-predicate PotentialMapHasDimensions(p: PotentialMap, numRows: nat, numCols: nat) {
-  |p| == numRows
-  && forall r: seq<RealInf> | r in p :: |r| == numCols
-}
-
-/*
- * A potential map satisfies position safety w.r.t. a cost map iff every tile with finite potential
- * is free of obstacles.
- */
-predicate PositionSafe(pot: PotentialMap, costMap: CostMap)
-{
-  PotentialMapHasDimensions(pot, costMap.numRows, costMap.numCols)
-  && forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols ::
-    pot[i][j].Real? ==> Open(costMap, i, j)
-}
 
 /* 
  * ------------------------------------------------------------------------------------
@@ -174,6 +127,56 @@ function method AdjacentOf(p: Point): seq<Point>
    Point(p.row + 1, p.col + 1)
   ]
 }
+
+
+/* 
+ * ------------------------------------------------------------------------------------
+ *                     Cost map-related functions and predicates
+ * ------------------------------------------------------------------------------------
+ */
+
+/*
+ * It tells whether a given position in the cost map is free of obstacle
+ */
+predicate method Open(costMap: CostMap, row: int, col: int)
+{
+  costMap.value(Point(row, col)) < obstacleCost
+}
+
+/*
+ * A cost map is valid iff every position has a positive cost
+ */
+predicate ValidCostMap(costMap: CostMap)
+{
+  forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols :: costMap.value(Point(i, j)) > 0.0
+}
+
+
+/* 
+ * ------------------------------------------------------------------------------------
+ *                  Potential map-related functions and predicates
+ * ------------------------------------------------------------------------------------
+ */
+
+/*
+ * It is satisfied iff the given potential map is a matrix with the given dimensions
+ */
+predicate PotentialMapHasDimensions(p: PotentialMap, numRows: nat, numCols: nat) {
+  |p| == numRows
+  && forall r: seq<RealInf> | r in p :: |r| == numCols
+}
+
+/*
+ * A potential map satisfies position safety w.r.t. a cost map iff every tile with finite potential
+ * is free of obstacles.
+ */
+predicate PositionSafe(pot: PotentialMap, costMap: CostMap)
+{
+  PotentialMapHasDimensions(pot, costMap.numRows, costMap.numCols)
+  && forall i, j | 0 <= i < costMap.numRows && 0 <= j < costMap.numCols ::
+    pot[i][j].Real? ==> Open(costMap, i, j)
+}
+
 
 /*
  * Given a position p in a potential map of (numRows x numCols) tiles, it tells
