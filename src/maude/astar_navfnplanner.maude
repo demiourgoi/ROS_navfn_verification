@@ -26,6 +26,7 @@ mod ASTAR is
  op a* : Pose Pose CostMap  Nat    Nat      Nat     Nat -> Path .
  *** For model checking
  op a* : Pose Pose Gradient  Nat Nat Nat Potential -> Path .
+ eq a*({X, Y}, {X', Y'}, CM, NC, NR, I, IPATH) = a*({X, Y, 0} 0, {X', Y', 0} 0, CM, NC, NR, I, IPATH) .
  rl a*({FX, FY, FZ} Q, {FX', FY', FZ'} Q', CM, NC, NR, I, IPATH) =>
          a*({float2nat(FX), float2nat(FY), float2nat(FZ)} Q,
             {float2nat(FX'), float2nat(FY'), float2nat(FZ')} Q', CM, NC, NR, I, IPATH) .

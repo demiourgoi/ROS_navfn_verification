@@ -404,7 +404,7 @@ if __name__ == "__main__":
                         choices=['none', 'failed', 'all'], default='none', const='failed')
     parser.add_argument('--costmap', help='Draw cost maps instead of navigation functions', action='store_true')
     parser.add_argument('--width', '-w', help='Width of the map (if not square)', type=int)
-    parser.add_argument('--name', help='Name of the high-level backend', choices=['Maude', 'Dafny'], default='Maude')
+    parser.add_argument('--name', help='Name of the high-level backend', choices=['Maude', 'Dafny', 'ROS (fixed)'], default='Maude')
 
     args = parser.parse_args()
     main(args)
