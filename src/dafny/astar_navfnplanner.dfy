@@ -882,11 +882,11 @@ method NextMove(p: OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCol
     assert -2.0 < dx < 2.0;
     assert -2.0 < dy < 2.0;
 
-    if (AbsReal(dx) > 1.0) {
+    if (AbsReal(dx) > 0.5) {
       nx := nx + SignReal(dx) as int;
       dx := dx - SignReal(dx);
     }
-    if (AbsReal(dy) > 1.0) {
+    if (AbsReal(dy) > 0.5) {
       ny := ny + SignReal(dy) as int;
       dy := dy - SignReal(dy);
     }
