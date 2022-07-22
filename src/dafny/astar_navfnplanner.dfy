@@ -288,8 +288,62 @@ predicate ValidQueue(queue: seq<Pose>, pot: PotentialMap, costMap: CostMap)
 
 /* 
  * ------------------------------------------------------------------------------------
+ *                                      Paths
+ * ------------------------------------------------------------------------------------
+ */
+
+/*
+ * A path is said to be valid w.r.t. a costMap if every point is close enough to an open position
+ * In this case 'close enough' means 'a distance lower or equal to 1.0 in each axis'
+ */
+predicate ValidPath(path: Path, costMap: CostMap)
+{
+  forall p | p in path :: 
+    exists i, j :: 0 <= i < costMap.numRows && 0 <= j < costMap.numCols
+        && p.row - i as real <= 1.0 && p.col - j as real <= 1.0 && Open(costMap, i, j)
+}
+
+
+/*
+ * Given a continous Path (i.e. with real coordinates) 'path' and a continuous one (i.e. with discrete coordinates) 'closest'
+ * We say that 'path' is of finite potential iff every point in path is close enough to its counterpart in closest, and
+ * the potential map in the closest position is finite
+ */
+predicate FinitePotentialPath(path: Path, closest: seq<Point>, potentialMap: PotentialMap, numRows: nat, numCols: nat)
+  requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
+{
+  |path| == |closest|
+  && (forall i | 0 <= i < |path| :: path[i].row - closest[i].row as real <= 1.0 && path[i].col - closest[i].col as real <= 1.0)
+  && (forall i | 0 <= i < |closest| :: 0 <= closest[i].row < numRows && 0 <= closest[i].col < numCols && potentialMap[closest[i].row][closest[i].col].Real?)
+}
+
+
+/*
+ * A path with finite potential is valid assuming potential safety.
+ */
+lemma FinitePotentialPathImpliesValidPath(path: Path, closest: seq<Point>, navfn: PotentialMap, costMap: CostMap)
+  requires PositionSafe(navfn, costMap)
+  requires FinitePotentialPath(path, closest, navfn, costMap.numRows, costMap.numCols)
+  ensures ValidPath(path, costMap)
+{
+  // Dafny proves it by itself
+}
+
+
+/* 
+ * ------------------------------------------------------------------------------------
  *                                   NavFn algorithm
  * ------------------------------------------------------------------------------------
+ */
+
+/*
+ * It computes a valid path from 'start' to 'goal' given a cost map and a maximum number of iterations
+ * when computing the navFn function (numIterations) and when computing a path (numPathIterations)
+ *
+ * It returns:
+ *    - error: whether the path was computed without exceeding the number of iterations
+ *    - path: valid path from start to goal
+ *    - navfn: navigation function (intermediate result used for white-box testing)
  */
 method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numPathIterations: nat) returns (error: bool, path: Path, navfn: PotentialMap)
   requires 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
@@ -297,15 +351,18 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
   requires Open(costMap, goal.pos.row, goal.pos.col)
   requires ValidCostMap(costMap)
   ensures !error ==>
-    |path| >= 1
+    ValidPath(path, costMap)
+    && |path| >= 1
     && path[0] == RealPoint(start.pos.row as real, start.pos.col as real)
-    && path[|path| - 1] == RealPoint(goal.pos.row as real, goal.pos.col as real)
-
+    && path[|path| - 1] == RealPoint(goal.pos.row as real, goal.pos.col as real)    
 {
   navfn := ComputeNavFn(start, goal, costMap, numIterations);
   ghost var closestPath: seq<Point>;
   if (navfn[start.pos.row][start.pos.col].Real?) {
     error, path, closestPath := ComputePath(start.pos, goal.pos, navfn, numPathIterations, costMap.numRows, costMap.numCols);
+    if !error {
+      FinitePotentialPathImpliesValidPath(path, closestPath, navfn, costMap);
+    }
   } else {
     error := true;
   }
@@ -329,8 +386,10 @@ method ComputeNavFn(start: Pose, goal: Pose, costMap: CostMap, numIterations: na
   requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
   requires Open(costMap, goal.pos.row, goal.pos.col)
   ensures PositionSafe(navfn, costMap)
+  ensures navfn[goal.pos.row][goal.pos.col].Real?
 {
-  var pot := BuildInitialPotentialMap(costMap.numRows, costMap.numCols, goal.pos.row, goal.pos.col);
+  var pot: PotentialMap := BuildInitialPotentialMap(costMap.numRows, costMap.numCols, goal.pos.row, goal.pos.col);
+  assert pot[goal.pos.row][goal.pos.col].Real?;
   var initialThreshold := EuclidDistance(start.pos, goal.pos);
   initialThreshold := initialThreshold + obstacleCost;
   var current := InitCurrentQueue(goal, pot, costMap);
@@ -352,8 +411,10 @@ method ComputeNavFnRec(start: Pose, goal: Pose,
   requires ValidCostMap(costMap)
   requires 0 <= start.pos.row < costMap.numRows && 0 <= start.pos.col < costMap.numCols
   requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
+  requires pot[goal.pos.row][goal.pos.col].Real?
   ensures PositionSafe(pot', costMap)
   ensures Progress(pot', goal, costMap.numRows, costMap.numCols)
+  ensures pot'[goal.pos.row][goal.pos.col].Real?
   decreases numIterations, |current|
 {
   if (numIterations == 0) {
@@ -410,7 +471,9 @@ method ComputeNavFnRec(start: Pose, goal: Pose,
       assert Adjacent(pMin, front);
       assert 0 <= pMin.pos.row < costMap.numRows && 0 <= pMin.pos.col < costMap.numCols;
       assert pot[pMin.pos.row][pMin.pos.col] == min;
-      var potAux, updated := UpdatePotential(pot, front, costMap, min, snd, pMin, goal);
+      assert pot[goal.pos.row][goal.pos.col].Real?;
+      var potAux: PotentialMap, updated: bool := UpdatePotential(pot, front, costMap, min, snd, pMin, goal);
+      assert potAux[goal.pos.row][goal.pos.col].Real?;
       var next', excess' := next, excess;
       if (updated) {
         assert ValidQueue(current, potAux, costMap);
@@ -720,8 +783,10 @@ method ComputePath(start: Point, goal: Point, potentialMap: PotentialMap, numSte
   requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
   requires 0 <= start.row < numRows && 0 <= start.col < numCols
   requires potentialMap[start.row][start.col].Real?
+  requires 0 <= goal.row < numRows && 0 <= goal.col < numCols
+  requires potentialMap[goal.row][goal.col].Real?
   ensures !error ==>
-            |path| == |closest|
+            FinitePotentialPath(path, closest, potentialMap, numRows, numCols)
             && |path| >= 1
             && path[0] == RealPoint(start.row as real, start.col as real)
             && path[|path| - 1] == RealPoint(goal.row as real, goal.col as real)
@@ -742,6 +807,7 @@ method ComputePath(start: Point, goal: Point, potentialMap: PotentialMap, numSte
     invariant |path| == |closest|
     invariant path == [] ==> p.base == start && p.offset == RealPoint(0.0, 0.0)
     invariant (if path == [] then ToRealPoint(p) else path[0]) == RealPoint(start.row as real, start.col as real)
+    invariant FinitePotentialPath(path, closest, potentialMap, numRows, numCols)
     invariant forall i | 0 <= i < |closest| :: 0 <= closest[i].row < numRows && 0 <= closest[i].col < numCols &&
         potentialMap[closest[i].row][closest[i].col].Real?
   {
