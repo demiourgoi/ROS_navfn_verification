@@ -716,12 +716,13 @@ function method ToRealPoint(p: OffsetPoint): RealPoint {
 }
 
 
-
+// If we multiply two nonzero numbers of the same sign, the result is positive
 lemma MultSameSign(x: real, y: real)
   requires (x < 0.0 && y < 0.0) || (x > 0.0 && y > 0.0)
   ensures x * y > 0.0
 { }
 
+// The norm of a nonzero vector (x, y) is always positive
 lemma NormPositive(x: real, y: real)
   requires x != 0.0 || y != 0.0
   ensures Sqrt(x * x + y * y) > 0.0
@@ -754,11 +755,117 @@ lemma NormPositive(x: real, y: real)
   SqrtZero(sumsq);
 }
 
-lemma {:axiom} NormBound(x: real, y: real)
+
+// If the product of two numbers is zero, one of them is zero
+lemma MultZero(x: real, y:real)
+  requires x * y == 0.0
+  ensures x == 0.0 || y == 0.0
+{ }
+
+
+// Unicity of square root
+lemma SquareRootUnique(x: real, y: real)
+  requires x >= 0.0 && y >= 0.0
+  requires x * x == y * y
+  ensures x == y
+{
+    if x > 0.0 || y > 0.0 {
+        assert (x + y) * (x - y) == x * x - y * y == 0.0;
+        MultZero(x + y, x - y);
+        assert x + y > 0.0;
+        assert x - y == 0.0;
+        assert x == y;
+    } else {
+        assert x == 0.0 == y;
+    }
+}
+
+// Square root distributes over multiplication
+lemma SqrtMul(x: real, y: real)
+  requires x >= 0.0 && y >= 0.0
+  ensures Sqrt(x * y) == Sqrt(x) * Sqrt(y)
+{
+  assert Sqrt(x * y) * Sqrt(x * y) == x * y;
+  assert Sqrt(x) * Sqrt(x) == x;
+  assert Sqrt(y) * Sqrt(y) == y;
+  assert Sqrt(x) * Sqrt(x) * Sqrt(y) * Sqrt(y) == x * y;
+  assert Sqrt(x) * Sqrt(y) * Sqrt(x) * Sqrt(y) == x * y;
+  SquareRootUnique(Sqrt(x) * Sqrt(y), Sqrt(x * y));
+  assert Sqrt(x) * Sqrt(y) == Sqrt(x * y);
+}
+
+
+// Square root is monotone
+lemma SqrtMonotone(x: real, y: real)
+  requires 0.0 <= x <= y
+  ensures Sqrt(x) <= Sqrt(y)
+{
+  assert (Sqrt(x) + Sqrt(y)) * (Sqrt(x) - Sqrt(y)) == Sqrt(x) * Sqrt(x) - Sqrt(y) * Sqrt(y) == x - y <= 0.0;
+  assert (Sqrt(x) + Sqrt(y)) * (Sqrt(x) - Sqrt(y)) <= 0.0;
+  // The product is negative, so only one of factors must be negative, but the first one is positive
+  assert Sqrt(x) + Sqrt(y) >= 0.0;
+  assert Sqrt(x) - Sqrt(y) <= 0.0;
+}
+
+
+// Sqrt(x * x) == x
+lemma SqrtSquare(x: real)
+  requires x >= 0.0
+  ensures Sqrt(x * x) == x
+{ 
+  calc {
+        Sqrt(x * x);
+    == { SqrtMul(x, x); }
+        Sqrt(x) * Sqrt(x);
+    ==
+        x;
+  }  
+}
+
+// NormBound property particularized for positive x coordinates
+lemma NormBoundAux(x: real, y: real)
+  requires x > 0.0
+  ensures Sqrt(x * x + y * y) > 0.0
+  ensures -1.0 < x * stepSize / Sqrt(x * x + y * y) < 1.0
+{
+  assert y * y >= 0.0;
+  SqrtSquare(x);
+  SqrtMonotone(x * x, x * x + y * y);
+  assert x == Sqrt(x * x) <= Sqrt(x * x + y * y);
+  assert -1.0 <= x / Sqrt(x * x + y * y) <= 1.0;
+  assert -1.0 < x / Sqrt(x * x + y * y) * stepSize <= 1.0 * stepSize < 1.0;
+  assert x * stepSize / Sqrt(x * x + y * y) == x / Sqrt(x * x + y * y) * stepSize;    
+}
+
+
+// In the NextMove method, dx and dx increase or decrease by 1.0 at most
+lemma NormBound(x: real, y: real)
   requires x != 0.0 || y != 0.0
   ensures Sqrt(x * x + y * y) > 0.0
   ensures -1.0 < x * stepSize / Sqrt(x * x + y * y) < 1.0
-// Assumed for the moment, but can be proved
+{
+  NormPositive(x, y);
+  if (x == 0.0) {
+    assert y != 0.0;
+  } else if (x > 0.0) {
+    NormBoundAux(x, y);
+  } else {    
+    var z := -x;
+    NormBoundAux(z, y);
+    assert -1.0 < z * stepSize / Sqrt(z * z + y * y) < 1.0;
+    calc {
+          -1.0 < z * stepSize / Sqrt(z * z + y * y) < 1.0;
+      ==> { assert x * x == z * z; assert x * x + y * y == z * z + y * y; }
+          -1.0 < z * stepSize / Sqrt(x * x + y * y) < 1.0;
+      ==> 
+          -1.0 * -1.0 > -1.0 * z * stepSize / Sqrt(x * x + y * y) > -1.0 * 1.0;
+      ==> 
+          1.0 > -1.0 * z * stepSize / Sqrt(x * x + y * y) > -1.0;
+      ==> { assert x == -1.0 * z; assert -1.0 * z * stepSize / Sqrt(x * x + y * y) == x * stepSize / Sqrt(x * x + y * y); }
+          1.0 > x * stepSize / Sqrt(x * x + y * y) > -1.0;
+    }
+  }
+}
 
 lemma ClosestToInteger(p: OffsetPoint)
   requires p.offset == RealPoint(0.0, 0.0)
