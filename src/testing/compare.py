@@ -191,7 +191,7 @@ class Plotter:
         # Draw the potential as a image omitting infinity
         # (otherwise, the other differences could not be seen)
         # (extent is used to make coordinates be in the corners)
-        self.plt.imshow(potarr, vmax=vmax, extent=(0, potarr.shape[1], potarr.shape[0], 0))
+        self.plt.imshow(potarr, vmax=vmax, extent=(-.5, potarr.shape[1] - .5, potarr.shape[0] - .5, -.5))
         self.plt.colorbar()
 
         # Draw red squares in the infinity
@@ -199,7 +199,7 @@ class Plotter:
 
         for (x, y), value in self.np.ndenumerate(potarr):
             if abs(value) > 1e5:
-                ax.add_patch(self.Rectangle([y, x], 1, 1, edgecolor='red', facecolor='red'))
+                ax.add_patch(self.Rectangle([y - .5, x -.5], 1, 1, edgecolor='red', facecolor='red'))
 
         # Finally, the path
         self.plt.plot(*zip(*path), color=pcolor, marker='o')
@@ -240,7 +240,7 @@ class Plotter:
         for (x, y), value in self.np.ndenumerate(diff):
             if abs(value) > 1e5:
                 color = 'blue' if value < 0.0 else 'aqua'
-                ax.add_patch(self.Rectangle([y, x], 1, 1, edgecolor=color))
+                ax.add_patch(self.Rectangle([y - .5, x - .5], 1, 1, edgecolor=color))
 
         self.draw_paths(path1, path2)
 
@@ -251,7 +251,7 @@ class Plotter:
         
         cm = self.plt.cm.colors.ListedColormap([(x, x, x, 1) for x in self.np.linspace(1, .25, 254 - 50)] + [(1, 0, 0, 1)])
 
-        self.plt.imshow(self.costmap, extent=(0, h, w, 0), cmap=cm)
+        self.plt.imshow(self.costmap, extent=(-.5, h -.5, w - .5, -.5), cmap=cm)
         self.plt.colorbar()
 
     def draw(self, origin, dest, potarr1_raw, potarr2_raw, path1, path2, equal):

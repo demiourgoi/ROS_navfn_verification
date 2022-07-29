@@ -36,20 +36,19 @@ def show_using_numpy(map_full_map_path, w, h, args, lines):
     import numpy as np
     import matplotlib.pyplot as plt
 
-
     costmap = np.fromfile(map_full_map_path, dtype=np.ubyte).reshape((h, w))
-    
+
     # Create a colormap where obstacles and passable cells are gray
     gray_scale = [(f, f, f, 1) for f in np.linspace(1, .25, 254 - 50)]
     cm = plt.cm.colors.ListedColormap(gray_scale + [(1, 0, 0, 1)])
-    
+
     w, h = costmap.shape
-    plt.imshow(costmap, cmap=cm, extent=(0, h, w, 0))
+    plt.imshow(costmap, cmap=cm, extent=(-.5, h - .5, w - .5, -.5))
 
     # Overlay the path if given
     if args.path:
         path = ast.literal_eval(args.path)
-        plt.plot(*zip(*path), color='blue', marker='o')
+        plt.plot(*zip(*path), color=args.path_color, marker='o')
 
         print('Path cost:', calculate_cost(costmap, path))
 
@@ -59,12 +58,15 @@ def show_using_numpy(map_full_map_path, w, h, args, lines):
         cases = [map(int, line.strip().split(' ')) for line in lines[3:]]
 
         for x0, y0, x, y in cases:
-            plt.arrow(x0, y0, x - x0, y - y0, color='blue',
+            plt.arrow(x0, y0, x - x0, y - y0, color=args.path_color,
                       length_includes_head=True, head_width=0.002 * w)
 
     # Add a title to the map if given
     if args.title:
         plt.title(args.title)
+
+    if args.colorbar:
+        plt.colorbar()
 
     # Show or write the result
     if args.o:
@@ -124,6 +126,8 @@ if __name__ == "__main__":
     parser.add_argument('--path', help='Print a path on the map, given a Python list of pairs over (implies --numpy)')
     parser.add_argument('--cases', help='Print the test cases (initial and final pose) on the map (implies --numpy)', action='store_true')
     parser.add_argument('--title', help='Print a title on top of the map')
+    parser.add_argument('--colorbar', help='Add a colorbar to the picture', action='store_true')
+    parser.add_argument('--path-color', help='Color of paths', default='blue')
     parser.add_argument('-o', help='Output the drawing to a file')
 
     show_map(parser.parse_args())
