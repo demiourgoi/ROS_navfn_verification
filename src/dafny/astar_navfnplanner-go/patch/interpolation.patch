@@ -1,0 +1,13 @@
+--- a/astar_navfnplanner-go/src/astar_navfnplanner.go
++++ b/astar_navfnplanner-go/src/astar_navfnplanner.go
+@@ -982,7 +982,8 @@ func (_static *CompanionStruct_Default__
+     _30_d = ((_28_diff).Dtor_r()).DivBy((_27_hf))
+     var _31_interpol _dafny.Real
+     _ = _31_interpol
+-    _31_interpol = ((((_dafny.RealOfString("-2301/10000")).Times((_30_d))).Times((_30_d))).Plus(((_dafny.RealOfString("5307/10000")).Times((_30_d))))).Plus((_dafny.RealOfString("704/1000")))
++    d := _30_d.Float64()
++    _31_interpol = _dafny.RealOf(float32(-0.2301 * d * d + 0.5307 * d + 0.7040));
+     _29_v_k = ((min).Dtor_r()).Plus(((_27_hf).Times((_31_interpol))))
+   }
+   if (Companion_Default___.GreaterThan(((pot).Index((((p).Dtor_pos()).Dtor_row())).(_dafny.Seq)).Index((((p).Dtor_pos()).Dtor_col())).(RealInf), Companion_RealInf_.Create_Real_(_29_v_k))) {
+

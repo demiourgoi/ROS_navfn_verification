@@ -25,7 +25,7 @@ sed -i 's/_System "System_"/_System "astar_navfnplanner\/System_"/g' "$GOSRC/ast
 sed -i 's/import (/import (\n  "math"/g' "$GOSRC/astar_navfnplanner.go"
 
 echo "func (_static *CompanionStruct_Default___) Sqrt(x _dafny.Real) _dafny.Real {
-  return _dafny.RealOf(math.Sqrt(x.Float64()))
+  return _dafny.RealOf(float32(math.Sqrt(x.Float64())))
 }" >> "$GOSRC/astar_navfnplanner.go"
 
 # Define a conversion from dafny.Real to Float64
@@ -36,6 +36,12 @@ echo "func (x Real) Float64() float64 {
 
 # Change dafny.Real to float32
 patch -i astar_navfnplanner-go/patch/realAsfloat32.patch -p 1
+
+# Adjust type conversion in the navigation function interpolation to match C++
+patch -i astar_navfnplanner-go/patch/interpolation.patch -p 1
+
+# Adjust type conversion in the gradient interpolation to match C++
+patch -i astar_navfnplanner-go/patch/gradient.patch -p 1
 
 # Add code to nofify the intermediate state for white-box testing
 # patch -i astar_navfnplanner-go/patch/notifyQueues.patch -p 1

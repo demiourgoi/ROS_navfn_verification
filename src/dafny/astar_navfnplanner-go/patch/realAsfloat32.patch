@@ -8,7 +8,7 @@
    big "math/big"
    refl "reflect"
    "runtime"
-@@ -2119,25 +2120,17 @@ func (Ord) IsNatOrd() bool {
+@@ -2124,25 +2125,17 @@ func (Ord) IsNatOrd() bool {
   ******************************************************************************/
  
  // A Real is an arbitrary-precision real number, represented as a ratio of
@@ -29,17 +29,19 @@
 +  return Real(f32)
  }
  
- // RealOf converts a float64 into a Real.  Common values are cached.
- func RealOf(f float64) Real {
+-// RealOf converts a float64 into a Real.  Common values are cached.
+-func RealOf(f float64) Real {
 -  if f == 0.0 {
 -    return ZeroReal
 -  }
 -  return realOf(new(big.Rat).SetFloat64(f))
-+  return Real(float32(f))
++// RealOf converts a float32 into a Real.  Common values are cached.
++func RealOf(f float32) Real {
++  return Real(f)
  }
  
  // RealOfFrac makes a Real of the ratio of two Ints.
-@@ -2149,14 +2142,14 @@ func RealOfFrac(num, denom Int) Real {
+@@ -2154,14 +2147,14 @@ func RealOfFrac(num, denom Int) Real {
  }
  
  // ZeroReal is the Real value zero.
@@ -57,7 +59,7 @@
  }
  
  // RealOfString parses the given string in base 10 and panics if this is not
-@@ -2166,113 +2159,61 @@ func RealOfString(s string) Real {
+@@ -2171,113 +2164,61 @@ func RealOfString(s string) Real {
    if !ok {
      panic("Can't parse generated string as ratio: \"" + s + "\"")
    }
@@ -191,11 +193,15 @@
  }
  
  // EqualsGeneric compares an int to another value.
-@@ -2601,6 +2542,5 @@ func CatchHalt() {
+@@ -2606,6 +2547,9 @@ func CatchHalt() {
    }
  }
  func (x Real) Float64() float64 {
 -  fp, _ := x.impl.Float64()
 -  return fp
 +  return float64(x)
++}
++
++func (x Real) Float32() float32 {
++  return float32(x)
  }

@@ -16,7 +16,7 @@ def split_xy(n, nx):
 
 def eval2int(frame, expr):
 	"""Evaluate a expression in the given frame as an integer"""
-	return frame.EvaluateExpression(expr).GetValueAsSigned()
+	return frame.EvaluateExpression(expr).signed
 
 
 def eval2float(frame, expr):
@@ -26,7 +26,7 @@ def eval2float(frame, expr):
 
 def eval2bool(frame, expr):
 	"""Evaluate a expression in the given frame as a float"""
-	return frame.EvaluateExpression(expr).GetValueAsSigned() != 0
+	return frame.EvaluateExpression(expr).signed != 0
 
 
 class ROSTracer:
@@ -66,9 +66,11 @@ class ROSTracer:
 		dist = eval2float(frame, 'dist')
 
 		is_below = eval2bool(frame, 'pot < curT')
+		is_interpol = not eval2bool(frame, 'dc >= hf')
 
 		print(split_xy(n, nx), 'is assigned potential', pot - dist, 'at distance', dist,
-		      '(below threshold)' if is_below else '(over threshold)')
+		      '(below threshold)' if is_below else '(over threshold)',
+		      '(interpolation)' if is_interpol else '')
 
 		# Check neighbors in every possible direction
 		for d, v in zip('lrud', (-1, 1, -nx, nx)):

@@ -34,13 +34,13 @@ func printPath(path dafny.Seq) {
 	if has {
 		dx, dy := elem.(RealPoint).Dtor_col(), elem.(RealPoint).Dtor_row()
 
-		fmt.Printf("[%g, %g]", dx.Float64(), dy.Float64())
+		fmt.Printf("[%g, %g]", dx.Float32(), dy.Float32())
 		elem, has := it()
 
 		for has {
 			dx, dy := elem.(RealPoint).Dtor_col(), elem.(RealPoint).Dtor_row()
 
-			fmt.Printf(", [%g, %g]", dx.Float64(), dy.Float64())
+			fmt.Printf(", [%g, %g]", dx.Float32(), dy.Float32())
 			elem, has = it()
 		}
 	}
@@ -51,9 +51,9 @@ func printNavfn(navfn dafny.Seq) {
 		row := navfn.IndexInt(i).(dafny.Seq)
 		for j := 0;  j < row.LenInt(); j++ {
 			value_raw := row.IndexInt(j).(RealInf);
-			value := 1e10
+			value := float32(1e10)
 			if value_raw.Is_Real() {
-				value = value_raw.Dtor_r().Float64()
+				value = value_raw.Dtor_r().Float32()
 			}
 			if i == 0 && j == 0 {
 				fmt.Printf("%g", value)
@@ -127,7 +127,7 @@ func readFile(reader io.Reader, base string, printNavFn bool) (error) {
 			goal := Companion_Pose_.Create_Pose_(Companion_Point_.Create_Point_(dafny.IntOf(positions[3]), dafny.IntOf(positions[2])))
 			costMap := Companion_CostMap_.Create_CostMap_(func (p Point) dafny.Real {
 				index := p.Dtor_col().Int() + p.Dtor_row().Int() * width
-				return dafny.RealOf(float64(int(costmap[index])))
+				return dafny.RealOf(float32(int(costmap[index])))
 			}, dafny.IntOf(height), dafny.IntOf(width))
 			numIterations := dafny.IntOf(Max(width * height / 20, width + height))
 			numPathIterations := dafny.IntOf(4 * width)

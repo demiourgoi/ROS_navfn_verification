@@ -785,11 +785,17 @@ lemma SqrtMul(x: real, y: real)
   requires x >= 0.0 && y >= 0.0
   ensures Sqrt(x * y) == Sqrt(x) * Sqrt(y)
 {
-  assert Sqrt(x * y) * Sqrt(x * y) == x * y;
-  assert Sqrt(x) * Sqrt(x) == x;
-  assert Sqrt(y) * Sqrt(y) == y;
-  assert Sqrt(x) * Sqrt(x) * Sqrt(y) * Sqrt(y) == x * y;
-  assert Sqrt(x) * Sqrt(y) * Sqrt(x) * Sqrt(y) == x * y;
+  calc {
+        Sqrt(x * y) * Sqrt(x * y);
+    ==
+        x * y;
+    == { assert Sqrt(x) * Sqrt(x) == x; }
+        Sqrt(x) * Sqrt(x) * y;
+    == { assert Sqrt(y) * Sqrt(y) == y; }
+        Sqrt(x) * Sqrt(x) * Sqrt(y) * Sqrt(y);
+    ==
+        Sqrt(x) * Sqrt(y) * Sqrt(x) * Sqrt(y);
+  }
   SquareRootUnique(Sqrt(x) * Sqrt(y), Sqrt(x * y));
   assert Sqrt(x) * Sqrt(y) == Sqrt(x * y);
 }
@@ -800,11 +806,18 @@ lemma SqrtMonotone(x: real, y: real)
   requires 0.0 <= x <= y
   ensures Sqrt(x) <= Sqrt(y)
 {
-  assert (Sqrt(x) + Sqrt(y)) * (Sqrt(x) - Sqrt(y)) == Sqrt(x) * Sqrt(x) - Sqrt(y) * Sqrt(y) == x - y <= 0.0;
-  assert (Sqrt(x) + Sqrt(y)) * (Sqrt(x) - Sqrt(y)) <= 0.0;
+  var a := Sqrt(x) + Sqrt(y);
+  var b := Sqrt(x) - Sqrt(y);
+
+  calc {
+       a * b;
+    == Sqrt(x) * Sqrt(x) - Sqrt(y) * Sqrt(y);
+    == x - y;
+    <= 0.0;
+  }
   // The product is negative, so only one of factors must be negative, but the first one is positive
-  assert Sqrt(x) + Sqrt(y) >= 0.0;
-  assert Sqrt(x) - Sqrt(y) <= 0.0;
+  assert a >= 0.0;
+  assert b <= 0.0;
 }
 
 
@@ -822,19 +835,45 @@ lemma SqrtSquare(x: real)
   }  
 }
 
+// The division of a product is the product of a division
+lemma DivisionOfProduct(a: real, b: real, c: real)
+  requires c > 0.0
+  ensures a * b / c == (a / c) * b
+{ }
+
+// Bound above the quotient of two ascending numbers
+lemma QuotientBound(a: real, b: real)
+  requires b > 0.0
+  requires a <= b
+  ensures a / b <= 1.0
+{ }
+
 // NormBound property particularized for positive x coordinates
 lemma NormBoundAux(x: real, y: real)
   requires x > 0.0
   ensures Sqrt(x * x + y * y) > 0.0
-  ensures -1.0 < x * stepSize / Sqrt(x * x + y * y) < 1.0
+  ensures 0.0 <= x * stepSize / Sqrt(x * x + y * y) <= stepSize
 {
-  assert y * y >= 0.0;
-  SqrtSquare(x);
-  SqrtMonotone(x * x, x * x + y * y);
-  assert x == Sqrt(x * x) <= Sqrt(x * x + y * y);
-  assert -1.0 <= x / Sqrt(x * x + y * y) <= 1.0;
-  assert -1.0 < x / Sqrt(x * x + y * y) * stepSize <= 1.0 * stepSize < 1.0;
-  assert x * stepSize / Sqrt(x * x + y * y) == x / Sqrt(x * x + y * y) * stepSize;    
+  var norm := Sqrt(x * x + y * y);
+
+  calc {
+       x;
+    == { SqrtSquare(x); }
+       Sqrt(x * x);
+    <= { assert y * y >= 0.0; SqrtMonotone(x * x, x * x + y * y); }
+       Sqrt(x * x + y * y);
+    ==
+       norm;
+  }
+
+  calc {
+       x * stepSize / norm;
+    == { DivisionOfProduct(x, stepSize, norm); }
+       stepSize * (x / norm);
+    <= { QuotientBound(x, norm); }
+       (1.0) * stepSize;
+    == stepSize;
+  }
 }
 
 
@@ -842,27 +881,24 @@ lemma NormBoundAux(x: real, y: real)
 lemma NormBound(x: real, y: real)
   requires x != 0.0 || y != 0.0
   ensures Sqrt(x * x + y * y) > 0.0
-  ensures -1.0 < x * stepSize / Sqrt(x * x + y * y) < 1.0
+  ensures -stepSize <= x * stepSize / Sqrt(x * x + y * y) <= stepSize
 {
   NormPositive(x, y);
   if (x == 0.0) {
     assert y != 0.0;
   } else if (x > 0.0) {
     NormBoundAux(x, y);
-  } else {    
+  } else {
     var z := -x;
-    NormBoundAux(z, y);
-    assert -1.0 < z * stepSize / Sqrt(z * z + y * y) < 1.0;
+    // The upper bound is straighforward (the sign is enough)
+    assert x * stepSize / Sqrt(x * x + y * y) <= 0.0 <= stepSize;
+    // Lets consider the lower bound
     calc {
-          -1.0 < z * stepSize / Sqrt(z * z + y * y) < 1.0;
-      ==> { assert x * x == z * z; assert x * x + y * y == z * z + y * y; }
-          -1.0 < z * stepSize / Sqrt(x * x + y * y) < 1.0;
-      ==> 
-          -1.0 * -1.0 > -1.0 * z * stepSize / Sqrt(x * x + y * y) > -1.0 * 1.0;
-      ==> 
-          1.0 > -1.0 * z * stepSize / Sqrt(x * x + y * y) > -1.0;
-      ==> { assert x == -1.0 * z; assert -1.0 * z * stepSize / Sqrt(x * x + y * y) == x * stepSize / Sqrt(x * x + y * y); }
-          1.0 > x * stepSize / Sqrt(x * x + y * y) > -1.0;
+         x * stepSize / Sqrt(x * x + y * y);
+      == { assert x * x == z * z; }
+         -z * stepSize / Sqrt(z * z + y * y);
+      >= { NormBoundAux(z, y); }
+         -stepSize;
     }
   }
 }
