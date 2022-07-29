@@ -24,6 +24,10 @@ def eval2float(frame, expr):
 	# Or alternatively .GetData().GetFloat(lldb.SBError(), 0)
 	return float(frame.EvaluateExpression(expr).GetValue())
 
+def eval2uint32(frame, expr):
+	"""Evaluate a expression in the given frame as a uint32"""
+	return frame.EvaluateExpression(expr).GetData().uint32[0]
+
 def eval2bool(frame, expr):
 	"""Evaluate a expression in the given frame as a float"""
 	return frame.EvaluateExpression(expr).signed != 0
@@ -32,9 +36,10 @@ def eval2bool(frame, expr):
 class ROSTracer:
 	"""Trace the intermediate steps of ROS NavFn for debugging"""
 
-	def __init__(self, debugger):
+	def __init__(self, debugger, exact_float=False):
 		self.target = debugger.CreateTarget('profile_cpp_bin_dbg')
 		self.process = None
+		self.exact_float = exact_float
 
 		# Breakpoints
 		self.bp_handlers = {}
@@ -120,8 +125,10 @@ class ROSTracer:
 		index = eval2int(frame, 'i')
 		stc = eval2int(frame, 'stc')
 		nx = eval2int(frame, 'nx')
-		dx = eval2float(frame, 'dx')
-		dy = eval2float(frame, 'dy')
+
+		eval_fn = eval2uint32 if self.exact_float else eval2float
+		dx = eval_fn(frame, 'dx')
+		dy = eval_fn(frame, 'dy')
 
 		print('--- Path step', index, 'at', split_xy(stc, nx), '+', (dx, dy), flush=True)
 
@@ -155,6 +162,7 @@ def main():
 
 	parser = argparse.ArgumentParser(description='Trace the intermediate steps of the ROS NavFn execution')
 	parser.add_argument('test', help='Test file to load')
+	parser.add_argument('--exact-float', help='Show exact float values (as unsigned integers)', action='store_true')
 
 	args = parser.parse_args()
 
@@ -168,7 +176,7 @@ def main():
 	# Make SBProcess.Continue synchronous
 	debugger.SetAsync(False)
 
-	tracer = ROSTracer(debugger)
+	tracer = ROSTracer(debugger, exact_float=args.exact_float)
 	tracer.run(args.test)
 
 	return 0

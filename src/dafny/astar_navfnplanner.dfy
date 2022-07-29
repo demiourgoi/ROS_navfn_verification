@@ -1037,8 +1037,9 @@ method GetGradient(pos: Point, potentialMap: PotentialMap, numRows: nat, numCols
   var norm := Sqrt(gx * gx + gy * gy);
 
   if (norm > 0.0) {
-    gx := gx / norm;
-    gy := gy / norm;
+    norm := 1.0 / norm;
+    gx := gx * norm;
+    gy := gy * norm;
   }
 
   grad := RealPoint(gy, gx);

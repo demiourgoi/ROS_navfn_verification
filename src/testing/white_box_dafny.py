@@ -60,7 +60,7 @@ class DafnyTarget:
 		self.process = None
 
 		# Breakpoints
-		self.case_b = self.target.BreakpointCreateByLocation('astar_navfnplanner.go', 619)
+		self.case_b = self.target.BreakpointCreateByLocation('astar_navfnplanner.go', 694)	# Astar method
 		self.tuple_b = self.target.BreakpointCreateByName('notify_tuple', 'astar_navfnplanner')
 		self.endq_b = self.target.BreakpointCreateByName('end_queue', 'astar_navfnplanner')
 

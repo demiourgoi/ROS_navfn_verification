@@ -231,7 +231,7 @@ class Plotter:
         vmax = diff[support].max()
         vmin = diff[support].min()
 
-        self.plt.imshow(diff, vmin=vmin, vmax=vmax, extent=(0, diff.shape[1], diff.shape[0], 0))
+        self.plt.imshow(diff, vmin=vmin, vmax=vmax, extent=(-.5, diff.shape[1] - .5, diff.shape[0] - .5, -.5))
         self.plt.colorbar()
 
         # Draw red (green) squares in the infinity values of Maude (ROS)

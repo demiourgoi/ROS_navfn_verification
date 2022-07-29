@@ -1,6 +1,6 @@
 --- a/astar_navfnplanner-go/src/astar_navfnplanner.go
 +++ b/astar_navfnplanner-go/src/astar_navfnplanner.go
-@@ -1271,10 +1271,14 @@ func (_static *CompanionStruct_Default__
+@@ -1272,10 +1272,14 @@ func (_static *CompanionStruct_Default__
      _58_gse = _out25
      var _59_x _dafny.Real
      _ = _59_x
