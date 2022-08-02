@@ -1,6 +1,6 @@
 --- a/astar_navfnplanner-go/src/astar_navfnplanner.go
 +++ b/astar_navfnplanner-go/src/astar_navfnplanner.go
-@@ -982,7 +982,8 @@ func (_static *CompanionStruct_Default__
+@@ -985,7 +985,8 @@ func (_static *CompanionStruct_Default__
      _30_d = ((_28_diff).Dtor_r()).DivBy((_27_hf))
      var _31_interpol _dafny.Real
      _ = _31_interpol

@@ -1,0 +1,65 @@
+--- a/src/dafny/astar_navfnplanner-go/src/main.go
++++ b/src/dafny/astar_navfnplanner-go/src/main.go
+@@ -13,6 +13,7 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"io"
++	"math"
+ 	"os"
+ 	"path/filepath"
+ 	"strconv"
+@@ -34,13 +35,13 @@ func printPath(path dafny.Seq) {
+ 	if has {
+ 		dx, dy := elem.(RealPoint).Dtor_col(), elem.(RealPoint).Dtor_row()
+ 
+-		fmt.Printf("[%g, %g]", dx.Float32(), dy.Float32())
++		fmt.Printf("[%d, %d]", math.Float32bits(dx.Float32()), math.Float32bits(dy.Float32()))
+ 		elem, has := it()
+ 
+ 		for has {
+ 			dx, dy := elem.(RealPoint).Dtor_col(), elem.(RealPoint).Dtor_row()
+ 
+-			fmt.Printf(", [%g, %g]", dx.Float32(), dy.Float32())
++			fmt.Printf(", [%d, %d]", math.Float32bits(dx.Float32()), math.Float32bits(dy.Float32()))
+ 			elem, has = it()
+ 		}
+ 	}
+@@ -51,14 +52,14 @@ func printNavfn(navfn dafny.Seq) {
+ 		row := navfn.IndexInt(i).(dafny.Seq)
+ 		for j := 0;  j < row.LenInt(); j++ {
+ 			value_raw := row.IndexInt(j).(RealInf);
+-			value := float32(1e10)
++			value := math.Float32bits(float32(1e10))
+ 			if value_raw.Is_Real() {
+-				value = value_raw.Dtor_r().Float32()
++				value = math.Float32bits(value_raw.Dtor_r().Float32())
+ 			}
+ 			if i == 0 && j == 0 {
+-				fmt.Printf("%g", value)
++				fmt.Printf("%d", value)
+ 			} else {
+-				fmt.Printf(", %g", value)
++				fmt.Printf(", %d", value)
+ 			}
+ 		}
+ 	}
+--- a/src/testing/profile_cpp.cc
++++ b/src/testing/profile_cpp.cc
+@@ -109,7 +109,7 @@ void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn, cons
+ 	     << "\"path\": [";
+ 
+ 	for (size_t i = 0; i < length; i++)
+-		cout << "[" << path[2*i] << ", " << path[2*i+1] << ((i+1 < length) ? "], " : "]");
++		cout << "[" << *reinterpret_cast<uint32_t*>(&path[2*i]) << ", " << *reinterpret_cast<uint32_t*>(&path[2*i+1]) << ((i+1 < length) ? "], " : "]");
+ 
+ 	cout << "]";
+ 
+@@ -120,7 +120,7 @@ void runTest(const CostMap &map, fpnumber* path, int* tcase, NavFn*& navfn, cons
+ 		const size_t mapSize = map.width * map.height;
+ 
+ 		for (size_t i = 0; i < mapSize; i++)
+-			cout << navfn->potarr[i] << ((i+1 < mapSize) ? ", " : "");
++			cout << *reinterpret_cast<uint32_t*>(&navfn->potarr[i]) << ((i+1 < mapSize) ? ", " : "");
+ 
+ 		cout << "]";
+ 	}

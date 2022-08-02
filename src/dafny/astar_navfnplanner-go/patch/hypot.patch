@@ -1,0 +1,20 @@
+--- a/astar_navfnplanner-go/src/astar_navfnplanner.go
++++ b/astar_navfnplanner-go/src/astar_navfnplanner.go
+@@ -668,7 +668,7 @@ func (_static *CompanionStruct_Default__
+   }
+ }
+ func (_static *CompanionStruct_Default___) Hypot(x _dafny.Real, y _dafny.Real) _dafny.Real {
+-  return Companion_Default___.Sqrt(((x).Times((x))).Plus(((y).Times((y)))))
++  return _dafny.RealOf(float32(math.Hypot(x.Float64(), y.Float64())))
+ }
+ func (_static *CompanionStruct_Default___) Open(costMap CostMap, row _dafny.Int, col _dafny.Int) bool {
+   return (((costMap).Dtor_value())(Companion_Point_.Create_Point_(row, col))).Cmp((Companion_Default___.ObstacleCost())) < 0
+@@ -1236,7 +1236,7 @@ func (_static *CompanionStruct_Default__
+   _ = _54_norm
+   _54_norm = Companion_Default___.Hypot(_47_gx, _48_gy)
+   if ((_54_norm).Cmp((_dafny.RealOfString("0"))) > 0) {
+-    _54_norm = (_dafny.RealOfString("1")).DivBy((_54_norm))
++    _54_norm = _dafny.RealOf(float32(1.0 / _54_norm.Float64()))
+     _47_gx = (_47_gx).Times((_54_norm))
+     _48_gy = (_48_gy).Times((_54_norm))
+   }

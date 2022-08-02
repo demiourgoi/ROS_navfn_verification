@@ -43,6 +43,9 @@ patch -i astar_navfnplanner-go/patch/interpolation.patch -p 1
 # Adjust type conversion in the gradient interpolation to match C++
 patch -i astar_navfnplanner-go/patch/gradient.patch -p 1
 
+# Adjust the implementation of Hypot to match C++
+patch -i astar_navfnplanner-go/patch/hypot.patch -p 1
+
 # Add code to nofify the intermediate state for white-box testing
 # patch -i astar_navfnplanner-go/patch/notifyQueues.patch -p 1
 

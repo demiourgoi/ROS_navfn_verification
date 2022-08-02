@@ -149,6 +149,10 @@ function method {:extern} Sqrt(x: real): real
   ensures Sqrt(x) >= 0.0
   ensures Sqrt(x) * Sqrt(x) == x
 
+function method Hypot(x: real, y: real): real {
+  Sqrt(x * x + y * y)
+}
+
 lemma SqrtZero(x: real)
   requires x > 0.0
   ensures Sqrt(x) > 0.0
@@ -725,7 +729,7 @@ lemma MultSameSign(x: real, y: real)
 // The norm of a nonzero vector (x, y) is always positive
 lemma NormPositive(x: real, y: real)
   requires x != 0.0 || y != 0.0
-  ensures Sqrt(x * x + y * y) > 0.0
+  ensures Hypot(x, y) > 0.0
 {
   var sumsq := x * x + y * y;
 
@@ -851,10 +855,10 @@ lemma QuotientBound(a: real, b: real)
 // NormBound property particularized for positive x coordinates
 lemma NormBoundAux(x: real, y: real)
   requires x > 0.0
-  ensures Sqrt(x * x + y * y) > 0.0
-  ensures 0.0 <= x * stepSize / Sqrt(x * x + y * y) <= stepSize
+  ensures Hypot(x, y) > 0.0
+  ensures 0.0 <= x * stepSize / Hypot(x, y) <= stepSize
 {
-  var norm := Sqrt(x * x + y * y);
+  var norm := Hypot(x, y);
 
   calc {
        x;
@@ -880,8 +884,8 @@ lemma NormBoundAux(x: real, y: real)
 // In the NextMove method, dx and dx increase or decrease by 1.0 at most
 lemma NormBound(x: real, y: real)
   requires x != 0.0 || y != 0.0
-  ensures Sqrt(x * x + y * y) > 0.0
-  ensures -stepSize <= x * stepSize / Sqrt(x * x + y * y) <= stepSize
+  ensures Hypot(x, y) > 0.0
+  ensures -stepSize <= x * stepSize / Hypot(x, y) <= stepSize
 {
   NormPositive(x, y);
   if (x == 0.0) {
@@ -891,12 +895,12 @@ lemma NormBound(x: real, y: real)
   } else {
     var z := -x;
     // The upper bound is straighforward (the sign is enough)
-    assert x * stepSize / Sqrt(x * x + y * y) <= 0.0 <= stepSize;
+    assert x * stepSize / Hypot(x, y) <= 0.0 <= stepSize;
     // Lets consider the lower bound
     calc {
-         x * stepSize / Sqrt(x * x + y * y);
+         x * stepSize / Hypot(x, y);
       == { assert x * x == z * z; }
-         -z * stepSize / Sqrt(z * z + y * y);
+         -z * stepSize / Hypot(z, y);
       >= { NormBoundAux(z, y); }
          -stepSize;
     }
@@ -1034,7 +1038,7 @@ method GetGradient(pos: Point, potentialMap: PotentialMap, numRows: nat, numCols
     }
   }
 
-  var norm := Sqrt(gx * gx + gy * gy);
+  var norm := Hypot(gx, gy);
 
   if (norm > 0.0) {
     norm := 1.0 / norm;
@@ -1084,11 +1088,18 @@ method NextMove(p: OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCol
     // (x, y) is not zero
     NormPositive(x, y);
 
-    dx := dx + x * stepSize / Sqrt(x * x + y * y);
-    dy := dy + y * stepSize / Sqrt(x * x + y * y);
+    // Step size multiplier
+    var ss := stepSize / Hypot(x, y);
+
+    dx := dx + x * ss;
+    dy := dy + y * ss;
 
     NormBound(x, y);
     NormBound(y, x);
+
+    assert dx == p.offset.col + x * stepSize / Hypot(x, y);
+    assert dy == p.offset.row + y * stepSize / Hypot(x, y);
+
     assert -2.0 < dx < 2.0;
     assert -2.0 < dy < 2.0;
 
