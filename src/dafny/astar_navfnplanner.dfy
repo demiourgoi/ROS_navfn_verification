@@ -304,7 +304,7 @@ predicate ValidPath(path: Path, costMap: CostMap)
 {
   forall p | p in path :: 
     exists i, j :: 0 <= i < costMap.numRows && 0 <= j < costMap.numCols
-        && p.row - i as real <= 1.0 && p.col - j as real <= 1.0 && Open(costMap, i, j)
+        && -1.0 <= p.row - i as real <= 1.0 && -1.0 <= p.col - j as real <= 1.0 && Open(costMap, i, j)
 }
 
 
@@ -317,7 +317,7 @@ predicate FinitePotentialPath(path: Path, closest: seq<Point>, potentialMap: Pot
   requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
 {
   |path| == |closest|
-  && (forall i | 0 <= i < |path| :: path[i].row - closest[i].row as real <= 1.0 && path[i].col - closest[i].col as real <= 1.0)
+  && (forall i | 0 <= i < |path| :: -1.0 <= path[i].row - closest[i].row as real <= 1.0 && -1.0 <= path[i].col - closest[i].col as real <= 1.0)
   && (forall i | 0 <= i < |closest| :: 0 <= closest[i].row < numRows && 0 <= closest[i].col < numCols && potentialMap[closest[i].row][closest[i].col].Real?)
 }
 
