@@ -881,7 +881,7 @@ lemma NormBoundAux(x: real, y: real)
 }
 
 
-// In the NextMove method, dx and dx increase or decrease by 1.0 at most
+// In the NextMove method {:verify false}, dx and dx increase or decrease by 1.0 at most
 lemma NormBound(x: real, y: real)
   requires x != 0.0 || y != 0.0
   ensures Hypot(x, y) > 0.0
@@ -1118,7 +1118,7 @@ method NextMove(p: OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCol
     closest' := p'.base;
     error := false;
 
-    assert potentialMap[p'.base.row][p'.base.col].Real?;
+    // assert potentialMap[p'.base.row][p'.base.col].Real?;
   } else {
     p' := p;
     closest' := p'.base;
@@ -1144,11 +1144,22 @@ method NextMove(p: OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCol
     if (adjs[min_idx].row < 0 || adjs[min_idx].row >= numRows || adjs[min_idx].col < 0 || adjs[min_idx].col >= numCols ||
       potentialMap[adjs[min_idx].row][adjs[min_idx].col].Infinity?) {
       error :=  true;
+      assert !error ==> closest' == p'.base;
+      assert !error ==> 0 <= closest'.row < numRows && 0 <= closest'.col < numCols;
+      assert !error ==> -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0;
+      assert !error ==> potentialMap[closest'.row][closest'.col].Real?;
     } else {
       error := false;
       p' := OffsetPoint(Point(adjs[min_idx].row, adjs[min_idx].col), RealPoint(0.0, 0.0));
       closest' := p'.base;
-      assert potentialMap[p'.base.row][p'.base.col].Real?;
+      assert !error ==> closest' == p'.base;
+      assert !error ==> 0 <= closest'.row < numRows && 0 <= closest'.col < numCols;
+      assert !error ==> -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0;
+      assert !error ==> potentialMap[closest'.row][closest'.col].Real?;
     }
+    assert !error ==> closest' == p'.base;
+    assert !error ==> 0 <= closest'.row < numRows && 0 <= closest'.col < numCols;
+    assert !error ==> -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0;
+    assert !error ==> potentialMap[closest'.row][closest'.col].Real?;
   }
 }
