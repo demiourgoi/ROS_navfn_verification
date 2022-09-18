@@ -1198,11 +1198,6 @@ lemma PostconditionTriviallyHolds(error: bool, p': OffsetPoint, closest': Point,
   reveal NextMovePostcondition();
 }
 
-ghost method ComputeClosest(p: OffsetPoint, p': OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCols: nat) returns (closest: Point)
-  requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
-  ensures 0 <= closest.row < numRows && 0 <= closest.col < numCols;
-  ensures BelongsToCell(ToRealPoint(p'), closest)
-  ensures potentialMap[closest.row][closest.col].Real?
 
 method ComputeNextAllFree(nx: nat, ny: nat, dx: real, dy: real, potentialMap: PotentialMap, numRows: nat, numCols: nat) returns (p': OffsetPoint, ghost closest: Point)
   requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
