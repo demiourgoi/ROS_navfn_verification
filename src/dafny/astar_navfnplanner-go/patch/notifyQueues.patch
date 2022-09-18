@@ -13,7 +13,7 @@
  import (
    "math"
    _dafny "astar_navfnplanner/dafny"
-@@ -686,6 +692,7 @@ func (_static *CompanionStruct_Default__
+@@ -689,6 +695,7 @@ func (_static *CompanionStruct_Default__
  }
  func (_static *CompanionStruct_Default___) AStar(start Pose, goal Pose, costMap CostMap, numIterations _dafny.Int, numPathIterations _dafny.Int) (bool, _dafny.Seq, _dafny.Seq) {
    var error_ bool = false
@@ -21,7 +21,7 @@
    _ = error_
    var path _dafny.Seq = _dafny.EmptySeq
    _ = path
-@@ -736,9 +743,24 @@ func (_static *CompanionStruct_Default__
+@@ -739,9 +746,24 @@ func (_static *CompanionStruct_Default__
    navfn = _out6
    return navfn
  }

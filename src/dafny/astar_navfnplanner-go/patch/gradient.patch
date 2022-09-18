@@ -1,19 +1,19 @@
 --- a/astar_navfnplanner-go/src/astar_navfnplanner.go
 +++ b/astar_navfnplanner-go/src/astar_navfnplanner.go
-@@ -1275,10 +1275,14 @@ func (_static *CompanionStruct_Default__
-     _58_gse = _out25
-     var _59_x _dafny.Real
-     _ = _59_x
--    _59_x = (((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_row()))).Times(((((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_col()))).Times(((_55_gcenter).Dtor_col()))).Plus(((((p).Dtor_offset()).Dtor_col()).Times(((_56_geast).Dtor_col()))))))).Plus(((((p).Dtor_offset()).Dtor_row()).Times(((((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_col()))).Times(((_57_gsouth).Dtor_col()))).Plus(((((p).Dtor_offset()).Dtor_col()).Times(((_58_gse).Dtor_col()))))))))
-+    x1 := float32((1.0 - p.Dtor_offset().Dtor_col().Float64()) * _55_gcenter.Dtor_col().Float64() + float64(p.Dtor_offset().Dtor_col().Float32() * _56_geast.Dtor_col().Float32()));
-+    x2 := float32((1.0 - p.Dtor_offset().Dtor_col().Float64()) * _57_gsouth.Dtor_col().Float64() + float64(p.Dtor_offset().Dtor_col().Float32() * _58_gse.Dtor_col().Float32()));
-+    _59_x = _dafny.RealOf(float32((1.0 - p.Dtor_offset().Dtor_row().Float64()) * float64(x1) + float64(p.Dtor_offset().Dtor_row().Float32() * x2)));
-     var _60_y _dafny.Real
-     _ = _60_y
--    _60_y = (((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_row()))).Times(((((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_col()))).Times(((_55_gcenter).Dtor_row()))).Plus(((((p).Dtor_offset()).Dtor_col()).Times(((_56_geast).Dtor_row()))))))).Plus(((((p).Dtor_offset()).Dtor_row()).Times(((((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_col()))).Times(((_57_gsouth).Dtor_row()))).Plus(((((p).Dtor_offset()).Dtor_col()).Times(((_58_gse).Dtor_row()))))))))
-+    y1 := float32((1.0 - p.Dtor_offset().Dtor_col().Float64()) * _55_gcenter.Dtor_row().Float64() + float64(p.Dtor_offset().Dtor_col().Float32() * _56_geast.Dtor_row().Float32()));
-+    y2 := float32((1.0 - p.Dtor_offset().Dtor_col().Float64()) * _57_gsouth.Dtor_row().Float64() + float64(p.Dtor_offset().Dtor_col().Float32() * _58_gse.Dtor_row().Float32()));
-+    _60_y = _dafny.RealOf(float32((1.0 - p.Dtor_offset().Dtor_row().Float64()) * float64(y1) + float64(p.Dtor_offset().Dtor_row().Float32() * y2)));
-     if (((_59_x).Cmp((_dafny.RealOfString("0"))) == 0) && ((_60_y).Cmp((_dafny.RealOfString("0"))) == 0)) {
+@@ -1278,10 +1278,14 @@ func (_static *CompanionStruct_Default__
+     _59_gse = _out25
+     var _60_x _dafny.Real
+     _ = _60_x
+-    _60_x = (((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_row()))).Times(((((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_col()))).Times(((_56_gcenter).Dtor_col()))).Plus(((((p).Dtor_offset()).Dtor_col()).Times(((_57_geast).Dtor_col()))))))).Plus(((((p).Dtor_offset()).Dtor_row()).Times(((((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_col()))).Times(((_58_gsouth).Dtor_col()))).Plus(((((p).Dtor_offset()).Dtor_col()).Times(((_59_gse).Dtor_col()))))))))
++    x1 := float32((1.0 - p.Dtor_offset().Dtor_col().Float64()) * _56_gcenter.Dtor_col().Float64() + float64(p.Dtor_offset().Dtor_col().Float32() * _57_geast.Dtor_col().Float32()));
++    x2 := float32((1.0 - p.Dtor_offset().Dtor_col().Float64()) * _58_gsouth.Dtor_col().Float64() + float64(p.Dtor_offset().Dtor_col().Float32() * _59_gse.Dtor_col().Float32()));
++    _60_x = _dafny.RealOf(float32((1.0 - p.Dtor_offset().Dtor_row().Float64()) * float64(x1) + float64(p.Dtor_offset().Dtor_row().Float32() * x2)));
+     var _61_y _dafny.Real
+     _ = _61_y
+-    _61_y = (((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_row()))).Times(((((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_col()))).Times(((_56_gcenter).Dtor_row()))).Plus(((((p).Dtor_offset()).Dtor_col()).Times(((_57_geast).Dtor_row()))))))).Plus(((((p).Dtor_offset()).Dtor_row()).Times(((((_dafny.RealOfString("1")).Minus((((p).Dtor_offset()).Dtor_col()))).Times(((_58_gsouth).Dtor_row()))).Plus(((((p).Dtor_offset()).Dtor_col()).Times(((_59_gse).Dtor_row()))))))))
++    y1 := float32((1.0 - p.Dtor_offset().Dtor_col().Float64()) * _56_gcenter.Dtor_row().Float64() + float64(p.Dtor_offset().Dtor_col().Float32() * _57_geast.Dtor_row().Float32()));
++    y2 := float32((1.0 - p.Dtor_offset().Dtor_col().Float64()) * _58_gsouth.Dtor_row().Float64() + float64(p.Dtor_offset().Dtor_col().Float32() * _59_gse.Dtor_row().Float32()));
++    _61_y = _dafny.RealOf(float32((1.0 - p.Dtor_offset().Dtor_row().Float64()) * float64(y1) + float64(p.Dtor_offset().Dtor_row().Float32() * y2)));
+     if (((_60_x).Cmp((_dafny.RealOfString("0"))) == 0) && ((_61_y).Cmp((_dafny.RealOfString("0"))) == 0)) {
        error_ = true
-       return error_, p_k
+     } else {
