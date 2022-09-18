@@ -304,7 +304,7 @@ predicate ValidPath(path: Path, costMap: CostMap)
 {
   forall p | p in path :: 
     exists i, j :: 0 <= i < costMap.numRows && 0 <= j < costMap.numCols
-        && -1.0 <= p.row - i as real <= 1.0 && -1.0 <= p.col - j as real <= 1.0 && Open(costMap, i, j)
+        && BelongsToCell(p, Point(i, j)) && Open(costMap, i, j)
 }
 
 
@@ -317,7 +317,7 @@ predicate FinitePotentialPath(path: Path, closest: seq<Point>, potentialMap: Pot
   requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
 {
   |path| == |closest|
-  && (forall i | 0 <= i < |path| :: -1.0 <= path[i].row - closest[i].row as real <= 1.0 && -1.0 <= path[i].col - closest[i].col as real <= 1.0)
+  && (forall i | 0 <= i < |path| :: BelongsToCell(path[i], closest[i]))
   && (forall i | 0 <= i < |closest| :: 0 <= closest[i].row < numRows && 0 <= closest[i].col < numCols && potentialMap[closest[i].row][closest[i].col].Real?)
 }
 
@@ -330,15 +330,24 @@ lemma FinitePotentialPathImpliesValidPath(path: Path, closest: seq<Point>, navfn
   requires FinitePotentialPath(path, closest, navfn, costMap.numRows, costMap.numCols)
   ensures ValidPath(path, costMap)
 {
-  // Dafny proves it by itself
+  reveal BelongsToCell();
 }
 
+
+/*
+ * It tells whether a position is contained within the area of a given cell
+ */
+predicate {:opaque} BelongsToCell(p: RealPoint, cell: Point)
+{
+  (-0.5 <= p.row - cell.row as real <= 0.5) && (-0.5 <= p.col - cell.col as real <= 0.5)
+}
 
 /* 
  * ------------------------------------------------------------------------------------
  *                                   NavFn algorithm
  * ------------------------------------------------------------------------------------
  */
+
 
 /*
  * It computes a valid path from 'start' to 'goal' given a cost map and a maximum number of iterations
@@ -372,6 +381,7 @@ method AStar(start: Pose, goal: Pose, costMap: CostMap, numIterations: nat, numP
   }
 }
 
+
 /* 
  * ------------------------------------------------------------------------------------
  *                        Computation of NavFn function
@@ -390,6 +400,7 @@ method ComputeNavFn(start: Pose, goal: Pose, costMap: CostMap, numIterations: na
   requires 0 <= goal.pos.row < costMap.numRows && 0 <= goal.pos.col < costMap.numCols
   requires Open(costMap, goal.pos.row, goal.pos.col)
   ensures PositionSafe(navfn, costMap)
+  ensures Progress(navfn, goal, costMap.numRows, costMap.numCols)
   ensures navfn[goal.pos.row][goal.pos.col].Real?
 {
   var pot: PotentialMap := BuildInitialPotentialMap(costMap.numRows, costMap.numCols, goal.pos.row, goal.pos.col);
@@ -715,7 +726,7 @@ function method ClosestPoint(p: OffsetPoint): Point {
   Point(p.base.row + Round(p.offset.row), p.base.col + Round(p.offset.col))
 }
 
-function method ToRealPoint(p: OffsetPoint): RealPoint {
+function method {:opaque} ToRealPoint(p: OffsetPoint): RealPoint {
   RealPoint(p.base.row as real + p.offset.row, p.base.col as real + p.offset.col)
 }
 
@@ -914,6 +925,9 @@ lemma ClosestToInteger(p: OffsetPoint)
   // Proved automatically
 }
 
+/*
+ * It tells whether all the cells adjacent to a given one have finite potential
+ */
 predicate method AllFree(p: Point, potentialMap: PotentialMap, ghost numRows: nat, ghost numCols: nat)
   requires |potentialMap| == numRows
   requires forall x | x in potentialMap :: |x| == numCols
@@ -924,6 +938,7 @@ predicate method AllFree(p: Point, potentialMap: PotentialMap, ghost numRows: na
     0 < p.row < |potentialMap| - 1 && 0 < p.col < |potentialMap[0]| - 1
     && forall adj | adj in AdjacentOf(p) :: potentialMap[adj.row][adj.col].Real?
 }
+
 
 method ComputePath(start: Point, goal: Point, potentialMap: PotentialMap, numSteps: nat, numRows: nat, numCols: nat)
   returns (error: bool, path: seq<RealPoint>, ghost closest: seq<Point>)
@@ -945,12 +960,24 @@ method ComputePath(start: Point, goal: Point, potentialMap: PotentialMap, numSte
   path := [];
   closest := [];
   error := false;
+
+  assert path == [] ==> ToRealPoint(p) == RealPoint(start.row as real, start.col as real) by {
+    reveal ToRealPoint();
+  }
+
+  assert BelongsToCell(ToRealPoint(p), cl) by {
+    reveal ToRealPoint();
+    reveal BelongsToCell();
+  }
+
   while (i > 0 && !error)
     decreases i
+    invariant !error ==> 0 <= p.base.row < numRows && 0 <= p.base.col < numCols
     invariant !error ==> 0 <= cl.row < numRows && 0 <= cl.col < numCols
     invariant !error ==> -1.0 <= p.offset.row <= 1.0 && -1.0 <= p.offset.col <= 1.0
-    invariant !error ==> cl == p.base
+    invariant !error ==> BelongsToCell(ToRealPoint(p), cl)
     invariant !error ==> potentialMap[p.base.row][p.base.col].Real?
+    invariant !error ==> potentialMap[cl.row][cl.col].Real?
     invariant |path| == |closest|
     invariant path == [] ==> p.base == start && p.offset == RealPoint(0.0, 0.0)
     invariant (if path == [] then ToRealPoint(p) else path[0]) == RealPoint(start.row as real, start.col as real)
@@ -961,7 +988,11 @@ method ComputePath(start: Point, goal: Point, potentialMap: PotentialMap, numSte
     var clpoint := ClosestPoint(p);
     assert path == [] ==> (ClosestToInteger(p); clpoint == start);
     if (clpoint == goal) {
-      path := path + [RealPoint(goal.row as real, goal.col as real)];
+      var lastPoint := RealPoint(goal.row as real, goal.col as real);
+      assert BelongsToCell(lastPoint, goal) by {
+        reveal BelongsToCell();
+      }
+      path := path + [lastPoint];
       closest := closest + [goal];
       error := false;
       return;
@@ -974,12 +1005,14 @@ method ComputePath(start: Point, goal: Point, potentialMap: PotentialMap, numSte
     var oscillation := |path| > 2 && path[|path| - 1] == path[|path| - 3];
 
     error, p, cl := NextMove(p, potentialMap, numRows, numCols, oscillation);
+    reveal NextMovePostcondition();
   }
 
   if (i == 0) {
     error := true;
   }
 }
+
 
 method GetGradient(pos: Point, potentialMap: PotentialMap, numRows: nat, numCols: nat)
   returns (grad : RealPoint)
@@ -1052,14 +1085,12 @@ method GetGradient(pos: Point, potentialMap: PotentialMap, numRows: nat, numCols
 method NextMove(p: OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCols: nat, oscillation: bool)
   returns (error: bool, p': OffsetPoint, ghost closest': Point)
   requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
-  requires 0 <= p.base.row < numRows && 0 <= p.base.col < numCols
-  requires -1.0 <= p.offset.row <= 1.0 && -1.0 <= p.offset.col <= 1.0
-//  requires closest == ClosestPoint(p)
+  requires 0 <= p.base.row < numRows
+  requires 0 <= p.base.col < numCols
+  requires -1.0 <= p.offset.row <= 1.0
+  requires -1.0 <= p.offset.col <= 1.0
   requires potentialMap[p.base.row][p.base.col].Real?
-  ensures !error ==> closest' == p'.base
-  ensures !error ==> 0 <= closest'.row < numRows && 0 <= closest'.col < numCols
-  ensures !error ==> -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0
-  ensures !error ==> potentialMap[closest'.row][closest'.col].Real?
+  ensures NextMovePostcondition(error, p', closest', numRows, numCols, potentialMap)
 {
   if (AllFree(p.base, potentialMap, numRows, numCols) && !oscillation) {
     // Gradient of the neighbor positions
@@ -1077,89 +1108,185 @@ method NextMove(p: OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCol
     // There is no path
     if (x == 0.0 && y == 0.0) {
       error := true;
-      return;
+      PostconditionTriviallyHolds(error, p', closest', numRows, numCols, potentialMap);
+      assert NextMovePostcondition(error, p', closest', numRows, numCols, potentialMap);
+    } else {
+      var nx := p.base.col;
+      var ny := p.base.row;
+      var dx := p.offset.col;
+      var dy := p.offset.row;
+
+      // (x, y) is not zero
+      NormPositive(x, y);
+
+      // Step size multiplier
+      var ss := stepSize / Hypot(x, y);
+
+      dx := dx + x * ss;
+      dy := dy + y * ss;
+
+      NormBound(x, y);
+      NormBound(y, x);
+
+      assert dx == p.offset.col + x * stepSize / Hypot(x, y);
+      assert dy == p.offset.row + y * stepSize / Hypot(x, y);
+
+      assert -1.5 <= dx <= 1.5;
+      assert -1.5 <= dy <= 1.5;
+
+      p', closest' := ComputeNextAllFree(nx, ny, dx, dy, potentialMap, numRows, numCols);
+      error := false;
+
+      assert NextMovePostcondition(error, p', closest', numRows, numCols, potentialMap) by {
+        assert BelongsToCell(ToRealPoint(p'), closest');
+        assert 0 <= closest'.row < numRows && 0 <= closest'.col < numCols;
+        assert -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0;
+        assert potentialMap[closest'.row][closest'.col].Real?;
+        reveal NextMovePostcondition();
+      }
     }
-
-    var nx := p.base.col;
-    var ny := p.base.row;
-    var dx := p.offset.col;
-    var dy := p.offset.row;
-
-    // (x, y) is not zero
-    NormPositive(x, y);
-
-    // Step size multiplier
-    var ss := stepSize / Hypot(x, y);
-
-    dx := dx + x * ss;
-    dy := dy + y * ss;
-
-    NormBound(x, y);
-    NormBound(y, x);
-
-    assert dx == p.offset.col + x * stepSize / Hypot(x, y);
-    assert dy == p.offset.row + y * stepSize / Hypot(x, y);
-
-    assert -2.0 < dx < 2.0;
-    assert -2.0 < dy < 2.0;
-
-    if (AbsReal(dx) > 1.0) {
-      nx := nx + SignReal(dx) as int;
-      dx := dx - SignReal(dx);
-    }
-    if (AbsReal(dy) > 1.0) {
-      ny := ny + SignReal(dy) as int;
-      dy := dy - SignReal(dy);
-    }
-    assert -1.0 <= dx <= 1.0;
-    assert -1.0 <= dy <= 1.0;
-
-    p' := OffsetPoint(Point(ny, nx), RealPoint(dy, dx));
-    closest' := p'.base;
-    error := false;
-
-    // assert potentialMap[p'.base.row][p'.base.col].Real?;
   } else {
     p' := p;
     closest' := p'.base;
 
     var adjs := AdjacentOf(p.base);
-    var i := 0;
-    var min_idx := 0;
+    assert |adjs| > 0;
+    var min_idx := SelectMinimumAmongAllAdjacents(adjs, potentialMap, numRows, numCols);
 
-    while (i < |adjs|)
-      invariant 0 <= i <= |adjs|
-      invariant 0 <= min_idx < |adjs|
-    {
-      if (0 <= adjs[i].row < numRows && 0 <= adjs[i].col < numCols &&
-          0 <= adjs[min_idx].row < numRows && 0 <= adjs[min_idx].col < numCols &&
-          !potentialMap[adjs[i].row][adjs[i].col].Infinity? && (
-             potentialMap[adjs[min_idx].row][adjs[min_idx].col].Infinity? ||
-             potentialMap[adjs[i].row][adjs[i].col].r.Floor < potentialMap[adjs[min_idx].row][adjs[min_idx].col].r.Floor)) {
-        min_idx := i;
-      }
-      i := i + 1;
-    }
 
     if (adjs[min_idx].row < 0 || adjs[min_idx].row >= numRows || adjs[min_idx].col < 0 || adjs[min_idx].col >= numCols ||
       potentialMap[adjs[min_idx].row][adjs[min_idx].col].Infinity?) {
       error :=  true;
-      assert !error ==> closest' == p'.base;
-      assert !error ==> 0 <= closest'.row < numRows && 0 <= closest'.col < numCols;
-      assert !error ==> -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0;
-      assert !error ==> potentialMap[closest'.row][closest'.col].Real?;
+      PostconditionTriviallyHolds(error, p', closest', numRows, numCols, potentialMap);
     } else {
       error := false;
       p' := OffsetPoint(Point(adjs[min_idx].row, adjs[min_idx].col), RealPoint(0.0, 0.0));
       closest' := p'.base;
-      assert !error ==> closest' == p'.base;
-      assert !error ==> 0 <= closest'.row < numRows && 0 <= closest'.col < numCols;
-      assert !error ==> -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0;
-      assert !error ==> potentialMap[closest'.row][closest'.col].Real?;
+      assert NextMovePostcondition(error, p', closest', numRows, numCols, potentialMap) by {
+        assert 0 <= closest'.row < numRows && 0 <= closest'.col < numCols;
+        assert -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0;
+        assert potentialMap[closest'.row][closest'.col].Real?;
+        assert BelongsToCell(ToRealPoint(p'), closest') by {
+          reveal ToRealPoint();
+          reveal BelongsToCell();
+        }
+        reveal NextMovePostcondition();
+      }
     }
-    assert !error ==> closest' == p'.base;
-    assert !error ==> 0 <= closest'.row < numRows && 0 <= closest'.col < numCols;
-    assert !error ==> -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0;
-    assert !error ==> potentialMap[closest'.row][closest'.col].Real?;
+  }
+  assert NextMovePostcondition(error, p', closest', numRows, numCols, potentialMap);
+}
+
+predicate {:opaque} NextMovePostcondition(error: bool, p': OffsetPoint, closest': Point, numRows: nat, numCols: nat, potentialMap: PotentialMap)
+  requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
+{
+    !error ==> 
+      (BelongsToCell(ToRealPoint(p'), closest')
+      && 0 <= closest'.row < numRows && 0 <= closest'.col < numCols
+      && 0 <= p'.base.row < numRows && 0 <= p'.base.col < numCols
+      && -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0
+      && potentialMap[p'.base.row][p'.base.col].Real?
+      && potentialMap[closest'.row][closest'.col].Real?)
+}
+
+
+lemma PostconditionTriviallyHolds(error: bool, p': OffsetPoint, closest': Point, numRows: nat, numCols: nat, potentialMap: PotentialMap)
+  requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
+  requires error == true
+  ensures NextMovePostcondition(error, p', closest', numRows, numCols, potentialMap)
+{ 
+  reveal NextMovePostcondition();
+}
+
+ghost method ComputeClosest(p: OffsetPoint, p': OffsetPoint, potentialMap: PotentialMap, numRows: nat, numCols: nat) returns (closest: Point)
+  requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
+  ensures 0 <= closest.row < numRows && 0 <= closest.col < numCols;
+  ensures BelongsToCell(ToRealPoint(p'), closest)
+  ensures potentialMap[closest.row][closest.col].Real?
+
+method ComputeNextAllFree(nx: nat, ny: nat, dx: real, dy: real, potentialMap: PotentialMap, numRows: nat, numCols: nat) returns (p': OffsetPoint, ghost closest: Point)
+  requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
+  requires 0 < nx < numCols - 1 && 0 < ny < numRows - 1
+  requires -1.5 <= dx <= 1.5
+  requires -1.5 <= dy <= 1.5
+  requires potentialMap[ny][nx].Real?
+  requires AllFree(Point(ny, nx), potentialMap, numRows, numCols)
+  ensures 0 <= closest.row < numRows && 0 <= closest.col < numCols
+  ensures 0 <= p'.base.row < numRows && 0 <= p'.base.col < numCols
+  ensures BelongsToCell(ToRealPoint(p'), closest)
+  ensures -1.0 <= p'.offset.row <= 1.0 && -1.0 <= p'.offset.col <= 1.0
+  ensures potentialMap[closest.row][closest.col].Real?
+  ensures potentialMap[p'.base.row][p'.base.col].Real?
+{
+  var nx', ny': nat;
+  var dx', dy': real;
+  nx' := nx;
+  ny' := ny;
+  dx' := dx;
+  dy' := dy;
+  if (AbsReal(dx) > 1.0) {
+    nx' := nx + SignReal(dx) as int;
+    dx' := dx - SignReal(dx);
+  }
+  if (AbsReal(dy) > 1.0) {
+    ny' := ny + SignReal(dy) as int;
+    dy' := dy - SignReal(dy);
+  }
+
+  assert -1 <= nx' - nx <= 1;
+  assert -1 <= ny' - ny <= 1;
+  
+
+  p' := OffsetPoint(Point(ny', nx'), RealPoint(dy', dx'));
+
+  reveal ToRealPoint();
+  reveal BelongsToCell();
+
+  if (dx' > 0.5) {
+    if (dy' > 0.5) {
+      closest := Point(ny' + 1, nx' + 1);
+    } else if (dy' < -0.5) {
+      closest := Point(ny' - 1, nx' + 1);
+    } else {
+      closest := Point(ny', nx' + 1);
+    }
+  } else if (dx' < -0.5) {
+    if (dy' > 0.5) {
+      closest := Point(ny' + 1, nx' - 1);
+    } else if (dy' < -0.5) {
+      closest := Point(ny' - 1, nx' - 1);
+    } else {
+      closest := Point(ny', nx' - 1);
+    }
+  } else {
+    if (dy' > 0.5) {
+      closest := Point(ny' + 1, nx');
+    } else if (dy' < -0.5) {
+      closest := Point(ny' - 1, nx');
+    } else {
+      closest := Point(ny', nx');
+    }
   }
 }
+
+method SelectMinimumAmongAllAdjacents(adjs: seq<Point>, potentialMap: PotentialMap, numRows: nat, numCols: nat) returns (min_idx: nat)
+  requires PotentialMapHasDimensions(potentialMap, numRows, numCols)
+  requires |adjs| > 0
+  ensures 0 <= min_idx < |adjs|
+{
+  var i := 0;
+  min_idx := 0;
+  while (i < |adjs|)
+    invariant 0 <= i <= |adjs|
+    invariant 0 <= min_idx < |adjs|
+  {
+    if (0 <= adjs[i].row < numRows && 0 <= adjs[i].col < numCols &&
+        0 <= adjs[min_idx].row < numRows && 0 <= adjs[min_idx].col < numCols &&
+        !potentialMap[adjs[i].row][adjs[i].col].Infinity? && (
+            potentialMap[adjs[min_idx].row][adjs[min_idx].col].Infinity? ||
+            potentialMap[adjs[i].row][adjs[i].col].r.Floor < potentialMap[adjs[min_idx].row][adjs[min_idx].col].r.Floor)) {
+      min_idx := i;
+    }
+    i := i + 1;
+  }
+}  
